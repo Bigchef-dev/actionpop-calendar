@@ -41,31 +41,6 @@
         </p>
     </div>
 
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda de Campagne | Rennes</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/icalendar@6.1.10/index.global.min.js"></script>
-    <style>
-        #calendar { background: white; border-radius: 12px; padding: 20px; min-height: 600px; }
-        .fc-event { cursor: pointer; border: none !important; }
-    </style>
-</head>
-<body class="bg-gray-50 p-4 md:p-10">
-
-    <div class="max-w-6xl mx-auto">
-        <header class="mb-8 text-center md:text-left">
-            <h1 class="text-3xl font-black text-blue-900 uppercase italic">Faire Mieux <span class="text-blue-600">Rennes</span></h1>
-            <p class="text-gray-500">Flux synchronisé en temps réel</p>
-        </header>
-
-        <div id="calendar" class="shadow-2xl border border-gray-200"></div>
-    </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var calendarEl = document.getElementById('calendar');
@@ -77,6 +52,7 @@
             }
 
             var calendar = new FullCalendar.Calendar(calendarEl, {
+                plugins: [ FullCalendar.dayGrid.DayGridPlugin, FullCalendar.list.ListView, FullCalendar.iCalendar.ICalendarPlugin ],
                 initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
                 locale: 'fr',
                 headerToolbar: {
@@ -103,7 +79,5 @@
             calendar.render();
         });
     </script>
-</body>
-</html>
 </body>
 </html>
