@@ -3,80 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda de Campagne | Faire Mieux</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Agenda de Campagne | Faire Mieux Rennes</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/icalendar@6.1.10/index.global.min.js"></script>
 
     <style>
-        .fc-toolbar-title { font-size: 1.2rem !important; font-weight: 700; text-transform: capitalize; }
-        .fc-event { border: none !important; border-radius: 4px !important; padding: 2px 5px !important; font-size: 0.85rem !important; cursor: pointer; }
-        #calendar { background: white; border-radius: 1rem; padding: 1.5rem; }
+        :root {
+            --brand-purple: #9750A4;
+            --brand-dark: #4A235A;
+            --brand-orange: #F97316;
+            --fc-button-bg-color: var(--brand-purple);
+            --fc-button-border-color: var(--brand-purple);
+            --fc-button-hover-bg-color: var(--brand-dark);
+            --fc-button-hover-border-color: var(--brand-dark);
+            --fc-button-active-bg-color: var(--brand-dark);
+            --fc-button-active-border-color: var(--brand-dark);
+            --fc-today-bg-color: #f3e8f5;
+        }
+
+        .fc-toolbar-title { font-size: 1.25rem !important; font-weight: 800; text-transform: uppercase; color: var(--brand-dark); }
+        .fc-event { border: none !important; border-radius: 4px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; font-weight: 600; }
+        .fc-event:hover { opacity: 0.9; transform: translateY(-1px); transition: transform 0.2s; }
+        #calendar { background: white; border-radius: 1rem; padding: 1.5rem; border: 1px solid #e7e5e4; min-height: 600px; }
+        .fc-button { text-transform: uppercase; font-size: 0.75rem !important; font-weight: 700 !important; letter-spacing: 0.05em; padding: 0.4em 0.65em !important; }
+        #modalDescription { white-space: pre-wrap; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-stone-50 min-h-screen antialiased font-sans relative">
 
     <div class="max-w-6xl mx-auto px-4 py-10">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 text-center md:text-left">
+        <header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
             <div>
-                <h1 class="text-3xl font-black text-blue-900 uppercase tracking-tighter italic">Faire Mieux <span class="text-blue-600">Rennes</span></h1>
-                <p class="text-gray-500 font-medium">L'agenda centralisé des actions militantes</p>
+                <h1 class="text-3xl md:text-5xl font-black text-[#4A235A] uppercase tracking-tighter leading-none">
+                    FAIRE MIEUX <span class="text-[#F97316]">RENNES</span>
+                </h1>
+                <p class="text-stone-500 font-bold text-sm uppercase tracking-widest mt-2">Agenda des actions militantes</p>
             </div>
+            <div class="flex items-center gap-3 bg-white px-5 py-2 rounded-full shadow-sm border border-stone-200">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#9750A4] opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-[#9750A4]"></span>
+                </span>
+                <span class="text-xs font-black text-[#4A235A] uppercase tracking-wider">Campagne en cours</span>
+            </div>
+        </header>
+
+        <div id="calendar" class="shadow-xl shadow-stone-200/50"></div>
+
+        <div class="mt-16">
+            <h3 class="text-2xl font-black text-[#4A235A] uppercase tracking-tight mb-6 text-center md:text-left">
+                S'abonner aux agendas
+            </h3>
+            <p class="text-stone-500 mb-8 text-center md:text-left">
+                Cliquez sur les boutons ci-dessous pour ajouter ces événements à votre téléphone.
+            </p>
             
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[10px] font-bold uppercase">
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-red-100"><span class="w-3 h-3 rounded-full bg-[#ef4444]"></span> Réunions</div>
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-blue-100"><span class="w-3 h-3 rounded-full bg-[#3b82f6]"></span> Tractage</div>
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-yellow-100"><span class="w-3 h-3 rounded-full bg-[#f59e0b]"></span> Marchés</div>
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-green-100"><span class="w-3 h-3 rounded-full bg-[#10b981]"></span> Collages</div>
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-purple-100"><span class="w-3 h-3 rounded-full bg-[#8b5cf6]"></span> Écoles</div>
-                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-gray-100"><span class="w-3 h-3 rounded-full bg-[#6b7280]"></span> Autre</div>
+            <div id="subscription-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+        </div>
+        
+        <footer class="text-center mt-16 pb-6 border-t border-stone-200 pt-8">
+            <p class="text-xs font-bold text-stone-400 uppercase tracking-widest">Propulsé par Framagenda</p>
+        </footer>
+    </div>
+
+    <div id="eventModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-stone-900 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-2xl font-black text-[#4A235A] uppercase mb-4" id="modalTitle">Titre</h3>
+                    <div class="flex items-center gap-2 text-[#F97316] font-bold mb-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span id="modalTime">Heure</span>
+                    </div>
+                    <div class="flex items-start gap-2 text-stone-600 font-medium mb-4">
+                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span id="modalLocation">Lieu</span>
+                    </div>
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-100 text-sm text-stone-700">
+                        <p id="modalDescription">Description</p>
+                    </div>
+                </div>
+                <div class="bg-stone-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-[#4A235A] text-white font-medium hover:bg-[#371b43] sm:ml-3 sm:w-auto sm:text-sm" onclick="closeModal()">Fermer</button>
+                </div>
             </div>
         </div>
-
-        <div id="calendar" class="shadow-2xl border border-gray-200"></div>
-
-        <p class="mt-6 text-center text-gray-400 text-xs italic">
-            Synchronisation en temps réel via Framagenda. Si un événement n'apparaît pas, rafraîchissez la page.
-        </p>
     </div>
 
     <script>
+        // =================================================================
+        // 🔧 CONFIGURATION : AJOUTE TES AGENDAS ICI
+        // =================================================================
+        const myAgendas = [
+            {
+                name: "Grands événements", 
+                id: "pKQRXPGQFbAmJpXj", 
+                color: "#D50000" // Rouge
+            },
+            {
+                name: "Manifestations & Rassemblements",
+                id: "xAxKp3q8ffee2g2d",
+                color: "#F57C00" // Orange
+            },
+            {
+                name: "Marchés / Tractage",
+                id: "yxmkc7DK7qyxEgnF",
+                color: "#C51162" // Orange
+            },
+            {
+                name: "Porte à portes",
+                id: "Wd8PFNbWxrRqzkmA",
+                color: "#43A047" // Vert
+            },
+            {
+                name: "Collages",
+                id: "dbeQBxs2WtTfY5t7",
+                color: "#546E7A"
+            },
+            {
+                name: "Réunions internes",
+                id: "HAefnJSKLe3qMJqJ",
+                color: "#3949AB" // Bleu
+            },
+        ];
+        // =================================================================
+
+        // Gestion de la modale
+        const modal = document.getElementById('eventModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalTime = document.getElementById('modalTime');
+        const modalLocation = document.getElementById('modalLocation');
+        const modalDescription = document.getElementById('modalDescription');
+
+        function openModal(info) {
+            modalTitle.textContent = info.event.title;
+            const optionsDate = { weekday: 'long', day: 'numeric', month: 'long' };
+            const optionsTime = { hour: '2-digit', minute: '2-digit' };
+            const dateStr = info.event.start.toLocaleDateString('fr-FR', optionsDate);
+            const timeStr = info.event.start.toLocaleTimeString('fr-FR', optionsTime);
+            modalTime.textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1) + ' à ' + timeStr;
+            modalLocation.textContent = info.event.extendedProps.location || "Lieu non précisé";
+            modalDescription.textContent = info.event.extendedProps.description || "Aucune description.";
+            modal.classList.remove('hidden');
+        }
+        function closeModal() { modal.classList.add('hidden'); }
+        document.addEventListener('keydown', (e) => { if(e.key === "Escape") closeModal(); });
+
         document.addEventListener('DOMContentLoaded', function() {
+            // 1. Préparer les sources pour le calendrier
+            const calendarSources = myAgendas.map(agenda => ({
+                url: 'https://corsproxy.io/?' + encodeURIComponent(`https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`),
+                format: 'ics',
+                color: agenda.color
+            }));
+
+            // 2. Initialiser le Calendrier
             var calendarEl = document.getElementById('calendar');
-
-            // Fonction Proxy AllOrigins (plus robuste pour Nextcloud/Framagenda)
-            function getProxyUrl(id) {
-                const target = `https://framagenda.org/remote.php/dav/public-calendars/${id}?export`;
-                return `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`;
-            }
-
             var calendar = new FullCalendar.Calendar(calendarEl, {
-                plugins: [ FullCalendar.dayGrid.DayGridPlugin, FullCalendar.list.ListView, FullCalendar.iCalendar.ICalendarPlugin ],
                 initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
                 locale: 'fr',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,listWeek'
-                },
-                buttonText: { today: 'Aujourd\'hui', month: 'Mois', list: 'Planning' },
-                
-                // On injecte ton ID ici
-                eventSources: [
-                    { 
-                        url: getProxyUrl('jMdS2PGq9Ts9wcb8'), 
-                        color: '#ef4444' // Rouge pour cet agenda
-                    }
-                    // Tu pourras ajouter les 5 autres ici de la même manière
-                ],
-                
-                eventSourceFailure: function(error) {
-                    console.log("Erreur de chargement d'un flux :", error);
+                firstDay: 1,
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+                buttonText: { today: 'Auj.', month: 'Mois', week: 'Semaine', day: 'Jour', list: 'Liste' },
+                slotMinTime: "07:00:00",
+                slotMaxTime: "22:00:00",
+                allDayText: 'Journée',
+                eventSources: calendarSources,
+                eventClick: function(info) {
+                    info.jsEvent.preventDefault();
+                    openModal(info);
                 }
             });
-
             calendar.render();
+
+            // 3. Générer les cartes d'abonnement (avec correction automatique du lien Google)
+            const subContainer = document.getElementById('subscription-container');
+            
+            myAgendas.forEach(agenda => {
+                const appleLink = `webcal://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
+                
+                // C'EST ICI QUE JE REPARE LE LIEN GOOGLE AUTOMATIQUEMENT :
+                const rawLink = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
+                const googleLink = `https://www.google.com/calendar/render?cid=${encodeURIComponent(rawLink)}`;
+
+                const cardHTML = `
+                    <div class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="w-4 h-4 rounded-full" style="background-color: ${agenda.color};"></span>
+                            <h4 class="font-bold text-stone-800 text-lg uppercase">${agenda.name}</h4>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <a href="${appleLink}" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-3 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
+                                🍏 iPhone
+                            </a>
+
+                            <button onclick="navigator.clipboard.writeText('${rawLink}').then(() => { alert('Lien copié dans le presse-papiers !'); })" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-3 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
+                                📋 Copier le lien
+                            </button>
+                        </div>
+                    </div>
+                `;
+                subContainer.innerHTML += cardHTML;
+            });
         });
     </script>
 </body>
