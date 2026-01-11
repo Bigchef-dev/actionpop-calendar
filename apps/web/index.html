@@ -41,39 +41,37 @@
         </p>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var calendarEl = document.getElementById('calendar');
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
 
-            // Fonction pour générer l'URL propre avec le proxy CORS
-            function getProxyUrl(id) {
-                var baseUrl = 'https://framagenda.org/remote.php/dav/public-calendars/' + id + '?export';
-                return 'https://corsproxy.io/?' + encodeURIComponent(baseUrl);
-            }
+        // Nouvelle fonction utilisant AllOrigins pour éviter l'erreur 400
+        function getProxyUrl(id) {
+            var target = 'https://framagenda.org/remote.php/dav/public-calendars/' + id + '?export';
+            return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(target);
+        }
 
-            var calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
-                locale: 'fr',
-                firstDay: 1,
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,listWeek'
-                },
-                buttonText: { today: 'Aujourd\'hui', month: 'Mois', week: 'Semaine', list: 'Planning' },
-                
-                // Remplace ID_FRAMAGENDA_X par tes vrais identifiants
-                eventSources: [
-                    { url: getProxyUrl('jMdS2PGq9Ts9wcb8'), color: '#ef4444' },
-                    { url: getProxyUrl('ID_TRACTAGE'), color: '#3b82f6' },
-                    { url: getProxyUrl('ID_MARCHES'),  color: '#f59e0b' },
-                    { url: getProxyUrl('ID_COLLAGES'), color: '#10b981' },
-                    { url: getProxyUrl('ID_ECOLES'),   color: '#8b5cf6' },
-                    { url: getProxyUrl('ID_AUTRE'),    color: '#6b7280' }
-                ]
-            });
-            calendar.render();
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+            locale: 'fr',
+            firstDay: 1,
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            buttonText: { today: 'Aujourd\'hui', month: 'Mois', week: 'Semaine', list: 'Planning' },
+            
+            eventSources: [
+                // J'ai mis ton premier ID pour tester
+                { url: getProxyUrl('jMdS2PGq9Ts9wcb8'), color: '#ef4444' },
+                /* Ajoute les autres ici :
+                { url: getProxyUrl('ID_2'), color: '#3b82f6' },
+                */
+            ]
         });
-    </script>
+        calendar.render();
+    });
+</script>
 </body>
 </html>
