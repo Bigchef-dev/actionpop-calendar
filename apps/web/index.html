@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda de Campagne | Faire Mieux</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/icalendar@6.1.10/index.global.min.js"></script>
+
+    <style>
+        .fc-toolbar-title { font-size: 1.2rem !important; font-weight: 700; text-transform: capitalize; }
+        .fc-event { border: none !important; border-radius: 4px !important; padding: 2px 5px !important; font-size: 0.85rem !important; cursor: pointer; }
+        #calendar { background: white; border-radius: 1rem; padding: 1.5rem; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div class="max-w-6xl mx-auto px-4 py-10">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 text-center md:text-left">
+            <div>
+                <h1 class="text-3xl font-black text-blue-900 uppercase tracking-tighter italic">Faire Mieux <span class="text-blue-600">Rennes</span></h1>
+                <p class="text-gray-500 font-medium">L'agenda centralisé des actions militantes</p>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-[10px] font-bold uppercase">
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-red-100"><span class="w-3 h-3 rounded-full bg-[#ef4444]"></span> Réunions</div>
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-blue-100"><span class="w-3 h-3 rounded-full bg-[#3b82f6]"></span> Tractage</div>
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-yellow-100"><span class="w-3 h-3 rounded-full bg-[#f59e0b]"></span> Marchés</div>
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-green-100"><span class="w-3 h-3 rounded-full bg-[#10b981]"></span> Collages</div>
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-purple-100"><span class="w-3 h-3 rounded-full bg-[#8b5cf6]"></span> Écoles</div>
+                <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-full shadow-sm border border-gray-100"><span class="w-3 h-3 rounded-full bg-[#6b7280]"></span> Autre</div>
+            </div>
+        </div>
+
+        <div id="calendar" class="shadow-2xl border border-gray-200"></div>
+
+        <p class="mt-6 text-center text-gray-400 text-xs italic">
+            Synchronisation en temps réel via Framagenda. Si un événement n'apparaît pas, rafraîchissez la page.
+        </p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            // Fonction pour générer l'URL propre avec le proxy CORS
+            function getProxyUrl(id) {
+                var baseUrl = 'https://framagenda.org/remote.php/dav/public-calendars/' + id + '?export';
+                return 'https://corsproxy.io/?' + encodeURIComponent(baseUrl);
+            }
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
+                locale: 'fr',
+                firstDay: 1,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                buttonText: { today: 'Aujourd\'hui', month: 'Mois', week: 'Semaine', list: 'Planning' },
+                
+                // Remplace ID_FRAMAGENDA_X par tes vrais identifiants
+                eventSources: [
+                    { url: getProxyUrl('https://framagenda.org/remote.php/dav/public-calendars/jMdS2PGq9Ts9wcb8?export'), color: '#ef4444' },
+                    { url: getProxyUrl('ID_TRACTAGE'), color: '#3b82f6' },
+                    { url: getProxyUrl('ID_MARCHES'),  color: '#f59e0b' },
+                    { url: getProxyUrl('ID_COLLAGES'), color: '#10b981' },
+                    { url: getProxyUrl('ID_ECOLES'),   color: '#8b5cf6' },
+                    { url: getProxyUrl('ID_AUTRE'),    color: '#6b7280' }
+                ]
+            });
+            calendar.render();
+        });
+    </script>
+</body>
+</html>
