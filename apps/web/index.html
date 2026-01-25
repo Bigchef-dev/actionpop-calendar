@@ -130,7 +130,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         // =================================================================
         // CONFIGURATION
         // =================================================================
@@ -145,25 +145,82 @@
             { name: "🔥 Actions jeunes", id: "cfbpr9CXGyB8KDzx", color: "#FAD02E" }
         ];
 
-        let calendarInstance = null; // Référence globale au calendrier
+        // COORDONNÉES DE RENNES (Pour la météo)
+        const CITY_LAT = 48.1173;
+        const CITY_LON = -1.6778;
+
+        let calendarInstance = null;
+        let weatherCache = {}; // Stockage de la météo
 
         // =================================================================
-        // FONCTIONS UTILITAIRES POUR L'EXPORT
+        // 🌦️ MODULE MÉTÉO (LA MASTERCLASS)
         // =================================================================
         
-        // Formatte une date JS en string YYYYMMDDTHHmmSSZ (UTC) pour iCal/Google
+        // 1. Dictionnaire des codes WMO (Codes météo standard) -> Emojis
+        function getWeatherIcon(code) {
+            const icons = {
+                0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', // Clair / Nuageux
+                45: '🌫️', 48: '🌫️', // Brouillard
+                51: '🌦️', 53: '🌦️', 55: '🌧️', // Bruine
+                61: '☂️', 63: '🌧️', 65: '🌧️', // Pluie
+                71: '❄️', 73: '❄️', 75: '❄️', // Neige
+                80: '🌦️', 81: '🌧️', 82: '⛈️', // Averses
+                95: '⛈️', 96: '⛈️', 99: '⛈️'  // Orage
+            };
+            return icons[code] || '🌡️';
+        }
+
+        // 2. Récupération des données Open-Meteo
+        async function fetchWeather() {
+            try {
+                // On demande : code météo, pluie, vent
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${CITY_LAT}&longitude=${CITY_LON}&hourly=weather_code,precipitation,wind_speed_10m&timezone=auto`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // On transforme les tableaux barbares en un objet facile à lire : "2023-10-25T14:00" -> {pluie: 2, vent: 15}
+                data.hourly.time.forEach((time, index) => {
+                    // OpenMeteo renvoie l'heure en format ISO "2023-10-25T14:00"
+                    weatherCache[time] = {
+                        code: data.hourly.weather_code[index],
+                        precip: data.hourly.precipitation[index],
+                        wind: data.hourly.wind_speed_10m[index]
+                    };
+                });
+                console.log("Météo chargée pour Rennes !");
+                // On rafraichit le calendrier pour afficher les icones
+                if(calendarInstance) calendarInstance.render();
+            } catch (e) {
+                console.error("Erreur météo:", e);
+            }
+        }
+
+        // 3. Fonction pour trouver la météo d'une date précise
+        function getWeatherForEvent(dateObj) {
+            // On arrondit l'heure de l'événement à l'heure pile précédente (ex: 14h30 -> 14h00)
+            // Car l'API donne la météo heure par heure
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const hour = String(dateObj.getHours()).padStart(2, '0');
+            
+            const key = `${year}-${month}-${day}T${hour}:00`;
+            return weatherCache[key] || null;
+        }
+
+        // =================================================================
+        // FONCTIONS UTILITAIRES
+        // =================================================================
         function formatToICSDate(date) {
             return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
         }
 
         function generateGoogleCalendarLink(event) {
             const start = formatToICSDate(event.start);
-            let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000)); // +1h par défaut
-            
+            let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000));
             const title = encodeURIComponent(event.title);
             const details = encodeURIComponent(event.extendedProps.description || "");
             const location = encodeURIComponent(event.extendedProps.location || "");
-            
             return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}&sf=true&output=xml`;
         }
 
@@ -171,7 +228,6 @@
             const start = formatToICSDate(event.start);
             let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000));
             const now = formatToICSDate(new Date());
-
             const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//FaireMieuxRennes//Agenda//FR
@@ -185,7 +241,6 @@ DESCRIPTION:${(event.extendedProps.description || '').replace(/\n/g, '\\n')}
 LOCATION:${event.extendedProps.location || ''}
 END:VEVENT
 END:VCALENDAR`;
-
             const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
             const link = document.createElement('a');
             link.href = window.URL.createObjectURL(blob);
@@ -196,19 +251,18 @@ END:VCALENDAR`;
         }
 
         // =================================================================
-        // GESTION DE LA MODALE
+        // GESTION DE LA MODALE (Inchangé)
         // =================================================================
         const modal = document.getElementById('eventModal');
         const modalTitle = document.getElementById('modalTitle');
         const modalTime = document.getElementById('modalTime');
         const modalLocation = document.getElementById('modalLocation');
         const modalDescription = document.getElementById('modalDescription');
-        const modalMapLink = document.getElementById('modalMapLink'); // Récupération du lien Map
+        const modalMapLink = document.getElementById('modalMapLink');
         const btnGoogle = document.getElementById('btnAddToGoogle');
         const btnIcal = document.getElementById('btnAddToIcal');
 
         function openModal(info) {
-            // 1. Titre et Heure
             modalTitle.textContent = info.event.title;
             const optionsDate = { weekday: 'long', day: 'numeric', month: 'long' };
             const optionsTime = { hour: '2-digit', minute: '2-digit' };
@@ -216,72 +270,48 @@ END:VCALENDAR`;
             const timeStr = info.event.start.toLocaleTimeString('fr-FR', optionsTime);
             modalTime.textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1) + ' à ' + timeStr;
             
-            // 2. GESTION DU LIEU ET DE LA CARTE
             const locationRaw = info.event.extendedProps.location;
-            
             if (locationRaw) {
                 modalLocation.textContent = locationRaw;
-                // Génère un lien de recherche universel Google Maps
                 modalMapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationRaw)}`;
-                
-                // Active le style cliquable
                 modalMapLink.style.pointerEvents = "auto";
-                modalMapLink.querySelector('span:last-child').style.display = "inline"; // Affiche "S'y rendre"
+                modalMapLink.querySelector('span:last-child').style.display = "inline";
             } else {
                 modalLocation.textContent = "Lieu non précisé";
                 modalMapLink.href = "#";
-                
-                // Désactive le clic
                 modalMapLink.style.pointerEvents = "none"; 
                 modalMapLink.querySelector('span:last-child').style.display = "none"; 
             }
 
-            // 3. Description
             modalDescription.textContent = info.event.extendedProps.description || "Aucune description.";
-            
-            // 4. Boutons Export
             btnGoogle.href = generateGoogleCalendarLink(info.event);
             btnIcal.onclick = function() { downloadSingleEventICS(info.event); };
-
             modal.classList.remove('hidden');
         }
         function closeModal() { modal.classList.add('hidden'); }
         document.addEventListener('keydown', (e) => { if(e.key === "Escape") closeModal(); });
 
         // =================================================================
-        // GESTION DES SOURCES ET DU CALENDRIER
+        // FULLCALENDAR & SOURCES
         // =================================================================
-
-        // Génère l'URL de la source avec un timestamp pour éviter le cache
         function getSourceConfig(agenda) {
-            // On ajoute _nocache=Date.now() pour forcer le rafraichissement
             const feedUrl = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export&_nocache=${Date.now()}`;
-            // Proxy CORS indispensable
             const proxiedUrl = `https://corsproxy.io/?url=${encodeURIComponent(feedUrl)}`;
-            
-            return {
-                id: agenda.id, // Important pour le filtrage
-                url: proxiedUrl,
-                format: 'ics',
-                color: agenda.color
-            };
+            return { id: agenda.id, url: proxiedUrl, format: 'ics', color: agenda.color };
         }
 
-        // Fonction pour activer/désactiver un agenda
         function toggleSource(agendaId) {
             const btn = document.getElementById(`btn-filter-${agendaId}`);
             const source = calendarInstance.getEventSourceById(agendaId);
             const agendaData = myAgendas.find(a => a.id === agendaId);
 
             if (source) {
-                // Si la source existe, on la supprime (désactivation)
                 source.remove();
                 btn.classList.remove('active');
                 btn.style.backgroundColor = "white";
                 btn.style.color = "#78716c";
                 btn.style.borderColor = "#e7e5e4";
             } else {
-                // Sinon on l'ajoute (activation)
                 calendarInstance.addEventSource(getSourceConfig(agendaData));
                 btn.classList.add('active');
                 btn.style.backgroundColor = agendaData.color;
@@ -291,10 +321,13 @@ END:VCALENDAR`;
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // 1. Initialiser le Calendrier (vide au début, les sources seront ajoutées par les boutons)
+            // 1. Charger la météo immédiatement
+            fetchWeather();
+
+            // 2. Initialiser le Calendrier
             var calendarEl = document.getElementById('calendar');
             calendarInstance = new FullCalendar.Calendar(calendarEl, {
-                initialView: window.innerWidth < 768 ? 'timeGridDay' : 'dayGridWeek',
+                initialView: window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek',
                 locale: 'fr',
                 firstDay: 1,
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek' },
@@ -302,6 +335,46 @@ END:VCALENDAR`;
                 slotMinTime: "07:00:00",
                 slotMaxTime: "22:00:00",
                 allDayText: 'Journée',
+                
+                // C'EST ICI QUE LA MAGIE OPÈRE (Affichage personnalisé)
+                eventContent: function(arg) {
+                    let weatherInfo = "";
+                    const weather = getWeatherForEvent(arg.event.start);
+                    
+                    if (weather) {
+                        const icon = getWeatherIcon(weather.code);
+                        let details = "";
+                        
+                        // Si pluie > 0mm
+                        if (weather.precip > 0) {
+                            details += `<span class="ml-1 text-[10px] bg-blue-100 text-blue-800 px-1 rounded">${weather.precip}mm</span>`;
+                        }
+                        // Si vent > 20km/h
+                        if (weather.wind > 20) {
+                            details += `<span class="ml-1 text-[10px] bg-slate-100 text-slate-600 px-1 rounded">💨${Math.round(weather.wind)}km/h</span>`;
+                        }
+                        
+                        // On affiche l'icone météo seulement si on a de la donnée pertinente (pas juste "clair" sans info) 
+                        // ou on l'affiche tout le temps :
+                        weatherInfo = `<div class="flex items-center mt-1" title="Météo prévue">${icon} ${details}</div>`;
+                    }
+
+                    // Construction du HTML de l'événement
+                    // On recrée le titre et l'heure car eventContent écrase le défaut
+                    let timeText = "";
+                    if (!arg.event.allDay) {
+                         timeText = `<div class="text-xs opacity-90 mb-0.5">${arg.timeText}</div>`;
+                    }
+                    
+                    return { html: `
+                        <div class="p-1 overflow-hidden h-full flex flex-col justify-start">
+                            ${timeText}
+                            <div class="leading-tight text-sm">${arg.event.title}</div>
+                            ${weatherInfo}
+                        </div>
+                    `};
+                },
+                
                 eventClick: function(info) {
                     info.jsEvent.preventDefault();
                     openModal(info);
@@ -309,57 +382,46 @@ END:VCALENDAR`;
             });
             calendarInstance.render();
 
-            // 2. Générer les filtres et charger les agendas par défaut
+            // 3. Générer les filtres et cartes
             const filterContainer = document.getElementById('filters-container');
             const subContainer = document.getElementById('subscription-container');
 
             myAgendas.forEach(agenda => {
-                // A. Création du bouton de filtre
                 const btn = document.createElement('button');
                 btn.id = `btn-filter-${agenda.id}`;
                 btn.className = `filter-btn active border px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide`;
                 btn.textContent = agenda.name;
-                // Style par défaut (actif)
                 btn.style.backgroundColor = agenda.color;
                 btn.style.color = "white";
-                
                 btn.onclick = () => toggleSource(agenda.id);
                 filterContainer.appendChild(btn);
 
-                // B. Ajout de la source au calendrier
                 calendarInstance.addEventSource(getSourceConfig(agenda));
 
-                // C. Création de la carte d'abonnement
                 const rawLink = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
                 const appleLink = `webcal://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
-                
-                // CORRECTION ICI : encodeURIComponent
                 const googleLink = `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(rawLink)}`;
                 
-                const cardHTML = `
+                subContainer.innerHTML += `
                     <div class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition flex flex-col h-full">
                         <div class="flex items-center gap-3 mb-4">
                             <span class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${agenda.color};"></span>
                             <h4 class="font-bold text-stone-800 text-lg uppercase leading-tight">${agenda.name}</h4>
                         </div>
-                        
                         <div class="mt-auto grid grid-cols-1 gap-2">
                             <a href="${googleLink}" target="_blank" class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition group">
                                 <svg class="w-4 h-4 text-stone-500 group-hover:text-[#4285F4] transition-colors" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 2C12.5 2 12.5 2 12.5 2C7 2 2.5 6.5 2.5 12C2.5 17.5 7 22 12.5 22C18 22 22.5 17.5 22.5 12C22.5 6.5 18 2 12.5 2ZM12.5 20C8.1 20 4.5 16.4 4.5 12C4.5 7.6 8.1 4 12.5 4C16.9 4 20.5 7.6 20.5 12C20.5 16.4 16.9 20 12.5 20ZM16.5 13H13.5V16H11.5V13H8.5V11H11.5V8H13.5V11H16.5V13Z"/></svg>
                                 Google Agenda
                             </a>
-
                             <a href="${appleLink}" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
                                 🍏 iPhone / Mac
                             </a>
-
                             <button onclick="navigator.clipboard.writeText('${rawLink}').then(() => { alert('Lien copié ! Collez-le dans Outlook ou autre.'); })" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
                                 📋 Copier lien
                             </button>
                         </div>
                     </div>
                 `;
-                subContainer.innerHTML += cardHTML;
             });
         });
     </script>
