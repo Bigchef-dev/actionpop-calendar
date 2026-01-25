@@ -294,7 +294,7 @@ END:VCALENDAR`;
             // 1. Initialiser le Calendrier (vide au début, les sources seront ajoutées par les boutons)
             var calendarEl = document.getElementById('calendar');
             calendarInstance = new FullCalendar.Calendar(calendarEl, {
-                initialView: window.innerWidth < 768 ? 'dayGridDay' : 'timeGridWeek',
+                initialView: window.innerWidth < 768 ? 'timeGridDay' : 'dayGridWeek',
                 locale: 'fr',
                 firstDay: 1,
                 headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek' },
