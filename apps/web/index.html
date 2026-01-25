@@ -33,12 +33,16 @@
         #calendar { background: white; border-radius: 1rem; padding: 1.5rem; border: 1px solid #e7e5e4; min-height: 600px; }
         .fc-button { text-transform: uppercase; font-size: 0.75rem !important; font-weight: 700 !important; letter-spacing: 0.05em; padding: 0.4em 0.65em !important; }
         #modalDescription { white-space: pre-wrap; }
+        
+        /* Style pour les filtres */
+        .filter-btn { transition: all 0.2s; opacity: 0.5; filter: grayscale(100%); transform: scale(0.98); }
+        .filter-btn.active { opacity: 1; filter: grayscale(0%); transform: scale(1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-color: transparent; }
     </style>
 </head>
 <body class="min-h-screen antialiased font-sans relative bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0]">
 
     <div class="max-w-6xl mx-auto px-4 py-10">
-        <header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+        <header class="flex flex-col md:flex-row justify-between items-end mb-6 gap-6">
             <div>
                 <h1 class="text-3xl md:text-5xl font-black text-[#4A235A] uppercase tracking-tighter leading-none">
                     FAIRE MIEUX <span class="text-[#F97316]">RENNES</span>
@@ -54,6 +58,12 @@
             </div>
         </header>
 
+        <div class="mb-6">
+            <h3 class="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Filtrer l'affichage</h3>
+            <div id="filters-container" class="flex flex-wrap gap-2">
+                </div>
+        </div>
+
         <div id="calendar" class="shadow-xl shadow-stone-200/50"></div>
 
         <div class="mt-16">
@@ -61,15 +71,15 @@
                 S'abonner aux agendas
             </h3>
             <p class="text-stone-500 mb-8 text-center md:text-left">
-                Cliquez sur les boutons ci-dessous pour ajouter ces événements à votre téléphone.
+                Cliquez sur les boutons ci-dessous pour ajouter l'intégralité d'un agenda à votre téléphone.
             </p>
             
             <div id="subscription-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                </div>
+            </div>
         </div>
         
         <footer class="text-center mt-16 pb-6 border-t border-stone-200 pt-8">
-            <p class="text-xs font-bold text-stone-400 uppercase tracking-widest">Propulsé par Framagenda</p>
+            <p class="text-xs font-bold text-stone-400 uppercase tracking-widest">Utilise Framagenda | GT Outils numériques Rennes 2026 | Mathéo, Lily, Amadou</p>
         </footer>
     </div>
 
@@ -79,17 +89,38 @@
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
             <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-2xl font-black text-[#4A235A] uppercase mb-4" id="modalTitle">Titre</h3>
+                    <h3 class="text-2xl font-black text-[#4A235A] uppercase mb-4 leading-tight" id="modalTitle">Titre</h3>
+                    
                     <div class="flex items-center gap-2 text-[#F97316] font-bold mb-3">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span id="modalTime">Heure</span>
                     </div>
-                    <div class="flex items-start gap-2 text-stone-600 font-medium mb-4">
-                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span id="modalLocation">Lieu</span>
+
+                    <div class="flex items-start gap-2 text-stone-600 font-medium mb-4 group">
+                        <svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-stone-400 group-hover:text-[#F97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        
+                        <a id="modalMapLink" href="#" target="_blank" class="hover:text-[#F97316] transition-colors hover:underline decoration-2 underline-offset-2 break-words">
+                            <span id="modalLocation">Lieu</span>
+                            <span class="text-xs text-stone-400 font-normal ml-2 no-underline">↗ S'y rendre</span>
+                        </a>
                     </div>
-                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-100 text-sm text-stone-700">
+
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-100 text-sm text-stone-700 mb-6">
                         <p id="modalDescription">Description</p>
+                    </div>
+
+                    <div class="border-t border-stone-100 pt-4">
+                        <p class="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">Ajouter cet événement (⚠️ Pour mise à jour auto, abonnez-vous en bas de page)</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <a id="btnAddToGoogle" href="#" target="_blank" class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 2C12.5 2 12.5 2 12.5 2C7 2 2.5 6.5 2.5 12C2.5 17.5 7 22 12.5 22C18 22 22.5 17.5 22.5 12C22.5 6.5 18 2 12.5 2ZM12.5 20C8.1 20 4.5 16.4 4.5 12C4.5 7.6 8.1 4 12.5 4C16.9 4 20.5 7.6 20.5 12C20.5 16.4 16.9 20 12.5 20ZM16.5 13H13.5V16H11.5V13H8.5V11H11.5V8H13.5V11H16.5V13Z"/></svg>
+                                Google
+                            </a>
+                            <button id="btnAddToIcal" class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19,4H5A2,2 0 0,0 3,6V18A2,2 0 0,0 5,20H19A2,2 0 0,0 21,18V6A2,2 0 0,0 19,4M19,18H5V8H19V18Z"/></svg>
+                                Apple / Outlook
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-stone-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -101,123 +132,229 @@
 
     <script>
         // =================================================================
-        // 🔧 CONFIGURATION : AJOUTE TES AGENDAS ICI
+        // CONFIGURATION
         // =================================================================
         const myAgendas = [
-            {
-                name: "Grands événements", 
-                id: "pKQRXPGQFbAmJpXj", 
-                color: "#D50000" // Rouge
-            },
-            {
-                name: "Manifestations & Rassemblements",
-                id: "xAxKp3q8ffee2g2d",
-                color: "#F57C00" // Orange
-            },
-            {
-                name: "Marchés / Tractage",
-                id: "yxmkc7DK7qyxEgnF",
-                color: "#C51162" // Orange
-            },
-            {
-                name: "Porte à portes",
-                id: "Wd8PFNbWxrRqzkmA",
-                color: "#43A047" // Vert
-            },
-            {
-                name: "Collages",
-                id: "dbeQBxs2WtTfY5t7",
-                color: "#546E7A"
-            },
-            {
-                name: "Réunions internes",
-                id: "HAefnJSKLe3qMJqJ",
-                color: "#3949AB" // Bleu
-            },
-            {
-                name: "Ecoles",
-                id: "69Yca8fFyGd3S34j",
-                color: "#12d108" // Bleu
-            },
-            {
-                name: "Actions jeunes",
-                id: "cfbpr9CXGyB8KDzx",
-                color: "#FFFF00"
-            }
+            { name: "🌟 Grands événements", id: "pKQRXPGQFbAmJpXj", color: "#D50000" },
+            { name: "📢 Manifestations", id: "xAxKp3q8ffee2g2d", color: "#F57C00" },
+            { name: "🥕 Marchés / Tractage", id: "yxmkc7DK7qyxEgnF", color: "#C51162" },
+            { name: "🚪 Porte à portes", id: "Wd8PFNbWxrRqzkmA", color: "#43A047" },
+            { name: "🖌️ Collages", id: "dbeQBxs2WtTfY5t7", color: "#546E7A" },
+            { name: "🧠 Réunions internes", id: "HAefnJSKLe3qMJqJ", color: "#3949AB" },
+            { name: "🏫 Ecoles", id: "69Yca8fFyGd3S34j", color: "#12d108" },
+            { name: "🔥 Actions jeunes", id: "cfbpr9CXGyB8KDzx", color: "#FAD02E" }
         ];
-        // =================================================================
 
-        // Gestion de la modale
+        let calendarInstance = null; // Référence globale au calendrier
+
+        // =================================================================
+        // FONCTIONS UTILITAIRES POUR L'EXPORT
+        // =================================================================
+        
+        // Formatte une date JS en string YYYYMMDDTHHmmSSZ (UTC) pour iCal/Google
+        function formatToICSDate(date) {
+            return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+        }
+
+        function generateGoogleCalendarLink(event) {
+            const start = formatToICSDate(event.start);
+            let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000)); // +1h par défaut
+            
+            const title = encodeURIComponent(event.title);
+            const details = encodeURIComponent(event.extendedProps.description || "");
+            const location = encodeURIComponent(event.extendedProps.location || "");
+            
+            return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}&sf=true&output=xml`;
+        }
+
+        function downloadSingleEventICS(event) {
+            const start = formatToICSDate(event.start);
+            let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000));
+            const now = formatToICSDate(new Date());
+
+            const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//FaireMieuxRennes//Agenda//FR
+BEGIN:VEVENT
+UID:${event.id || 'uid-' + Date.now()}@fairemieuxrennes
+DTSTAMP:${now}
+DTSTART:${start}
+DTEND:${end}
+SUMMARY:${event.title}
+DESCRIPTION:${(event.extendedProps.description || '').replace(/\n/g, '\\n')}
+LOCATION:${event.extendedProps.location || ''}
+END:VEVENT
+END:VCALENDAR`;
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', 'evenement.ics');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // =================================================================
+        // GESTION DE LA MODALE
+        // =================================================================
         const modal = document.getElementById('eventModal');
         const modalTitle = document.getElementById('modalTitle');
         const modalTime = document.getElementById('modalTime');
         const modalLocation = document.getElementById('modalLocation');
         const modalDescription = document.getElementById('modalDescription');
+        const modalMapLink = document.getElementById('modalMapLink'); // Récupération du lien Map
+        const btnGoogle = document.getElementById('btnAddToGoogle');
+        const btnIcal = document.getElementById('btnAddToIcal');
 
         function openModal(info) {
+            // 1. Titre et Heure
             modalTitle.textContent = info.event.title;
             const optionsDate = { weekday: 'long', day: 'numeric', month: 'long' };
             const optionsTime = { hour: '2-digit', minute: '2-digit' };
             const dateStr = info.event.start.toLocaleDateString('fr-FR', optionsDate);
             const timeStr = info.event.start.toLocaleTimeString('fr-FR', optionsTime);
             modalTime.textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1) + ' à ' + timeStr;
-            modalLocation.textContent = info.event.extendedProps.location || "Lieu non précisé";
+            
+            // 2. GESTION DU LIEU ET DE LA CARTE
+            const locationRaw = info.event.extendedProps.location;
+            
+            if (locationRaw) {
+                modalLocation.textContent = locationRaw;
+                // Génère un lien de recherche universel Google Maps
+                modalMapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationRaw)}`;
+                
+                // Active le style cliquable
+                modalMapLink.style.pointerEvents = "auto";
+                modalMapLink.querySelector('span:last-child').style.display = "inline"; // Affiche "S'y rendre"
+            } else {
+                modalLocation.textContent = "Lieu non précisé";
+                modalMapLink.href = "#";
+                
+                // Désactive le clic
+                modalMapLink.style.pointerEvents = "none"; 
+                modalMapLink.querySelector('span:last-child').style.display = "none"; 
+            }
+
+            // 3. Description
             modalDescription.textContent = info.event.extendedProps.description || "Aucune description.";
+            
+            // 4. Boutons Export
+            btnGoogle.href = generateGoogleCalendarLink(info.event);
+            btnIcal.onclick = function() { downloadSingleEventICS(info.event); };
+
             modal.classList.remove('hidden');
         }
         function closeModal() { modal.classList.add('hidden'); }
         document.addEventListener('keydown', (e) => { if(e.key === "Escape") closeModal(); });
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // 1. Préparer les sources pour le calendrier
-            const calendarSources = myAgendas.map(agenda => ({
-                url: 'https://corsproxy.io/?headers[]=cache-control:no-cache&url=' + encodeURIComponent(`https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`),
+        // =================================================================
+        // GESTION DES SOURCES ET DU CALENDRIER
+        // =================================================================
+
+        // Génère l'URL de la source avec un timestamp pour éviter le cache
+        function getSourceConfig(agenda) {
+            // On ajoute _nocache=Date.now() pour forcer le rafraichissement
+            const feedUrl = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export&_nocache=${Date.now()}`;
+            // Proxy CORS indispensable
+            const proxiedUrl = `https://corsproxy.io/?url=${encodeURIComponent(feedUrl)}`;
+            
+            return {
+                id: agenda.id, // Important pour le filtrage
+                url: proxiedUrl,
                 format: 'ics',
                 color: agenda.color
-            }));
+            };
+        }
 
-            // 2. Initialiser le Calendrier
+        // Fonction pour activer/désactiver un agenda
+        function toggleSource(agendaId) {
+            const btn = document.getElementById(`btn-filter-${agendaId}`);
+            const source = calendarInstance.getEventSourceById(agendaId);
+            const agendaData = myAgendas.find(a => a.id === agendaId);
+
+            if (source) {
+                // Si la source existe, on la supprime (désactivation)
+                source.remove();
+                btn.classList.remove('active');
+                btn.style.backgroundColor = "white";
+                btn.style.color = "#78716c";
+                btn.style.borderColor = "#e7e5e4";
+            } else {
+                // Sinon on l'ajoute (activation)
+                calendarInstance.addEventSource(getSourceConfig(agendaData));
+                btn.classList.add('active');
+                btn.style.backgroundColor = agendaData.color;
+                btn.style.color = "white";
+                btn.style.borderColor = agendaData.color;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Initialiser le Calendrier (vide au début, les sources seront ajoutées par les boutons)
             var calendarEl = document.getElementById('calendar');
-            var calendar = new FullCalendar.Calendar(calendarEl, {
+            calendarInstance = new FullCalendar.Calendar(calendarEl, {
                 initialView: window.innerWidth < 768 ? 'listWeek' : 'timeGridWeek',
                 locale: 'fr',
                 firstDay: 1,
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek' },
                 buttonText: { today: 'Auj.', month: 'Mois', week: 'Semaine', day: 'Jour', list: 'Liste' },
                 slotMinTime: "07:00:00",
                 slotMaxTime: "22:00:00",
                 allDayText: 'Journée',
-                eventSources: calendarSources,
                 eventClick: function(info) {
                     info.jsEvent.preventDefault();
                     openModal(info);
                 }
             });
-            calendar.render();
+            calendarInstance.render();
 
-            // 3. Générer les cartes d'abonnement (avec correction automatique du lien Google)
+            // 2. Générer les filtres et charger les agendas par défaut
+            const filterContainer = document.getElementById('filters-container');
             const subContainer = document.getElementById('subscription-container');
-            
+
             myAgendas.forEach(agenda => {
+                // A. Création du bouton de filtre
+                const btn = document.createElement('button');
+                btn.id = `btn-filter-${agenda.id}`;
+                btn.className = `filter-btn active border px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide`;
+                btn.textContent = agenda.name;
+                // Style par défaut (actif)
+                btn.style.backgroundColor = agenda.color;
+                btn.style.color = "white";
+                
+                btn.onclick = () => toggleSource(agenda.id);
+                filterContainer.appendChild(btn);
+
+                // B. Ajout de la source au calendrier
+                calendarInstance.addEventSource(getSourceConfig(agenda));
+
+                // C. Création de la carte d'abonnement
+                const rawLink = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
                 const appleLink = `webcal://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
                 
-                // C'EST ICI QUE JE REPARE LE LIEN GOOGLE AUTOMATIQUEMENT :
-                const rawLink = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
-                const googleLink = `https://www.google.com/calendar/render?cid=${encodeURIComponent(rawLink)}`;
-
+                // CORRECTION ICI : encodeURIComponent
+                const googleLink = `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(rawLink)}`;
+                
                 const cardHTML = `
-                    <div class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition">
+                    <div class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition flex flex-col h-full">
                         <div class="flex items-center gap-3 mb-4">
-                            <span class="w-4 h-4 rounded-full" style="background-color: ${agenda.color};"></span>
-                            <h4 class="font-bold text-stone-800 text-lg uppercase">${agenda.name}</h4>
+                            <span class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${agenda.color};"></span>
+                            <h4 class="font-bold text-stone-800 text-lg uppercase leading-tight">${agenda.name}</h4>
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <a href="${appleLink}" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-3 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
-                                🍏 iPhone
+                        
+                        <div class="mt-auto grid grid-cols-1 gap-2">
+                            <a href="${googleLink}" target="_blank" class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition group">
+                                <svg class="w-4 h-4 text-stone-500 group-hover:text-[#4285F4] transition-colors" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 2C12.5 2 12.5 2 12.5 2C7 2 2.5 6.5 2.5 12C2.5 17.5 7 22 12.5 22C18 22 22.5 17.5 22.5 12C22.5 6.5 18 2 12.5 2ZM12.5 20C8.1 20 4.5 16.4 4.5 12C4.5 7.6 8.1 4 12.5 4C16.9 4 20.5 7.6 20.5 12C20.5 16.4 16.9 20 12.5 20ZM16.5 13H13.5V16H11.5V13H8.5V11H11.5V8H13.5V11H16.5V13Z"/></svg>
+                                Google Agenda
                             </a>
 
-                            <button onclick="navigator.clipboard.writeText('${rawLink}').then(() => { alert('Lien copié dans le presse-papiers !'); })" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-3 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
-                                📋 Copier le lien
+                            <a href="${appleLink}" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
+                                🍏 iPhone / Mac
+                            </a>
+
+                            <button onclick="navigator.clipboard.writeText('${rawLink}').then(() => { alert('Lien copié ! Collez-le dans Outlook ou autre.'); })" class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition">
+                                📋 Copier lien
                             </button>
                         </div>
                     </div>
