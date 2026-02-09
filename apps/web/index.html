@@ -295,9 +295,9 @@ END:VCALENDAR`;
         // FULLCALENDAR & SOURCES
         // =================================================================
         function getSourceConfig(agenda) {
-            const feedUrl = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export&_nocache=${Date.now()}`;
+            const feedUrl = `https://cloud.lfirennes.fun/remote.php/dav/public-calendars/${agenda.id}?export&_nocache=${Date.now()}`;
             const proxiedUrl = `https://corsproxy.io/?key=1aae6667&url=${encodeURIComponent(feedUrl)}`;
-            return { id: agenda.id, url: proxiedUrl, format: 'ics', color: agenda.color };
+            return { id: agenda.id, url: feedUrl, format: 'ics', color: agenda.color };
         }
 
         function toggleSource(agendaId) {
