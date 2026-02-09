@@ -142,7 +142,7 @@
             { name: "🖌️ Collages", id: "dbeQBxs2WtTfY5t7", color: "#546E7A" },
             { name: "🧠 Réunions internes", id: "HAefnJSKLe3qMJqJ", color: "#3949AB" },
             { name: "🏫 Ecoles", id: "69Yca8fFyGd3S34j", color: "#12d108" },
-            { name: "🔥 Actions jeunes", id: "cfbpr9CXGyB8KDzx", color: "#FAD02E" }
+            { name: "🔥 Actions jeunes", id: "dZfyNGEkfBMi5yB9", color: "#FAD02E" }
         ];
 
         // COORDONNÉES DE RENNES (Pour la météo)
@@ -398,8 +398,8 @@ END:VCALENDAR`;
 
                 calendarInstance.addEventSource(getSourceConfig(agenda));
 
-                const rawLink = `https://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
-                const appleLink = `webcal://framagenda.org/remote.php/dav/public-calendars/${agenda.id}?export`;
+                const rawLink = `https://cloud.lfirennes.fun/remote.php/dav/public-calendars/${agenda.id}?export`;
+                const appleLink = `webcal://cloud.lfirennes.fun/remote.php/dav/public-calendars/public-calendars/${agenda.id}?export`;
                 const googleLink = `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(rawLink)}`;
                 
                 subContainer.innerHTML += `
