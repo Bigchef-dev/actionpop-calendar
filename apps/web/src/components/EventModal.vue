@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ModalEvent } from '../types'
+import { getWeatherForEvent } from '../composables/useWeather'
+import StatusBadge from './StatusBadge.vue'
+import WeatherBadge from './WeatherBadge.vue'
 
 const props = defineProps<{ event: ModalEvent | null }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -40,6 +43,10 @@ const mapsLink = computed(() => {
   const loc = props.event?.extendedProps.location
   return loc ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` : '#'
 })
+
+const weather = computed(() =>
+  props.event?.start && !props.event.allDay ? getWeatherForEvent(props.event.start) : null,
+)
 
 function downloadICS(): void {
   if (!props.event) return
@@ -100,22 +107,10 @@ function downloadICS(): void {
             <h3 class="text-2xl font-black text-[#4A235A] dark:text-[#e7d9ec] uppercase mb-2 leading-tight">
               {{ event.title }}
             </h3>
-
+            
             <!-- Badge statut -->
-            <div
-              v-if="event.extendedProps.status !== 'CONFIRMED'"
-              class="mb-3 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black uppercase"
-              :class="
-                event.extendedProps.status === 'TENTATIVE'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-700'
-              "
-            >
-              {{
-                event.extendedProps.status === 'TENTATIVE'
-                  ? '⚠️ Événement provisoire'
-                  : '✗ Événement annulé'
-              }}
+            <div v-if="event.extendedProps.status !== 'CONFIRMED'" class="mb-3">
+              <StatusBadge :status="event.extendedProps.status" />
             </div>
 
             <!-- Heure -->
@@ -124,6 +119,11 @@ function downloadICS(): void {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{{ dateTimeStr }}</span>
+            </div>
+
+            <!-- Météo -->
+            <div v-if="weather" class="flex items-center gap-2 mb-3">
+              <WeatherBadge :weather="weather" />
             </div>
 
             <!-- Lieu -->
