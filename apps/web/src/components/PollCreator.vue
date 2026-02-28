@@ -131,7 +131,8 @@ watch(calEvents, (newEvents) => {
 })
 
 function addItem() {
-  items.value.push({
+  // Insérer avant la fin
+  const newItem: PollItem = {
     key: keySeq++,
     checked: true,
     emoji: '📅',
@@ -140,12 +141,51 @@ function addItem() {
     referents: '',
     color: '',
     showEmojiPicker: false,
-  })
+  }
+  items.value.splice(items.value.length - 1, 0, newItem)
 }
 
 function removeItem(key: number) {
   items.value = items.value.filter((i) => i.key !== key)
   autoKeys.delete(key)
+}
+
+// ------------------------------------------------------------
+// Drag-and-drop reorder
+// ------------------------------------------------------------
+const draggingKey = ref<number | null>(null)
+const dragOverKey = ref<number | null>(null)
+
+function onDragStart(e: DragEvent, key: number) {
+  draggingKey.value = key
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(key))
+  }
+}
+
+function onDragOver(e: DragEvent, key: number) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  dragOverKey.value = key
+}
+
+function onDrop(key: number) {
+  if (draggingKey.value === null || draggingKey.value === key) return
+  const arr = [...items.value]
+  const from = arr.findIndex((i) => i.key === draggingKey.value)
+  const to = arr.findIndex((i) => i.key === key)
+  if (from === -1 || to === -1) return
+  const [item] = arr.splice(from, 1)
+  arr.splice(to, 0, item)
+  items.value = arr
+  draggingKey.value = null
+  dragOverKey.value = null
+}
+
+function onDragEnd() {
+  draggingKey.value = null
+  dragOverKey.value = null
 }
 
 function pickEmoji(item: PollItem, emoji: string) {
@@ -368,16 +408,34 @@ async function sendPoll() {
           <div
             v-for="item in items"
             :key="item.key"
+            draggable="true"
+            @dragstart="onDragStart($event, item.key)"
+            @dragover="onDragOver($event, item.key)"
+            @drop="onDrop(item.key)"
+            @dragend="onDragEnd"
             class="flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors"
-            :class="item.checked
-              ? 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700'
-              : 'bg-stone-50 dark:bg-stone-900 border-stone-200 dark:border-stone-800 opacity-60'"
+            :class="[
+              item.checked
+                ? 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700'
+                : 'bg-stone-50 dark:bg-stone-900 border-stone-200 dark:border-stone-800 opacity-60',
+              dragOverKey === item.key && draggingKey !== item.key
+                ? 'border-violet-400 dark:border-violet-500 ring-1 ring-violet-300'
+                : '',
+              draggingKey === item.key ? 'opacity-40' : ''
+            ]"
           >
+            <!-- Drag handle -->
+            <span
+              class="shrink-0 cursor-grab active:cursor-grabbing text-stone-300 dark:text-stone-600 select-none text-base leading-none"
+              title="Réordonner"
+            >⠇</span>
+
             <!-- Checkbox -->
             <input
               type="checkbox"
               v-model="item.checked"
               class="accent-violet-600 w-4 h-4 shrink-0 cursor-pointer"
+              @dragstart.prevent
             />
 
             <!-- Emoji picker trigger -->
