@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { ModalEvent } from '../types'
 import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'
@@ -49,6 +49,15 @@ const weather = computed(() =>
     ? getWeatherForEventRange(props.event.start, props.event.end ?? null)
     : null,
 )
+
+const copied = ref(false)
+
+function copyLink(): void {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  })
+}
 
 function downloadICS(): void {
   if (!props.event) return
@@ -158,7 +167,7 @@ function downloadICS(): void {
               <p class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-3">
                 Ajouter cet événement (⚠️ Pour mise à jour auto, abonnez-vous en bas de page)
               </p>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-2 gap-3 mb-3">
                 <a
                   :href="googleLink"
                   target="_blank"
@@ -179,6 +188,20 @@ function downloadICS(): void {
                   Apple / Outlook
                 </button>
               </div>
+              <!-- Bouton partage événement -->
+              <button
+                class="w-full flex items-center justify-center gap-2 border py-2 rounded-lg font-bold text-xs uppercase transition"
+                :class="copied
+                  ? 'bg-green-50 dark:bg-green-900/30 border-green-400 text-green-700 dark:text-green-400'
+                  : 'bg-white dark:bg-stone-800 border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700'"
+                @click="copyLink"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path v-if="!copied" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                {{ copied ? 'Lien copié !' : 'Copier le lien vers cet événement' }}
+              </button>
             </div>
           </div>
 

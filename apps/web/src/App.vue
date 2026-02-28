@@ -8,16 +8,33 @@ import SubscriptionGrid from './components/SubscriptionGrid.vue'
 import { AGENDAS } from './config'
 import { fetchWeather } from './composables/useWeather'
 import { useDarkMode } from './composables/useDarkMode'
+import { parseHash, updateHash, removeHashParam } from './composables/useUrlState'
 import type { ModalEvent } from './types'
 
 const { isDark, toggle } = useDarkMode()
 
 const calendarRef = ref<InstanceType<typeof CalendarView> | null>(null)
 
+// --- URL state bootstrap ---
+const urlState = parseHash()
+
+const ALL_IDS = new Set(AGENDAS.map((a) => a.id))
+
+function decodeActiveIds(raw: string | undefined): Set<string> {
+  if (!raw) return new Set(ALL_IDS)
+  const ids = raw.split(',').filter((id) => ALL_IDS.has(id))
+  return ids.length ? new Set(ids) : new Set(ALL_IDS)
+}
+
 // Reactive Set — replaced on mutation to trigger Vue reactivity
-const activeIds = ref<Set<string>>(new Set(AGENDAS.map((a) => a.id)))
+const activeIds = ref<Set<string>>(decodeActiveIds(urlState.a))
 
 const selectedEvent = ref<ModalEvent | null>(null)
+
+// Props that seed FullCalendar's initial state (read-only after mount)
+const initialView = urlState.v ?? undefined
+const initialDate = urlState.d ?? undefined
+const targetEventId = ref<string>(urlState.e ?? '')
 
 function onToggle(id: string): void {
   const next = new Set(activeIds.value)
@@ -29,9 +46,34 @@ function onToggle(id: string): void {
     calendarRef.value?.toggleSource(id, true)
   }
   activeIds.value = next
+  // Encode only when not all active (keeps URL clean by default)
+  const isAll = AGENDAS.every((a) => next.has(a.id))
+  updateHash({ a: isAll ? undefined : [...next].join(',') })
+}
+
+function onDatesChange(payload: { view: string; date: string }): void {
+  updateHash({ v: payload.view, d: payload.date })
+}
+
+function onEventClick(event: ModalEvent): void {
+  selectedEvent.value = event
+  updateHash({ e: event.id })
+}
+
+function onModalClose(): void {
+  selectedEvent.value = null
+  targetEventId.value = ''
+  removeHashParam('e')
 }
 
 onMounted(async () => {
+  // Disable agenda sources that are not in the URL-restored activeIds
+  const restoredIds = activeIds.value
+  for (const agenda of AGENDAS) {
+    if (!restoredIds.has(agenda.id)) {
+      calendarRef.value?.toggleSource(agenda.id, false)
+    }
+  }
   try {
     await fetchWeather()
     calendarRef.value?.refreshRender()
@@ -46,7 +88,15 @@ onMounted(async () => {
     <div class="max-w-6xl mx-auto px-4 py-10">
       <AppHeader :is-dark="isDark" @toggle-dark="toggle" />
       <FilterBar :agendas="AGENDAS" :active-ids="activeIds" @toggle="onToggle" />
-      <CalendarView ref="calendarRef" :agendas="AGENDAS" @event-click="selectedEvent = $event" />
+      <CalendarView
+        ref="calendarRef"
+        :agendas="AGENDAS"
+        :initial-view="initialView"
+        :initial-date="initialDate"
+        :target-event-id="targetEventId"
+        @event-click="onEventClick"
+        @dates-change="onDatesChange"
+      />
       <SubscriptionGrid :agendas="AGENDAS" />
 
       <footer class="text-center mt-16 pb-6 border-t border-stone-200 dark:border-stone-700 pt-8">
@@ -56,6 +106,6 @@ onMounted(async () => {
       </footer>
     </div>
 
-    <EventModal :event="selectedEvent" @close="selectedEvent = null" />
+    <EventModal :event="selectedEvent" @close="onModalClose" />
   </div>
 </template>

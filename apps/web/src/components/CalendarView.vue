@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { h, ref, computed } from 'vue'
+import { h, ref, computed, watch } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import listPlugin from '@fullcalendar/list'
-import type { CalendarOptions, EventContentArg, EventClickArg } from '@fullcalendar/core'
+import type { CalendarOptions, EventContentArg, EventClickArg, DatesSetArg } from '@fullcalendar/core'
 // @ts-ignore — FullCalendar locale modules have no individual type exports
 import frLocale from '@fullcalendar/core/locales/fr'
 import type { AgendaConfig, ModalEvent } from '../types'
@@ -13,10 +13,31 @@ import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'
 import WeatherBadge from './WeatherBadge.vue'
 
-const props = defineProps<{ agendas: AgendaConfig[] }>()
-const emit = defineEmits<{ (e: 'event-click', event: ModalEvent): void }>()
+const props = defineProps<{
+  agendas: AgendaConfig[]
+  initialView?: string
+  initialDate?: string
+  targetEventId?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'event-click', event: ModalEvent): void
+  (e: 'dates-change', payload: { view: string; date: string }): void
+}>()
 
 const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
+
+// Used to ensure the deep-linked event is only auto-opened once per page load
+const targetEmitted = ref(false)
+
+// Plain (non-reactive) variable so that changes to targetEventId do NOT cause
+// calendarOptions to recompute (which would make FullCalendar re-process
+// initialDate and jump back to today).
+let pendingEventId = props.targetEventId ?? ''
+watch(() => props.targetEventId, (v) => {
+  pendingEventId = v ?? ''
+  if (!v) targetEmitted.value = false
+})
 
 function renderEventContent(arg: EventContentArg) {
   const { event, timeText } = arg
@@ -57,7 +78,8 @@ function renderEventContent(arg: EventContentArg) {
 const calendarOptions = computed<CalendarOptions>(() => ({
   plugins: [timeGridPlugin, dayGridPlugin, listPlugin],
   locale: frLocale,
-  initialView: window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek',
+  initialView: props.initialView ?? (window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek'),
+  initialDate: props.initialDate ?? undefined,
   firstDay: 1,
   headerToolbar: {
     left: 'prev,next today',
@@ -70,6 +92,29 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   allDayText: 'Journée',
   eventSources: props.agendas.map(buildEventSource),
   eventContent: renderEventContent,
+  datesSet: (arg: DatesSetArg) => {
+    const api = calendarRef.value?.getApi()
+    if (!api) return
+    const date = api.getDate()
+    const iso = date.toISOString().split('T')[0]
+    emit('dates-change', { view: arg.view.type, date: iso })
+  },
+  eventsSet: () => {
+    if (targetEmitted.value || !pendingEventId) return
+    const api = calendarRef.value?.getApi()
+    if (!api) return
+    const event = api.getEventById(pendingEventId)
+    if (!event) return
+    targetEmitted.value = true
+    emit('event-click', {
+      id: event.id,
+      title: event.title,
+      start: event.start as Date,
+      end: event.end,
+      allDay: event.allDay,
+      extendedProps: event.extendedProps as ModalEvent['extendedProps'],
+    })
+  },
   eventClick: (info: EventClickArg) => {
     info.jsEvent.preventDefault()
     const e = info.event
