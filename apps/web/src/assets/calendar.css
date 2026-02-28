@@ -1,3 +1,9 @@
+﻿@import "tailwindcss";
+
+/* Class-based dark mode (toggled via .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===== FULLCALENDAR BASE ===== */
 :root {
   --brand-purple: #9750a4;
   --brand-dark: #4a235a;
@@ -40,7 +46,7 @@
   padding: 0.4em 0.65em !important;
 }
 
-/* Statut CalDAV */
+/* ===== STATUT CALDAV ===== */
 .event-tentative {
   background-image: repeating-linear-gradient(
     45deg,
@@ -55,7 +61,7 @@
   opacity: 0.55;
 }
 
-/* Filtres */
+/* ===== FILTRES ===== */
 .filter-btn {
   transition: all 0.2s;
   opacity: 0.5;
@@ -69,4 +75,52 @@
   transform: scale(1);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border-color: transparent;
+}
+
+/* ===== DARK MODE — FULLCALENDAR ===== */
+.dark {
+  --fc-page-bg-color: #1c1917;
+  --fc-neutral-bg-color: #292524;
+  --fc-neutral-text-color: #a8a29e;
+  --fc-border-color: #44403c;
+  --fc-event-text-color: #fff;
+  --fc-today-bg-color: #2d1b38;
+  --fc-now-indicator-color: #f97316;
+  --fc-non-business-color: rgba(0, 0, 0, 0.25);
+  --fc-highlight-color: rgba(151, 80, 164, 0.15);
+  --fc-button-bg-color: #7e3b8a;
+  --fc-button-border-color: #7e3b8a;
+  --fc-button-hover-bg-color: #6b2f75;
+  --fc-button-hover-border-color: #6b2f75;
+  --fc-button-active-bg-color: #5c2665;
+  --fc-button-active-border-color: #5c2665;
+}
+
+.dark .fc-toolbar-title {
+  color: #e7d9ec;
+}
+
+.dark .fc-col-header-cell-cushion,
+.dark .fc-daygrid-day-number,
+.dark .fc-timegrid-slot-label-cushion,
+.dark .fc-list-day-text,
+.dark .fc-list-day-side-text {
+  color: #d6c8db;
+}
+
+.dark .fc-list-event:hover td {
+  background: #292524;
+}
+
+.dark .fc-list-event-title a {
+  color: #e7d9ec;
+}
+
+.dark .fc-scrollgrid {
+  border-color: #44403c !important;
+}
+
+.dark .fc-scrollgrid td,
+.dark .fc-scrollgrid th {
+  border-color: #44403c !important;
 }

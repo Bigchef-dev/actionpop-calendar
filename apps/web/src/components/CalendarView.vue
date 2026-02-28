@@ -114,6 +114,6 @@ defineExpose({ toggleSource, refreshRender })
 <template>
   <div
     ref="calendarEl"
-    class="bg-white rounded-2xl p-6 border border-stone-200 shadow-xl shadow-stone-200/50 min-h-[600px]"
+    class="bg-white dark:bg-stone-900 rounded-2xl p-6 border border-stone-200 dark:border-stone-700 shadow-xl shadow-stone-200/50 dark:shadow-stone-900/50 min-h-[600px]"
   ></div>
 </template>

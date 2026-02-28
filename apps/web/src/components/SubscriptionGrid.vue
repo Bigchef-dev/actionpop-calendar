@@ -26,10 +26,10 @@ function copyLink(id: string): void {
 
 <template>
   <div class="mt-16">
-    <h3 class="text-2xl font-black text-[#4A235A] uppercase tracking-tight mb-6 text-center md:text-left">
+    <h3 class="text-2xl font-black text-[#4A235A] dark:text-[#e7d9ec] uppercase tracking-tight mb-6 text-center md:text-left">
       S'abonner aux agendas
     </h3>
-    <p class="text-stone-500 mb-8 text-center md:text-left">
+    <p class="text-stone-500 dark:text-stone-400 mb-8 text-center md:text-left">
       Cliquez sur les boutons ci-dessous pour ajouter l'intégralité d'un agenda à votre téléphone.
     </p>
 
@@ -37,18 +37,18 @@ function copyLink(id: string): void {
       <div
         v-for="agenda in agendas"
         :key="agenda.id"
-        class="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md transition flex flex-col h-full"
+        class="bg-white dark:bg-stone-900 p-6 rounded-2xl border border-stone-200 dark:border-stone-700 shadow-sm hover:shadow-md transition flex flex-col h-full"
       >
         <div class="flex items-center gap-3 mb-4">
           <span class="w-4 h-4 rounded-full flex-shrink-0" :style="{ backgroundColor: agenda.color }"></span>
-          <h4 class="font-bold text-stone-800 text-lg uppercase leading-tight">{{ agenda.name }}</h4>
+          <h4 class="font-bold text-stone-800 dark:text-stone-100 text-lg uppercase leading-tight">{{ agenda.name }}</h4>
         </div>
 
         <div class="mt-auto grid grid-cols-1 gap-2">
           <a
             :href="googleLink(agenda.id)"
             target="_blank"
-            class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition group"
+            class="flex items-center justify-center gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 dark:hover:bg-stone-700 transition group"
           >
             <svg class="w-4 h-4 text-stone-500 group-hover:text-[#4285F4] transition-colors" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.5 2C7 2 2.5 6.5 2.5 12C2.5 17.5 7 22 12.5 22C18 22 22.5 17.5 22.5 12C22.5 6.5 18 2 12.5 2ZM12.5 20C8.1 20 4.5 16.4 4.5 12C4.5 7.6 8.1 4 12.5 4C16.9 4 20.5 7.6 20.5 12C20.5 16.4 16.9 20 12.5 20ZM16.5 13H13.5V16H11.5V13H8.5V11H11.5V8H13.5V11H16.5V13Z" />
@@ -58,13 +58,13 @@ function copyLink(id: string): void {
 
           <a
             :href="appleLink(agenda.id)"
-            class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition"
+            class="flex items-center justify-center gap-2 bg-stone-100 dark:bg-stone-700 text-stone-800 dark:text-stone-200 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 dark:hover:bg-stone-600 transition"
           >
             🍏 iPhone / Mac
           </a>
 
           <button
-            class="flex items-center justify-center gap-2 bg-stone-100 text-stone-800 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 transition"
+            class="flex items-center justify-center gap-2 bg-stone-100 dark:bg-stone-700 text-stone-800 dark:text-stone-200 py-2.5 rounded-lg font-bold text-xs uppercase hover:bg-stone-200 dark:hover:bg-stone-600 transition"
             @click="copyLink(agenda.id)"
           >
             📋 Copier lien

@@ -7,7 +7,10 @@ import EventModal from './components/EventModal.vue'
 import SubscriptionGrid from './components/SubscriptionGrid.vue'
 import { AGENDAS } from './config'
 import { fetchWeather } from './composables/useWeather'
+import { useDarkMode } from './composables/useDarkMode'
 import type { ModalEvent } from './types'
+
+const { isDark, toggle } = useDarkMode()
 
 const calendarRef = ref<InstanceType<typeof CalendarView> | null>(null)
 
@@ -39,15 +42,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0]">
+  <div class="min-h-screen antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0] dark:from-[#120a16] dark:via-[#0f0712] dark:to-[#0c050f] transition-colors duration-300">
     <div class="max-w-6xl mx-auto px-4 py-10">
-      <AppHeader />
+      <AppHeader :is-dark="isDark" @toggle-dark="toggle" />
       <FilterBar :agendas="AGENDAS" :active-ids="activeIds" @toggle="onToggle" />
       <CalendarView ref="calendarRef" :agendas="AGENDAS" @event-click="selectedEvent = $event" />
       <SubscriptionGrid :agendas="AGENDAS" />
 
-      <footer class="text-center mt-16 pb-6 border-t border-stone-200 pt-8">
-        <p class="text-xs font-bold text-stone-400 uppercase tracking-widest">
+      <footer class="text-center mt-16 pb-6 border-t border-stone-200 dark:border-stone-700 pt-8">
+        <p class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest">
           Utilise Nextcloud | GT Outils numériques Rennes 2026 | Mathéo, Lily, Amadou
         </p>
       </footer>

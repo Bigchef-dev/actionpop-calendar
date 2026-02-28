@@ -87,17 +87,17 @@ function downloadICS(): void {
       <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <!-- Overlay -->
         <div
-          class="fixed inset-0 bg-stone-900 bg-opacity-75 transition-opacity"
+          class="fixed inset-0 bg-stone-900 bg-opacity-75 dark:bg-opacity-85 transition-opacity"
           @click="emit('close')"
         ></div>
 
         <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
         <!-- Panel -->
-        <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full relative">
-          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="inline-block align-bottom bg-white dark:bg-stone-900 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full relative">
+          <div class="bg-white dark:bg-stone-900 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <!-- Titre -->
-            <h3 class="text-2xl font-black text-[#4A235A] uppercase mb-2 leading-tight">
+            <h3 class="text-2xl font-black text-[#4A235A] dark:text-[#e7d9ec] uppercase mb-2 leading-tight">
               {{ event.title }}
             </h3>
 
@@ -127,7 +127,7 @@ function downloadICS(): void {
             </div>
 
             <!-- Lieu -->
-            <div class="flex items-start gap-2 text-stone-600 font-medium mb-4 group">
+            <div class="flex items-start gap-2 text-stone-600 dark:text-stone-300 font-medium mb-4 group">
               <svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-stone-400 group-hover:text-[#F97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -136,31 +136,31 @@ function downloadICS(): void {
                 v-if="event.extendedProps.location"
                 :href="mapsLink"
                 target="_blank"
-                class="hover:text-[#F97316] transition-colors hover:underline decoration-2 underline-offset-2 break-words"
+                class="hover:text-[#F97316] dark:text-stone-300 dark:hover:text-[#F97316] transition-colors hover:underline decoration-2 underline-offset-2 break-words"
               >
                 {{ event.extendedProps.location }}
                 <span class="text-xs text-stone-400 font-normal ml-2">↗ S'y rendre</span>
               </a>
-              <span v-else class="text-stone-400 italic">Lieu non précisé</span>
+              <span v-else class="text-stone-400 dark:text-stone-500 italic">Lieu non précisé</span>
             </div>
 
             <!-- Description -->
-            <div class="bg-stone-50 p-4 rounded-xl border border-stone-100 text-sm text-stone-700 mb-6">
+            <div class="bg-stone-50 dark:bg-stone-800 p-4 rounded-xl border border-stone-100 dark:border-stone-700 text-sm text-stone-700 dark:text-stone-300 mb-6">
               <p style="white-space: pre-wrap">
                 {{ event.extendedProps.description || 'Aucune description.' }}
               </p>
             </div>
 
             <!-- Actions export -->
-            <div class="border-t border-stone-100 pt-4">
-              <p class="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">
+            <div class="border-t border-stone-100 dark:border-stone-700 pt-4">
+              <p class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-3">
                 Ajouter cet événement (⚠️ Pour mise à jour auto, abonnez-vous en bas de page)
               </p>
               <div class="grid grid-cols-2 gap-3">
                 <a
                   :href="googleLink"
                   target="_blank"
-                  class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition"
+                  class="flex items-center justify-center gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 dark:hover:bg-stone-700 transition"
                 >
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12.5 2C7 2 2.5 6.5 2.5 12C2.5 17.5 7 22 12.5 22C18 22 22.5 17.5 22.5 12C22.5 6.5 18 2 12.5 2ZM12.5 20C8.1 20 4.5 16.4 4.5 12C4.5 7.6 8.1 4 12.5 4C16.9 4 20.5 7.6 20.5 12C20.5 16.4 16.9 20 12.5 20ZM16.5 13H13.5V16H11.5V13H8.5V11H11.5V8H13.5V11H16.5V13Z" />
@@ -168,7 +168,7 @@ function downloadICS(): void {
                   Google
                 </a>
                 <button
-                  class="flex items-center justify-center gap-2 bg-white border border-stone-300 text-stone-700 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 transition"
+                  class="flex items-center justify-center gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 py-2 rounded-lg font-bold text-xs uppercase hover:bg-stone-50 dark:hover:bg-stone-700 transition"
                   @click="downloadICS"
                 >
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -180,7 +180,7 @@ function downloadICS(): void {
             </div>
           </div>
 
-          <div class="bg-stone-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <div class="bg-stone-50 dark:bg-stone-800 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
             <button
               class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-[#4A235A] text-white font-medium hover:bg-[#371b43] sm:ml-3 sm:w-auto sm:text-sm"
               @click="emit('close')"

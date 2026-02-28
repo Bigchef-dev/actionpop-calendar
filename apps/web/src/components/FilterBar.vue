@@ -13,20 +13,22 @@ const emit = defineEmits<{
 
 <template>
   <div class="mb-6">
-    <h3 class="text-xs font-bold text-stone-400 uppercase tracking-widest mb-3">
+    <h3 class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-3">
       Filtrer l'affichage
     </h3>
     <div class="flex flex-wrap gap-2">
       <button
         v-for="agenda in agendas"
         :key="agenda.id"
-        class="filter-btn border px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide"
-        :class="{ active: activeIds.has(agenda.id) }"
         :style="
           activeIds.has(agenda.id)
             ? { backgroundColor: agenda.color, color: 'white', borderColor: agenda.color }
-            : { backgroundColor: 'white', color: '#78716c', borderColor: '#e7e5e4' }
+            : { backgroundColor: '', color: '', borderColor: '' }
         "
+        :class="[
+          'filter-btn border px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide',
+          activeIds.has(agenda.id) ? 'active' : 'bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-600'
+        ]"
         @click="emit('toggle', agenda.id)"
       >
         {{ agenda.name }}
