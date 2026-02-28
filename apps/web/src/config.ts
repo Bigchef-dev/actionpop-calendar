@@ -6,7 +6,7 @@ export const PROXY_KEY = '1aae6667'
 
 export const POLL_BACKEND_URL: string =
   (import.meta as unknown as { env: Record<string, string> }).env.VITE_POLL_BACKEND_URL ??
-  'https://poll.lfirennes.fun/'
+  'https://poll.lfirennes.fun'
 
 export const CITY_LAT = 48.117266
 export const CITY_LON = -1.6777926
