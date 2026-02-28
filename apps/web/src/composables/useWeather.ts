@@ -40,3 +40,53 @@ export function getWeatherForEvent(date: Date): WeatherEntry | null {
   const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:00`
   return cache.value[key] ?? null
 }
+
+// Severity order for WMO codes (higher = worse)
+const WMO_SEVERITY: Record<number, number> = {
+  0: 0, 1: 1, 2: 2, 3: 3,
+  45: 4, 48: 4,
+  51: 5, 53: 6, 55: 7,
+  61: 8, 63: 9, 65: 10,
+  71: 8, 73: 9, 75: 10,
+  80: 8, 81: 9, 82: 10,
+  95: 11, 96: 12, 99: 13,
+}
+
+/**
+ * Returns aggregated weather for the full event duration:
+ * worst WMO code, total precipitation, max wind speed.
+ * Falls back to single-hour lookup when end is null.
+ */
+export function getWeatherForEventRange(
+  start: Date,
+  end: Date | null,
+): WeatherEntry | null {
+  if (!end || end.getTime() <= start.getTime()) {
+    return getWeatherForEvent(start)
+  }
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const entries: WeatherEntry[] = []
+
+  // Walk hour by hour from start to end (exclusive of the last boundary)
+  const cur = new Date(start)
+  cur.setMinutes(0, 0, 0)
+  while (cur < end) {
+    const key = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}T${pad(cur.getHours())}:00`
+    const entry = cache.value[key]
+    if (entry) entries.push(entry)
+    cur.setHours(cur.getHours() + 1)
+  }
+
+  if (entries.length === 0) return null
+
+  const worst = entries.reduce((a, b) =>
+    (WMO_SEVERITY[b.code] ?? 0) > (WMO_SEVERITY[a.code] ?? 0) ? b : a,
+  )
+
+  return {
+    code: worst.code,
+    precip: Math.round(entries.reduce((sum, e) => sum + e.precip, 0) * 10) / 10,
+    wind: Math.max(...entries.map((e) => e.wind)),
+  }
+}

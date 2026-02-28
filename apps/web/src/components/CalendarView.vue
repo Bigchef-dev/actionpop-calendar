@@ -9,7 +9,7 @@ import type { CalendarOptions, EventContentArg, EventClickArg } from '@fullcalen
 import frLocale from '@fullcalendar/core/locales/fr'
 import type { AgendaConfig, ModalEvent } from '../types'
 import { buildEventSource } from '../composables/useIcalSource'
-import { getWeatherForEvent } from '../composables/useWeather'
+import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'
 import WeatherBadge from './WeatherBadge.vue'
 
@@ -22,7 +22,7 @@ function renderEventContent(arg: EventContentArg) {
   const { event, timeText } = arg
   const extProps = event.extendedProps as ModalEvent['extendedProps']
   const status = extProps.status ?? 'CONFIRMED'
-  const weather = event.start && !event.allDay ? getWeatherForEvent(event.start) : null
+  const weather = event.start && !event.allDay ? getWeatherForEventRange(event.start, event.end) : null
 
   const timeNode = event.allDay
     ? null

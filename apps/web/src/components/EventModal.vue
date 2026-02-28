@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ModalEvent } from '../types'
-import { getWeatherForEvent } from '../composables/useWeather'
+import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'
 import WeatherBadge from './WeatherBadge.vue'
 
@@ -45,7 +45,9 @@ const mapsLink = computed(() => {
 })
 
 const weather = computed(() =>
-  props.event?.start && !props.event.allDay ? getWeatherForEvent(props.event.start) : null,
+  props.event?.start && !props.event.allDay
+    ? getWeatherForEventRange(props.event.start, props.event.end ?? null)
+    : null,
 )
 
 function downloadICS(): void {
