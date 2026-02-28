@@ -37,6 +37,10 @@
         /* Style pour les filtres */
         .filter-btn { transition: all 0.2s; opacity: 0.5; filter: grayscale(100%); transform: scale(0.98); }
         .filter-btn.active { opacity: 1; filter: grayscale(0%); transform: scale(1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-color: transparent; }
+
+        /* Statut CalDAV */
+        .event-tentative { background-image: repeating-linear-gradient(45deg, transparent 0px, transparent 4px, rgba(255,255,255,0.28) 4px, rgba(255,255,255,0.28) 8px) !important; }
+        .event-cancelled { opacity: 0.55; }
     </style>
 </head>
 <body class="min-h-screen antialiased font-sans relative bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0]">
@@ -90,6 +94,7 @@
             <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-2xl font-black text-[#4A235A] uppercase mb-4 leading-tight" id="modalTitle">Titre</h3>
+                    <div id="modalStatusBadge" class="hidden mb-3 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black uppercase"></div>
                     
                     <div class="flex items-center gap-2 text-[#F97316] font-bold mb-3">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -228,6 +233,8 @@
             const start = formatToICSDate(event.start);
             let end = event.end ? formatToICSDate(event.end) : formatToICSDate(new Date(event.start.getTime() + 60*60*1000));
             const now = formatToICSDate(new Date());
+            const status = event.extendedProps.status || 'CONFIRMED';
+            const statusLine = status !== 'CONFIRMED' ? `\nSTATUS:${status}` : '';
             const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//FaireMieuxRennes//Agenda//FR
@@ -238,7 +245,7 @@ DTSTART:${start}
 DTEND:${end}
 SUMMARY:${event.title}
 DESCRIPTION:${(event.extendedProps.description || '').replace(/\n/g, '\\n')}
-LOCATION:${event.extendedProps.location || ''}
+LOCATION:${event.extendedProps.location || ''}${statusLine}
 END:VEVENT
 END:VCALENDAR`;
             const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
@@ -264,6 +271,20 @@ END:VCALENDAR`;
 
         function openModal(info) {
             modalTitle.textContent = info.event.title;
+
+            const modalStatusBadge = document.getElementById('modalStatusBadge');
+            const eventStatus = info.event.extendedProps.status || 'CONFIRMED';
+            if (eventStatus === 'TENTATIVE') {
+                modalStatusBadge.className = 'mb-3 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black uppercase bg-yellow-100 text-yellow-800';
+                modalStatusBadge.textContent = '⚠️ Événement provisoire';
+            } else if (eventStatus === 'CANCELLED') {
+                modalStatusBadge.className = 'mb-3 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black uppercase bg-red-100 text-red-700';
+                modalStatusBadge.textContent = '✗ Événement annulé';
+            } else {
+                modalStatusBadge.className = 'hidden';
+                modalStatusBadge.textContent = '';
+            }
+
             const optionsDate = { weekday: 'long', day: 'numeric', month: 'long' };
             const optionsTime = { hour: '2-digit', minute: '2-digit' };
             const dateStr = info.event.start.toLocaleDateString('fr-FR', optionsDate);
@@ -297,7 +318,52 @@ END:VCALENDAR`;
         function getSourceConfig(agenda) {
             const feedUrl = `https://cloud.lfirennes.fun/remote.php/dav/public-calendars/${agenda.id}?export&_nocache=${Date.now()}`;
             const proxiedUrl = `https://corsproxy.io/?key=1aae6667&url=${encodeURIComponent(feedUrl)}`;
-            return { id: agenda.id, url: feedUrl, format: 'ics', color: agenda.color };
+            return {
+                id: agenda.id,
+                color: agenda.color,
+                events: async function(fetchInfo, successCallback, failureCallback) {
+                    try {
+                        const response = await fetch(proxiedUrl);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const icsText = await response.text();
+                        const jcalData = ICAL.parse(icsText);
+                        const comp = new ICAL.Component(jcalData);
+                        const vevents = comp.getAllSubcomponents('vevent');
+                        const events = vevents.map(vevent => {
+                            const summary = vevent.getFirstPropertyValue('summary') || '(sans titre)';
+                            const dtstart = vevent.getFirstProperty('dtstart');
+                            const dtend = vevent.getFirstProperty('dtend');
+                            const uid = vevent.getFirstPropertyValue('uid') || '';
+                            const description = vevent.getFirstPropertyValue('description') || '';
+                            const location = vevent.getFirstPropertyValue('location') || '';
+                            const statusRaw = vevent.getFirstPropertyValue('status');
+                            const status = statusRaw ? statusRaw.toUpperCase() : 'CONFIRMED';
+                            const classNames = [];
+                            if (status === 'TENTATIVE') classNames.push('event-tentative');
+                            if (status === 'CANCELLED') classNames.push('event-cancelled');
+                            const startIcal = dtstart ? dtstart.getFirstValue() : null;
+                            const endIcal = dtend ? dtend.getFirstValue() : null;
+                            const startDate = startIcal ? startIcal.toJSDate() : null;
+                            const endDate = endIcal ? endIcal.toJSDate() : null;
+                            const allDay = startIcal ? startIcal.isDate : false;
+                            return {
+                                id: uid,
+                                title: summary,
+                                start: startDate,
+                                end: endDate,
+                                allDay: allDay,
+                                color: agenda.color,
+                                classNames: classNames,
+                                extendedProps: { status, description, location }
+                            };
+                        }).filter(e => e.start !== null);
+                        successCallback(events);
+                    } catch(err) {
+                        console.error(`Erreur chargement agenda ${agenda.name}:`, err);
+                        failureCallback(err);
+                    }
+                }
+            };
         }
 
         function toggleSource(agendaId) {
@@ -365,11 +431,21 @@ END:VCALENDAR`;
                     if (!arg.event.allDay) {
                          timeText = `<div class="text-xs opacity-90 mb-0.5">${arg.timeText}</div>`;
                     }
+
+                    const status = arg.event.extendedProps.status || 'CONFIRMED';
+                    let titleHtml;
+                    if (status === 'CANCELLED') {
+                        titleHtml = `<div class="leading-tight text-sm"><span style="text-decoration:line-through;opacity:0.75">${arg.event.title}</span> <span class="text-[9px] bg-red-200 text-red-700 px-1 rounded font-black uppercase">Annulé</span></div>`;
+                    } else if (status === 'TENTATIVE') {
+                        titleHtml = `<div class="leading-tight text-sm">${arg.event.title} <span class="text-[9px] bg-yellow-100 text-yellow-800 px-1 rounded font-black uppercase">Provisoire</span></div>`;
+                    } else {
+                        titleHtml = `<div class="leading-tight text-sm">${arg.event.title}</div>`;
+                    }
                     
                     return { html: `
                         <div class="p-1 overflow-hidden h-full flex flex-col justify-start">
                             ${timeText}
-                            <div class="leading-tight text-sm">${arg.event.title}</div>
+                            ${titleHtml}
                             ${weatherInfo}
                         </div>
                     `};
