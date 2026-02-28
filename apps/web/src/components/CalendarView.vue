@@ -88,7 +88,7 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   },
   buttonText: { today: 'Auj.', month: 'Mois', week: 'Semaine', day: 'Jour', list: 'Liste' },
   slotMinTime: '07:00:00',
-  slotMaxTime: '22:00:00',
+  slotMaxTime: '23:30:00',
   allDayText: 'Journée',
   eventSources: props.agendas.map(buildEventSource),
   eventContent: renderEventContent,
