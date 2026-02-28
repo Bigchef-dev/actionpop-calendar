@@ -1,0 +1,72 @@
+:root {
+  --brand-purple: #9750a4;
+  --brand-dark: #4a235a;
+  --brand-orange: #f97316;
+  --fc-button-bg-color: var(--brand-purple);
+  --fc-button-border-color: var(--brand-purple);
+  --fc-button-hover-bg-color: var(--brand-dark);
+  --fc-button-hover-border-color: var(--brand-dark);
+  --fc-button-active-bg-color: var(--brand-dark);
+  --fc-button-active-border-color: var(--brand-dark);
+  --fc-today-bg-color: #f3e8f5;
+}
+
+.fc-toolbar-title {
+  font-size: 1.25rem !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.fc-event {
+  border: none !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.fc-event:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  transition: transform 0.2s;
+}
+
+.fc-button {
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em;
+  padding: 0.4em 0.65em !important;
+}
+
+/* Statut CalDAV */
+.event-tentative {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0px,
+    transparent 4px,
+    rgba(255, 255, 255, 0.28) 4px,
+    rgba(255, 255, 255, 0.28) 8px
+  ) !important;
+}
+
+.event-cancelled {
+  opacity: 0.55;
+}
+
+/* Filtres */
+.filter-btn {
+  transition: all 0.2s;
+  opacity: 0.5;
+  filter: grayscale(100%);
+  transform: scale(0.98);
+}
+
+.filter-btn.active {
+  opacity: 1;
+  filter: grayscale(0%);
+  transform: scale(1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+}
