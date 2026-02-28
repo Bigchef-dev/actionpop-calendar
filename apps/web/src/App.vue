@@ -5,11 +5,18 @@ import FilterBar from './components/FilterBar.vue'
 import CalendarView from './components/CalendarView.vue'
 import EventModal from './components/EventModal.vue'
 import SubscriptionGrid from './components/SubscriptionGrid.vue'
+import PollCreator from './components/PollCreator.vue'
 import { AGENDAS } from './config'
 import { fetchWeather } from './composables/useWeather'
 import { useDarkMode } from './composables/useDarkMode'
 import { parseHash, updateHash, removeHashParam } from './composables/useUrlState'
 import type { ModalEvent } from './types'
+
+// --- Poll page detection ---
+// If ?chatId= is present in the query string, show the poll creator instead of the calendar.
+const urlParams = new URLSearchParams(window.location.search)
+const pollChatId = urlParams.has('chatId') ? (urlParams.get('chatId') ?? '') : null
+const isPollPage = pollChatId !== null
 
 const { isDark, toggle } = useDarkMode()
 
@@ -67,6 +74,7 @@ function onModalClose(): void {
 }
 
 onMounted(async () => {
+  if (isPollPage) return
   // Disable agenda sources that are not in the URL-restored activeIds
   const restoredIds = activeIds.value
   for (const agenda of AGENDAS) {
@@ -84,7 +92,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0] dark:from-[#120a16] dark:via-[#0f0712] dark:to-[#0c050f] transition-colors duration-300">
+  <!-- Poll creator page -->
+  <PollCreator v-if="isPollPage" :chat-id="pollChatId!" />
+
+  <!-- Calendar app (default) -->
+  <div v-else class="min-h-screen antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0] dark:from-[#120a16] dark:via-[#0f0712] dark:to-[#0c050f] transition-colors duration-300">
     <div class="max-w-6xl mx-auto px-4 py-10">
       <AppHeader :is-dark="isDark" @toggle-dark="toggle" />
       <FilterBar :agendas="AGENDAS" :active-ids="activeIds" @toggle="onToggle" />
