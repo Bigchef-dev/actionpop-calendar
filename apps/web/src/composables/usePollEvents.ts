@@ -1,7 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { parse, Component } from 'ical.js'
 import type { AgendaConfig } from '../types'
-import { NEXTCLOUD_BASE, PROXY_BASE, PROXY_KEY } from '../config'
+import { NEXTCLOUD_BASE } from '../config'
 
 export interface PollEvent {
   id: string
@@ -17,9 +17,8 @@ export interface PollEvent {
 
 async function fetchAgendaEvents(agenda: AgendaConfig, date: Date): Promise<PollEvent[]> {
   const feedUrl = `${NEXTCLOUD_BASE}/${agenda.id}?export&_nocache=${Date.now()}`
-  const proxiedUrl = `${PROXY_BASE}/?key=${PROXY_KEY}&url=${encodeURIComponent(feedUrl)}`
 
-  const res = await fetch(proxiedUrl)
+  const res = await fetch(feedUrl)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const icsText = await res.text()
   const comp = new Component(parse(icsText))

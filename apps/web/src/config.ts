@@ -1,8 +1,6 @@
 import type { AgendaConfig } from './types'
 
 export const NEXTCLOUD_BASE = 'https://cloud.lfirennes.fun/remote.php/dav/public-calendars'
-export const PROXY_BASE = 'https://corsproxy.io'
-export const PROXY_KEY = '1aae6667'
 
 export const POLL_BACKEND_URL: string =
   (import.meta as unknown as { env: Record<string, string> }).env.VITE_POLL_BACKEND_URL ??

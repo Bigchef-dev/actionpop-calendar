@@ -1,13 +1,10 @@
 import { parse, Component } from 'ical.js'
 import type { AgendaConfig, ModalEvent } from '../types'
-import { NEXTCLOUD_BASE, PROXY_BASE, PROXY_KEY } from '../config'
+import { NEXTCLOUD_BASE } from '../config'
 
 type EventStatus = ModalEvent['extendedProps']['status']
 
 export function buildEventSource(agenda: AgendaConfig) {
-  const feedUrl = `${NEXTCLOUD_BASE}/${agenda.id}?export&_nocache=${Date.now()}`
-  const proxiedUrl = `${PROXY_BASE}/?key=${PROXY_KEY}&url=${encodeURIComponent(feedUrl)}`
-
   return {
     id: agenda.id,
     color: agenda.color,
@@ -17,7 +14,8 @@ export function buildEventSource(agenda: AgendaConfig) {
       failureCallback: (err: Error) => void,
     ) => {
       try {
-        const res = await fetch(proxiedUrl)
+        const feedUrl = `${NEXTCLOUD_BASE}/${agenda.id}?export&_nocache=${Date.now()}`
+        const res = await fetch(feedUrl)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const icsText = await res.text()
         const comp = new Component(parse(icsText))
