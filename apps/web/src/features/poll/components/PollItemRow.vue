@@ -100,12 +100,20 @@ const emit = defineEmits<{
       >×</button>
     </div>
 
-    <!-- Ligne 2 : heure + référents -->
+    <!-- Ligne 2 : heure début - heure fin + référents -->
     <div class="flex items-center gap-2 pl-8">
       <input
         v-model="item.time"
         type="time"
         class="w-28 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-700 dark:text-stone-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+        title="Heure de début"
+      />
+      <span class="text-stone-400 dark:text-stone-500 text-xs shrink-0">-</span>
+      <input
+        v-model="item.endTime"
+        type="time"
+        class="w-28 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-700 dark:text-stone-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+        title="Heure de fin"
       />
       <input
         v-model="item.referents"

@@ -10,6 +10,7 @@ function makeItem(overrides: Partial<PollItem> = {}): PollItem {
     checked: true,
     emoji: '📅',
     time: '',
+    endTime: '',
     title: '',
     referents: '',
     color: '',
@@ -23,8 +24,12 @@ function eventToItem(e: PollEvent): PollItem {
   const time = d
     ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
     : ''
+  const de = e.endDate
+  const endTime = de
+    ? `${String(de.getHours()).padStart(2, '0')}:${String(de.getMinutes()).padStart(2, '0')}`
+    : ''
   const { emoji, rest } = extractLeadingEmoji(e.title)
-  return makeItem({ emoji, time, title: rest, referents: extractReferents(e.description), color: e.color })
+  return makeItem({ emoji, time, endTime, title: rest, referents: extractReferents(e.description), color: e.color })
 }
 
 export function usePollItems(calEvents: Ref<PollEvent[]>) {

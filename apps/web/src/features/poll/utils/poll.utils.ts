@@ -5,6 +5,7 @@ export interface PollItem {
   checked: boolean
   emoji: string
   time: string
+  endTime: string
   title: string
   referents: string
   color: string
@@ -40,7 +41,11 @@ export function extractReferents(description: string): string {
 export function buildOption(item: PollItem): string {
   const parts: string[] = []
   if (item.emoji) parts.push(item.emoji)
-  if (item.time) parts.push(formatTime(item.time))
+  if (item.time) {
+    const start = formatTime(item.time)
+    const timeStr = item.endTime ? `${start} - ${formatTime(item.endTime)}` : start
+    parts.push(timeStr)
+  }
   parts.push(item.title.trim())
   if (item.referents.trim()) parts.push(`(référent·e: ${item.referents.trim()})`)
   return parts.join(' ')
