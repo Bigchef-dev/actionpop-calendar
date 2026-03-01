@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import type { WeatherEntry } from '../types'
-import { CITY_LAT, CITY_LON } from '../config'
+import type { WeatherEntry } from '../../../types'
+import { CITY_LAT, CITY_LON } from '../../../config'
 
 const WMO_ICONS: Record<number, string> = {
   0: '☀️',  1: '🌤️', 2: '⛅',  3: '☁️',

@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { POLL_BACKEND_URL } from '../config'
+import { POLL_BACKEND_URL } from '../../../config'
 import { type PollItem, buildOption } from '../utils/poll.utils'
 
 export function useSendPoll(chatId: string, question: Ref<string>, items: Ref<PollItem[]>) {

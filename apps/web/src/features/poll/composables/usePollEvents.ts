@@ -1,7 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { parse, Component } from 'ical.js'
-import type { AgendaConfig } from '../types'
-import { NEXTCLOUD_BASE } from '../config'
+import type { AgendaConfig } from '../../../types'
+import { NEXTCLOUD_BASE } from '../../../config'
 
 export interface PollEvent {
   id: string

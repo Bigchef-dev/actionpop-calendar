@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useDarkMode } from '../composables/useDarkMode'
+import { useDarkMode } from '../../../shared/composables/useDarkMode'
 import { usePollEvents } from '../composables/usePollEvents'
 import { usePollItems } from '../composables/usePollItems'
 import { usePollDrag } from '../composables/usePollDrag'
 import { useSendPoll } from '../composables/useSendPoll'
 import { formatTime } from '../utils/poll.utils'
-import { AGENDAS } from '../config'
-import type { AgendaConfig } from '../types'
+import { AGENDAS } from '../../../config'
+import type { AgendaConfig } from '../../../types'
 import PollItemRow from './PollItemRow.vue'
 
 const props = defineProps<{ chatId: string }>()

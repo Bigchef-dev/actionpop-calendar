@@ -7,7 +7,7 @@ import listPlugin from '@fullcalendar/list'
 import type { CalendarOptions, EventContentArg, EventClickArg, DatesSetArg } from '@fullcalendar/core'
 // @ts-ignore — FullCalendar locale modules have no individual type exports
 import frLocale from '@fullcalendar/core/locales/fr'
-import type { AgendaConfig, ModalEvent } from '../types'
+import type { AgendaConfig, ModalEvent } from '../../../types'
 import { buildEventSource } from '../composables/useIcalSource'
 import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'

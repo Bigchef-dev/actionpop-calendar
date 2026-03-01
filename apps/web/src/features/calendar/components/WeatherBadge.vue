@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getWeatherIcon } from '../composables/useWeather'
-import type { WeatherEntry } from '../types'
+import type { WeatherEntry } from '../../../types'
 
 defineProps<{ weather: WeatherEntry }>()
 </script>

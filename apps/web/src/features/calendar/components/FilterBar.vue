@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgendaConfig } from '../types'
+import type { AgendaConfig } from '../../../types'
 
 defineProps<{
   agendas: AgendaConfig[]

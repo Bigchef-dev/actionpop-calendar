@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { AgendaConfig } from '../types'
-import { NEXTCLOUD_BASE } from '../config'
+import type { AgendaConfig } from '../../types'
+import { NEXTCLOUD_BASE } from '../../config'
 
 defineProps<{ agendas: AgendaConfig[] }>()
 

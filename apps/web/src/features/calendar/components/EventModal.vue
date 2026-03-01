@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { ModalEvent } from '../types'
+import type { ModalEvent } from '../../../types'
 import { getWeatherForEventRange } from '../composables/useWeather'
 import StatusBadge from './StatusBadge.vue'
 import WeatherBadge from './WeatherBadge.vue'

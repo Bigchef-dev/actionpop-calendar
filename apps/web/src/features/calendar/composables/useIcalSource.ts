@@ -1,6 +1,6 @@
 import { parse, Component } from 'ical.js'
-import type { AgendaConfig, ModalEvent } from '../types'
-import { NEXTCLOUD_BASE } from '../config'
+import type { AgendaConfig, ModalEvent } from '../../../types'
+import { NEXTCLOUD_BASE } from '../../../config'
 
 type EventStatus = ModalEvent['extendedProps']['status']
 
