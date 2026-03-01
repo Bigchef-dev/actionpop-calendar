@@ -30,7 +30,7 @@ export function extractReferents(description: string): string {
   for (const line of description.split(/\n|\\n/)) {
     if (/responsable|référent/i.test(line)) {
       const afterColon = line.includes(':') ? line.split(':').slice(1).join(':').trim() : ''
-      const value = afterColon || line.replace(/responsable|référent[s]?/gi, '').replace(/[:\-–]/g, '').trim()
+      const value = afterColon || line.replace(/responsable|referent|référent[s]?/gi, '').replace(/[:\-–]/g, '').trim()
       if (value) names.push(value)
     }
   }
