@@ -29,33 +29,65 @@ async function fetchAgendaEvents(agenda: AgendaConfig, date: Date): Promise<Poll
   const nextDay = new Date(targetDay)
   nextDay.setDate(nextDay.getDate() + 1)
 
-  return vevents
-    .map((vevent) => {
-      const summary = vevent.getFirstPropertyValue('summary') ?? '(sans titre)'
-      const uid = vevent.getFirstPropertyValue('uid') ?? ''
-      const description = String(vevent.getFirstPropertyValue('description') ?? '')
-      const dtstartProp = vevent.getFirstProperty('dtstart')
-      const dtendProp = vevent.getFirstProperty('dtend')
-      const startIcal = dtstartProp?.getFirstValue() ?? null
-      const endIcal = dtendProp?.getFirstValue() ?? null
-      const startDate: Date | null = startIcal?.toJSDate() ?? null
-      const endDate: Date | null = endIcal?.toJSDate() ?? null
-      const allDay = startIcal?.isDate ?? false
+  // Separate masters from RECURRENCE-ID exceptions
+  const masters: typeof vevents = []
+  const exceptions: typeof vevents = []
+  for (const v of vevents) {
+    if (v.getFirstProperty('recurrence-id')) exceptions.push(v)
+    else masters.push(v)
+  }
 
-      return {
-        id: uid,
-        title: String(summary),
-        description,
-        startDate,
-        endDate,
-        allDay,
-        color: agenda.color,
-        agendaName: agenda.name,
-        agendaId: agenda.id,
-      } satisfies PollEvent
-    })
+  // Set of (uid + startDate ISO) covered by an exception
+  const exceptionKeys = new Set<string>()
+  for (const v of exceptions) {
+    const uid = String(v.getFirstPropertyValue('uid') ?? '')
+    const rid = v.getFirstProperty('recurrence-id')?.getFirstValue()
+    if (rid) exceptionKeys.add(`${uid}::${rid.toJSDate().toISOString()}`)
+  }
+
+  const mapVevent = (vevent: (typeof vevents)[number], isException: boolean): PollEvent | null => {
+    const summary = vevent.getFirstPropertyValue('summary') ?? '(sans titre)'
+    const uid = vevent.getFirstPropertyValue('uid') ?? ''
+    const description = String(vevent.getFirstPropertyValue('description') ?? '')
+    const statusRaw = vevent.getFirstPropertyValue('status')
+    const status = (statusRaw?.toUpperCase() as string | undefined) ?? 'CONFIRMED'
+
+    // Skip cancelled exceptions (deleted occurrences)
+    if (isException && status === 'CANCELLED') return null
+
+    const dtstartProp = vevent.getFirstProperty('dtstart')
+    const dtendProp = vevent.getFirstProperty('dtend')
+    const startIcal = dtstartProp?.getFirstValue() ?? null
+    const endIcal = dtendProp?.getFirstValue() ?? null
+    const startDate: Date | null = startIcal?.toJSDate() ?? null
+    const endDate: Date | null = endIcal?.toJSDate() ?? null
+    const allDay = startIcal?.isDate ?? false
+
+    // Skip master occurrences overridden by an exception
+    if (!isException && startDate) {
+      const key = `${uid}::${startDate.toISOString()}`
+      if (exceptionKeys.has(key)) return null
+    }
+
+    return {
+      id: uid,
+      title: String(summary),
+      description,
+      startDate,
+      endDate,
+      allDay,
+      color: agenda.color,
+      agendaName: agenda.name,
+      agendaId: agenda.id,
+    } satisfies PollEvent
+  }
+
+  return [
+    ...masters.map((v) => mapVevent(v, false)),
+    ...exceptions.map((v) => mapVevent(v, true)),
+  ]
     .filter((e): e is PollEvent & { startDate: Date } => {
-      if (!e.startDate) return false
+      if (!e || !e.startDate) return false
       const s = new Date(e.startDate)
       s.setHours(s.getHours(), s.getMinutes(), 0, 0)
       return s >= targetDay && s < nextDay
