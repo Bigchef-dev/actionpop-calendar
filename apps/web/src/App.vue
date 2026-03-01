@@ -96,8 +96,8 @@ onMounted(async () => {
   <PollCreator v-if="isPollPage" :chat-id="pollChatId!" />
 
   <!-- Calendar app (default) -->
-  <div v-else class="min-h-screen antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0] dark:from-[#120a16] dark:via-[#0f0712] dark:to-[#0c050f] transition-colors duration-300">
-    <div class="max-w-6xl mx-auto px-4 py-10">
+  <div v-else class="min-h-dvh antialiased font-sans bg-gradient-to-br from-[#f8f5f9] via-[#f3eef5] to-[#ede5f0] dark:from-[#120a16] dark:via-[#0f0712] dark:to-[#0c050f] transition-colors duration-300">
+    <div class="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-10">
       <AppHeader :is-dark="isDark" @toggle-dark="toggle" />
       <FilterBar :agendas="AGENDAS" :active-ids="activeIds" @toggle="onToggle" />
       <CalendarView
@@ -110,7 +110,6 @@ onMounted(async () => {
         @dates-change="onDatesChange"
       />
       <SubscriptionGrid :agendas="AGENDAS" />
-
       <footer class="text-center mt-16 pb-6 border-t border-stone-200 dark:border-stone-700 pt-8">
         <p class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest">
           Utilise Nextcloud | GT Outils numériques Rennes 2026 | Mathéo, Lily, Amadou

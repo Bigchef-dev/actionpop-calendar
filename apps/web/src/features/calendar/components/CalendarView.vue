@@ -78,14 +78,13 @@ function renderEventContent(arg: EventContentArg) {
 const calendarOptions = computed<CalendarOptions>(() => ({
   plugins: [timeGridPlugin, dayGridPlugin, listPlugin],
   locale: frLocale,
+  height: window.innerWidth < 768 ? '80dvh' : 680,
   initialView: props.initialView ?? (window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek'),
   initialDate: props.initialDate ?? undefined,
   firstDay: 1,
-  headerToolbar: {
-    left: 'prev,next today',
-    center: 'title',
-    right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek',
-  },
+  headerToolbar: window.innerWidth < 768
+    ? { left: 'prev,next', center: 'title', right: 'timeGridDay,listWeek' }
+    : { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek' },
   buttonText: { today: 'Auj.', month: 'Mois', week: 'Semaine', day: 'Jour', list: 'Liste' },
   slotMinTime: '07:00:00',
   slotMaxTime: '23:30:00',
@@ -149,7 +148,7 @@ defineExpose({ toggleSource, refreshRender })
 
 <template>
   <div
-    class="bg-white dark:bg-stone-900 rounded-2xl p-6 border border-stone-200 dark:border-stone-700 shadow-xl shadow-stone-200/50 dark:shadow-stone-900/50 min-h-[600px]"
+    class="bg-white dark:bg-stone-900 rounded-xl sm:rounded-2xl p-2 sm:p-6 border border-stone-200 dark:border-stone-700 shadow-xl shadow-stone-200/50 dark:shadow-stone-900/50"
   >
     <FullCalendar ref="calendarRef" :options="calendarOptions" />
   </div>

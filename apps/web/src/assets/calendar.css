@@ -24,6 +24,15 @@
   color: var(--brand-dark);
 }
 
+@media (max-width: 767px) {
+  .fc-toolbar-title {
+    font-size: 0.95rem !important;
+  }
+  .fc-toolbar.fc-header-toolbar {
+    margin-bottom: 0.5em !important;
+  }
+}
+
 .fc-event {
   border: none !important;
   border-radius: 4px !important;
