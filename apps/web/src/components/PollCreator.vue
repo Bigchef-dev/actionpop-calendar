@@ -1,325 +1,55 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useDarkMode } from '../composables/useDarkMode'
-import { usePollEvents, type PollEvent } from '../composables/usePollEvents'
-import { AGENDAS, POLL_BACKEND_URL } from '../config'
+import { usePollEvents } from '../composables/usePollEvents'
+import { usePollItems } from '../composables/usePollItems'
+import { usePollDrag } from '../composables/usePollDrag'
+import { useSendPoll } from '../composables/useSendPoll'
+import { formatTime } from '../utils/poll.utils'
+import { AGENDAS } from '../config'
 import type { AgendaConfig } from '../types'
+import PollItemRow from './PollItemRow.vue'
 
 const props = defineProps<{ chatId: string }>()
 
 const { isDark, toggle } = useDarkMode()
 
-// ------------------------------------------------------------
-// Date selector
-// ------------------------------------------------------------
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-const selectedDateStr = ref<string>(todayStr())
+// Date
+function todayStr() { return new Date().toISOString().slice(0, 10) }
+const selectedDateStr = ref(todayStr())
 const selectedDate = computed(() => new Date(selectedDateStr.value + 'T00:00:00'))
 
-// ------------------------------------------------------------
-// Agenda filter chips
-// ------------------------------------------------------------
+// Agendas
 const activeAgendaIds = ref<Set<string>>(new Set(AGENDAS.map((a) => a.id)))
-
 function toggleAgenda(id: string) {
   const next = new Set(activeAgendaIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
+  next.has(id) ? next.delete(id) : next.add(id)
   activeAgendaIds.value = next
 }
+const activeAgendas = computed<AgendaConfig[]>(() => AGENDAS.filter((a) => activeAgendaIds.value.has(a.id)))
 
-const activeAgendas = computed<AgendaConfig[]>(() =>
-  AGENDAS.filter((a) => activeAgendaIds.value.has(a.id)),
-)
-
-// ------------------------------------------------------------
-// Fetch events
-// ------------------------------------------------------------
+// Events
 const { events: calEvents, loading, error: fetchError, reload } = usePollEvents(selectedDate, activeAgendas)
 
-// ------------------------------------------------------------
-// Poll item list (editable)
-// ------------------------------------------------------------
-const EMOJIS = ['🚪', '🏫', '🚇', '🍒', '🪣', '⛺', '🇵🇸', '✊', '💡', '🍽️', '📢', '🔥', '🌟', '☀️', '🏠', '🚨', '📄']
+// Items
+const { items, autoKeys, addItem, removeItem, toggleEmojiPicker, pickEmoji } = usePollItems(calEvents)
 
-interface PollItem {
-  key: number
-  checked: boolean
-  emoji: string
-  time: string
-  title: string
-  referents: string
-  color: string
-  showEmojiPicker: boolean
-}
+// Drag & drop
+const { draggingKey, dragOverKey, isTouchDragging, onDragStart, onDragOver, onDrop, onDragEnd, onHandleTouchStart, onHandleTouchMove, onHandleTouchEnd } = usePollDrag(items)
 
-let keySeq = 0
-
-function extractLeadingEmoji(text: string): { emoji: string; rest: string } {
-  // Match a leading emoji (including multi-codepoint sequences like 🖌️)
-  const match = text.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(\s*)/u)
-  if (match) {
-    return { emoji: match[1], rest: text.slice(match[0].length).trim() }
-  }
-  return { emoji: '📅', rest: text }
-}
-
-// Converts "HH:MM" (from <input type="time">) → "10h" or "10h30"
-function formatTime(t: string): string {
-  if (!t) return ''
-  const [hh, mm] = t.split(':')
-  const h = parseInt(hh, 10)
-  const m = parseInt(mm, 10)
-  return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
-}
-
-// Extract names from description lines containing "responsable" or "référent"
-function extractReferents(description: string): string {
-  const names: string[] = []
-  for (const line of description.split(/\n|\\n/)) {
-    if (/responsable|référent/i.test(line)) {
-      // grab the part after ":" if present, otherwise the whole line minus the keyword
-      const afterColon = line.includes(':') ? line.split(':').slice(1).join(':').trim() : ''
-      const value = afterColon || line.replace(/responsable|référent[s]?/gi, '').replace(/[:\-–]/g, '').trim()
-      if (value) names.push(value)
-    }
-  }
-  return names.join(', ')
-}
-
-function eventToItem(e: PollEvent): PollItem {
-  const d = e.startDate
-  const time = d
-    ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    : ''
-  const { emoji, rest } = extractLeadingEmoji(e.title)
-  return {
-    key: keySeq++,
-    checked: true,
-    emoji,
-    time,
-    title: rest,
-    referents: extractReferents(e.description),
-    color: e.color,
-    showEmojiPicker: false,
-  }
-}
-
-const CANNOT_ATTEND: PollItem = {
-  key: keySeq++,
-  checked: true,
-  emoji: '❌',
-  time: '',
-  title: 'Je ne peux pas',
-  referents: '',
-  color: '',
-  showEmojiPicker: false,
-}
-
-const items = ref<PollItem[]>([CANNOT_ATTEND])
-
-// Sync items when calEvents changes — keep manually-added items (key >= auto threshold)
-let autoKeys = new Set<number>()
-watch(calEvents, (newEvents) => {
-  const manual = items.value.filter((i) => !autoKeys.has(i.key))
-  const auto = newEvents.map((e) => eventToItem(e))
-  autoKeys = new Set(auto.map((i) => i.key))
-  items.value = [...auto, ...manual]
-})
-
-function addItem() {
-  // Insérer avant la fin
-  const newItem: PollItem = {
-    key: keySeq++,
-    checked: true,
-    emoji: '📅',
-    time: '',
-    title: '',
-    referents: '',
-    color: '',
-    showEmojiPicker: false,
-  }
-  items.value.splice(items.value.length - 1, 0, newItem)
-}
-
-function removeItem(key: number) {
-  items.value = items.value.filter((i) => i.key !== key)
-  autoKeys.delete(key)
-}
-
-// ------------------------------------------------------------
-// Drag-and-drop reorder (pointer + touch)
-// ------------------------------------------------------------
-const draggingKey = ref<number | null>(null)
-const dragOverKey = ref<number | null>(null)
-
-function onDragStart(e: DragEvent, key: number) {
-  draggingKey.value = key
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', String(key))
-  }
-}
-
-function onDragOver(e: DragEvent, key: number) {
-  e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  dragOverKey.value = key
-}
-
-function onDrop(key: number) {
-  if (draggingKey.value === null || draggingKey.value === key) return
-  const arr = [...items.value]
-  const from = arr.findIndex((i) => i.key === draggingKey.value)
-  const to = arr.findIndex((i) => i.key === key)
-  if (from === -1 || to === -1) return
-  const [item] = arr.splice(from, 1)
-  arr.splice(to, 0, item)
-  items.value = arr
-  draggingKey.value = null
-  dragOverKey.value = null
-}
-
-function onDragEnd() {
-  draggingKey.value = null
-  dragOverKey.value = null
-}
-
-// Touch drag support
-function onTouchStart(e: TouchEvent, key: number) {
-  draggingKey.value = key
-}
-
-function onTouchMove(e: TouchEvent) {
-  if (draggingKey.value === null) return
-  e.preventDefault()
-  const touch = e.touches[0]
-  const el = document.elementFromPoint(touch.clientX, touch.clientY)
-  const itemEl = el?.closest('[data-item-key]')
-  if (itemEl) {
-    const key = Number(itemEl.getAttribute('data-item-key'))
-    if (key !== draggingKey.value) dragOverKey.value = key
-  }
-}
-
-function onTouchEnd() {
-  if (draggingKey.value !== null && dragOverKey.value !== null) {
-    onDrop(dragOverKey.value)
-  }
-  draggingKey.value = null
-  dragOverKey.value = null
-}
-
-function pickEmoji(item: PollItem, emoji: string) {
-  item.emoji = emoji
-  item.showEmojiPicker = false
-}
-
-function closeAllEmojiPickers(exceptKey?: number) {
-  for (const i of items.value) {
-    if (i.key !== exceptKey) i.showEmojiPicker = false
-  }
-}
-
-function toggleEmojiPicker(item: PollItem) {
-  const wasOpen = item.showEmojiPicker
-  closeAllEmojiPickers(item.key)
-  item.showEmojiPicker = !wasOpen
-}
-
-// ------------------------------------------------------------
-// Question field
-// ------------------------------------------------------------
-const question = ref<string>('')
+// Question
+const question = ref('')
 watch(selectedDateStr, (d) => {
   const [y, m, day] = d.split('-')
   const date = new Date(Number(y), Number(m) - 1, Number(day))
   const label = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-  const labelCap = label.charAt(0).toUpperCase() + label.slice(1)
-  question.value = `📅 Actions - ${labelCap}`
+  question.value = `📅 Actions - ${label.charAt(0).toUpperCase() + label.slice(1)}`
 }, { immediate: true })
 
-// ------------------------------------------------------------
-// Send poll
-// ------------------------------------------------------------
-const sendState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
-const sendError = ref<string>('')
+// Send & copy
+const { sendState, sendError, copyState, sendPoll, copyPreview } = useSendPoll(props.chatId, question, items)
 
-// ------------------------------------------------------------
-// Clipboard copy
-// ------------------------------------------------------------
-const copyState = ref<'idle' | 'copied'>('idle')
-
-async function copyPreview() {
-  const checkedItems = items.value.filter((i) => i.checked && i.title.trim())
-  const lines = [
-    question.value.trim(),
-    '',
-    ...checkedItems.map((i) => {
-      const parts: string[] = []
-      parts.push(i.emoji)
-      if (i.time) parts.push(formatTime(i.time))
-      parts.push(i.title.trim())
-      if (i.referents.trim()) parts.push(`(${i.referents.trim()})`)
-      return parts.join(' ')
-    }),
-  ]
-  await navigator.clipboard.writeText(lines.join('\n'))
-  copyState.value = 'copied'
-  setTimeout(() => (copyState.value = 'idle'), 2000)
-}
-
-async function sendPoll() {
-  const checkedItems = items.value.filter((i) => i.checked && i.title.trim())
-  if (checkedItems.length < 2) {
-    sendError.value = 'Sélectionnez au moins 2 éléments à inclure dans le sondage.'
-    sendState.value = 'error'
-    return
-  }
-  if (!question.value.trim()) {
-    sendError.value = 'La question est obligatoire.'
-    sendState.value = 'error'
-    return
-  }
-
-  const options = checkedItems.map((i) => {
-    const parts: string[] = []
-    if (i.emoji) parts.push(i.emoji)
-    if (i.time) parts.push(formatTime(i.time))
-    parts.push(i.title.trim())
-    if (i.referents.trim()) parts.push(`(${i.referents.trim()})`)
-    return parts.join(' ')
-  })
-
-  sendState.value = 'loading'
-  sendError.value = ''
-  try {
-    const res = await fetch(`${POLL_BACKEND_URL}/send-poll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chatId: props.chatId,
-        question: question.value.trim(),
-        options,
-        isAnonymous: false,
-        allowsMultipleAnswers: true,
-      }),
-    })
-    const data = await res.json()
-    if (!data.ok) {
-      sendError.value = data.error ?? 'Erreur Telegram inconnue'
-      sendState.value = 'error'
-    } else {
-      sendState.value = 'success'
-    }
-  } catch (e) {
-    sendError.value = e instanceof Error ? e.message : 'Erreur réseau'
-    sendState.value = 'error'
-  }
-}
+const checkedItems = computed(() => items.value.filter((i) => i.checked && i.title.trim()))
 </script>
 
 <template>
@@ -422,117 +152,27 @@ async function sendPoll() {
           ⚠️ {{ fetchError }}
         </div>
 
-        <!-- No events -->
-        <div v-else-if="!loading && items.filter(i => autoKeys.has(i.key)).length === 0 && items.length === 0" class="text-sm text-stone-400 dark:text-stone-500 text-center py-6">
-          Aucun événement trouvé pour cette journée. Ajoutez-en manuellement ci-dessous.
-        </div>
-
         <!-- Items -->
         <div v-else class="space-y-2">
-          <div
+          <PollItemRow
             v-for="item in items"
             :key="item.key"
-            :data-item-key="item.key"
-            draggable="true"
-            @dragstart="onDragStart($event, item.key)"
-            @dragover="onDragOver($event, item.key)"
+            :item="item"
+            :is-auto="autoKeys.has(item.key)"
+            :is-dragging="draggingKey === item.key"
+            :is-drag-over="dragOverKey === item.key && draggingKey !== item.key"
+            :is-touch-dragging="isTouchDragging"
+            @remove="removeItem(item.key)"
+            @drag-start="onDragStart($event, item.key)"
+            @drag-over="onDragOver($event, item.key)"
             @drop="onDrop(item.key)"
-            @dragend="onDragEnd"
-            @touchstart="onTouchStart($event, item.key)"
-            @touchmove="onTouchMove"
-            @touchend="onTouchEnd"
-            class="flex flex-col gap-1.5 rounded-xl border px-3 py-2 transition-colors touch-none"
-            :class="[
-              item.checked
-                ? 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700'
-                : 'bg-stone-50 dark:bg-stone-900 border-stone-200 dark:border-stone-800 opacity-60',
-              dragOverKey === item.key && draggingKey !== item.key
-                ? 'border-violet-400 dark:border-violet-500 ring-1 ring-violet-300'
-                : '',
-              draggingKey === item.key ? 'opacity-40' : ''
-            ]"
-          >
-            <!-- Ligne 1 : contrôles + titre -->
-            <div class="flex items-center gap-2">
-              <!-- Drag handle -->
-              <span
-                class="shrink-0 cursor-grab active:cursor-grabbing text-stone-300 dark:text-stone-600 select-none text-base leading-none"
-                title="Réordonner"
-              >⠇</span>
-
-              <!-- Checkbox -->
-              <input
-                type="checkbox"
-                v-model="item.checked"
-                class="accent-violet-600 w-4 h-4 shrink-0 cursor-pointer"
-                @dragstart.prevent
-              />
-
-              <!-- Emoji picker trigger -->
-              <div class="relative shrink-0">
-                <button
-                  @click="toggleEmojiPicker(item)"
-                  class="w-8 h-8 rounded-lg bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 flex items-center justify-center text-lg transition-colors"
-                  title="Choisir un emoji"
-                >{{ item.emoji }}</button>
-
-                <!-- Emoji popover -->
-                <div
-                  v-if="item.showEmojiPicker"
-                  class="absolute z-50 top-10 left-0 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-xl shadow-xl p-2 grid grid-cols-5 gap-1 w-44"
-                >
-                  <button
-                    v-for="e in EMOJIS"
-                    :key="e"
-                    @click="pickEmoji(item, e)"
-                    class="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-700 text-base transition-colors"
-                  >{{ e }}</button>
-                </div>
-              </div>
-
-              <!-- Title input -->
-              <input
-                v-model="item.title"
-                type="text"
-                maxlength="100"
-                class="flex-1 min-w-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-800 dark:text-stone-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
-                placeholder="Titre de l'événement"
-              />
-
-              <!-- Agenda dot -->
-              <span
-                v-if="autoKeys.has(item.key) && item.color"
-                class="w-2 h-2 rounded-full shrink-0"
-                :style="{ backgroundColor: item.color }"
-                title="Source CalDAV"
-              />
-
-              <!-- Remove button -->
-              <button
-                @click="removeItem(item.key)"
-                class="shrink-0 text-stone-300 dark:text-stone-600 hover:text-red-400 dark:hover:text-red-400 text-lg leading-none transition-colors"
-                title="Supprimer"
-              >×</button>
-            </div>
-
-            <!-- Ligne 2 : heure + référents -->
-            <div class="flex items-center gap-2 pl-8">
-              <!-- Time input -->
-              <input
-                v-model="item.time"
-                type="time"
-                class="w-28 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-700 dark:text-stone-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
-              />
-
-              <!-- Referents input -->
-              <input
-                v-model="item.referents"
-                type="text"
-                class="flex-1 min-w-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 italic"
-                placeholder="Référents…"
-              />
-            </div>
-          </div>
+            @drag-end="onDragEnd"
+            @handle-touch-start="onHandleTouchStart($event, item.key)"
+            @handle-touch-move="onHandleTouchMove"
+            @handle-touch-end="onHandleTouchEnd"
+            @toggle-emoji="toggleEmojiPicker(item)"
+            @pick-emoji="pickEmoji(item, $event)"
+          />
         </div>
 
         <!-- Add item button -->
@@ -545,7 +185,7 @@ async function sendPoll() {
       </section>
 
       <!-- Preview -->
-      <section v-if="items.filter(i => i.checked && i.title.trim()).length > 0" class="mb-6">
+      <section v-if="checkedItems.length > 0" class="mb-6">
         <div class="flex items-center justify-between mb-2">
           <p class="text-xs font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest">Aperçu des options</p>
           <button
@@ -562,7 +202,7 @@ async function sendPoll() {
         </div>
         <ul class="space-y-1">
           <li
-            v-for="(item, idx) in items.filter(i => i.checked && i.title.trim())"
+            v-for="(item, idx) in checkedItems"
             :key="item.key"
             class="text-sm text-stone-700 dark:text-stone-300"
           >
