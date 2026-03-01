@@ -151,7 +151,7 @@ function removeItem(key: number) {
 }
 
 // ------------------------------------------------------------
-// Drag-and-drop reorder
+// Drag-and-drop reorder (pointer + touch)
 // ------------------------------------------------------------
 const draggingKey = ref<number | null>(null)
 const dragOverKey = ref<number | null>(null)
@@ -184,6 +184,31 @@ function onDrop(key: number) {
 }
 
 function onDragEnd() {
+  draggingKey.value = null
+  dragOverKey.value = null
+}
+
+// Touch drag support
+function onTouchStart(e: TouchEvent, key: number) {
+  draggingKey.value = key
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (draggingKey.value === null) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  const el = document.elementFromPoint(touch.clientX, touch.clientY)
+  const itemEl = el?.closest('[data-item-key]')
+  if (itemEl) {
+    const key = Number(itemEl.getAttribute('data-item-key'))
+    if (key !== draggingKey.value) dragOverKey.value = key
+  }
+}
+
+function onTouchEnd() {
+  if (draggingKey.value !== null && dragOverKey.value !== null) {
+    onDrop(dragOverKey.value)
+  }
   draggingKey.value = null
   dragOverKey.value = null
 }
@@ -266,7 +291,6 @@ async function sendPoll() {
     if (i.time) parts.push(formatTime(i.time))
     parts.push(i.title.trim())
     if (i.referents.trim()) parts.push(`(${i.referents.trim()})`)
-    return parts.join(' ')
     return parts.join(' ')
   })
 
@@ -408,12 +432,16 @@ async function sendPoll() {
           <div
             v-for="item in items"
             :key="item.key"
+            :data-item-key="item.key"
             draggable="true"
             @dragstart="onDragStart($event, item.key)"
             @dragover="onDragOver($event, item.key)"
             @drop="onDrop(item.key)"
             @dragend="onDragEnd"
-            class="flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors"
+            @touchstart="onTouchStart($event, item.key)"
+            @touchmove="onTouchMove"
+            @touchend="onTouchEnd"
+            class="flex flex-col gap-1.5 rounded-xl border px-3 py-2 transition-colors touch-none"
             :class="[
               item.checked
                 ? 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700'
@@ -424,80 +452,86 @@ async function sendPoll() {
               draggingKey === item.key ? 'opacity-40' : ''
             ]"
           >
-            <!-- Drag handle -->
-            <span
-              class="shrink-0 cursor-grab active:cursor-grabbing text-stone-300 dark:text-stone-600 select-none text-base leading-none"
-              title="Réordonner"
-            >⠇</span>
+            <!-- Ligne 1 : contrôles + titre -->
+            <div class="flex items-center gap-2">
+              <!-- Drag handle -->
+              <span
+                class="shrink-0 cursor-grab active:cursor-grabbing text-stone-300 dark:text-stone-600 select-none text-base leading-none"
+                title="Réordonner"
+              >⠇</span>
 
-            <!-- Checkbox -->
-            <input
-              type="checkbox"
-              v-model="item.checked"
-              class="accent-violet-600 w-4 h-4 shrink-0 cursor-pointer"
-              @dragstart.prevent
-            />
+              <!-- Checkbox -->
+              <input
+                type="checkbox"
+                v-model="item.checked"
+                class="accent-violet-600 w-4 h-4 shrink-0 cursor-pointer"
+                @dragstart.prevent
+              />
 
-            <!-- Emoji picker trigger -->
-            <div class="relative shrink-0">
-              <button
-                @click="toggleEmojiPicker(item)"
-                class="w-8 h-8 rounded-lg bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 flex items-center justify-center text-lg transition-colors"
-                title="Choisir un emoji"
-              >{{ item.emoji }}</button>
-
-              <!-- Emoji popover -->
-              <div
-                v-if="item.showEmojiPicker"
-                class="absolute z-50 top-10 left-0 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-xl shadow-xl p-2 grid grid-cols-5 gap-1 w-44"
-              >
+              <!-- Emoji picker trigger -->
+              <div class="relative shrink-0">
                 <button
-                  v-for="e in EMOJIS"
-                  :key="e"
-                  @click="pickEmoji(item, e)"
-                  class="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-700 text-base transition-colors"
-                >{{ e }}</button>
+                  @click="toggleEmojiPicker(item)"
+                  class="w-8 h-8 rounded-lg bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 flex items-center justify-center text-lg transition-colors"
+                  title="Choisir un emoji"
+                >{{ item.emoji }}</button>
+
+                <!-- Emoji popover -->
+                <div
+                  v-if="item.showEmojiPicker"
+                  class="absolute z-50 top-10 left-0 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-600 rounded-xl shadow-xl p-2 grid grid-cols-5 gap-1 w-44"
+                >
+                  <button
+                    v-for="e in EMOJIS"
+                    :key="e"
+                    @click="pickEmoji(item, e)"
+                    class="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 dark:hover:bg-stone-700 text-base transition-colors"
+                  >{{ e }}</button>
+                </div>
               </div>
+
+              <!-- Title input -->
+              <input
+                v-model="item.title"
+                type="text"
+                maxlength="100"
+                class="flex-1 min-w-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-800 dark:text-stone-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
+                placeholder="Titre de l'événement"
+              />
+
+              <!-- Agenda dot -->
+              <span
+                v-if="autoKeys.has(item.key) && item.color"
+                class="w-2 h-2 rounded-full shrink-0"
+                :style="{ backgroundColor: item.color }"
+                title="Source CalDAV"
+              />
+
+              <!-- Remove button -->
+              <button
+                @click="removeItem(item.key)"
+                class="shrink-0 text-stone-300 dark:text-stone-600 hover:text-red-400 dark:hover:text-red-400 text-lg leading-none transition-colors"
+                title="Supprimer"
+              >×</button>
             </div>
 
-            <!-- Time input -->
-            <input
-              v-model="item.time"
-              type="time"
-              class="w-24 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-700 dark:text-stone-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
-            />
+            <!-- Ligne 2 : heure + référents -->
+            <div class="flex items-center gap-2 pl-8">
+              <!-- Time input -->
+              <input
+                v-model="item.time"
+                type="time"
+                class="w-28 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-700 dark:text-stone-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400"
+              />
 
-            <!-- Title input -->
-            <input
-              v-model="item.title"
-              type="text"
-              maxlength="100"
-              class="flex-1 min-w-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-800 dark:text-stone-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-violet-400"
-              placeholder="Titre de l'événement"
-            />
-
-            <!-- Referents input -->
-            <input
-              v-model="item.referents"
-              type="text"
-              class="w-36 shrink-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 italic"
-              placeholder="Responsables…"
-            />
-
-            <!-- Agenda dot -->
-            <span
-              v-if="autoKeys.has(item.key) && item.color"
-              class="w-2 h-2 rounded-full shrink-0"
-              :style="{ backgroundColor: item.color }"
-              :title="'Source CalDAV'"
-            />
-
-            <!-- Remove button -->
-            <button
-              @click="removeItem(item.key)"
-              class="shrink-0 text-stone-300 dark:text-stone-600 hover:text-red-400 dark:hover:text-red-400 text-lg leading-none transition-colors"
-              title="Supprimer"
-            >×</button>
+              <!-- Referents input -->
+              <input
+                v-model="item.referents"
+                type="text"
+                class="flex-1 min-w-0 rounded-lg border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 italic"
+                placeholder="Référents…"
+              />
+            </div>
           </div>
         </div>
 
