@@ -10,6 +10,7 @@ import frLocale from '@fullcalendar/core/locales/fr'
 import type { AgendaConfig, ModalEvent } from '../../../types'
 import { buildEventSource } from '../composables/useIcalSource'
 import { getWeatherForEventRange } from '../composables/useWeather'
+import { extractReferents, formatTime } from '../../poll/utils/poll.utils'
 import StatusBadge from './StatusBadge.vue'
 import WeatherBadge from './WeatherBadge.vue'
 
@@ -35,14 +36,14 @@ const viewStart = ref<Date | null>(null)
 const viewEnd = ref<Date | null>(null)
 const copiedWeek = ref(false)
 
-function formatHour(d: Date): string {
-  const h = d.getHours()
-  const m = d.getMinutes()
-  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
-}
-
 const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+
+function timeToHHMM(d: Date): string {
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
 function copyWeek(): void {
   const api = calendarRef.value?.getApi()
@@ -51,7 +52,7 @@ function copyWeek(): void {
   const end = viewEnd.value ?? api.view.currentEnd
 
   // Collect & filter events in view range, skip cancelled
-  type RawEvent = { start: Date; end: Date | null; title: string; allDay: boolean }
+  type RawEvent = { start: Date; end: Date | null; title: string; allDay: boolean; description?: string }
   const events: RawEvent[] = api.getEvents()
     .filter((e) => {
       const s = e.start
@@ -60,7 +61,13 @@ function copyWeek(): void {
       if (status === 'CANCELLED') return false
       return s >= start && s < end
     })
-    .map((e) => ({ start: e.start as Date, end: e.end, title: e.title, allDay: e.allDay }))
+    .map((e) => ({
+      start: e.start as Date,
+      end: e.end,
+      title: e.title,
+      allDay: e.allDay,
+      description: (e.extendedProps as { description?: string }).description,
+    }))
     .sort((a, b) => a.start.getTime() - b.start.getTime())
 
   // Group by calendar day (YYYY-MM-DD key)
@@ -77,11 +84,13 @@ function copyWeek(): void {
     lines.push(`${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}`)
     for (const ev of dayEvents) {
       if (ev.allDay) {
-        lines.push(`${ev.title}`)
+        lines.push(ev.title)
       } else {
-        const s = formatHour(ev.start)
-        const e = ev.end ? ` à ${formatHour(ev.end)}` : ''
-        lines.push(`${s}${e} : ${ev.title}`)
+        const hhmm = timeToHHMM(ev.start)
+        const formatted = formatTime(hhmm)
+        const referents = extractReferents(ev.description || '')
+        const line = formatted + ' : ' + ev.title + (referents ? ` (${referents})` : '')
+        lines.push(line)
       }
     }
     lines.push('')
