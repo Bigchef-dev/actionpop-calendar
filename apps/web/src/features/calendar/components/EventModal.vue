@@ -50,6 +50,22 @@ const weather = computed(() =>
     : null,
 )
 
+function linkify(text: string): string {
+  // Escape HTML first to prevent XSS
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  // Replace URLs with clickable links
+  const linked = escaped.replace(
+    /(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-[#9750A4] underline underline-offset-2 hover:text-[#F97316] break-all transition-colors">$1</a>',
+  )
+  // Preserve line breaks
+  return linked.replace(/\n/g, '<br>')
+}
+
 const copied = ref(false)
 
 function copyLink(): void {
@@ -157,9 +173,11 @@ function downloadICS(): void {
 
             <!-- Description -->
             <div class="bg-stone-50 dark:bg-stone-800 p-4 rounded-xl border border-stone-100 dark:border-stone-700 text-sm text-stone-700 dark:text-stone-300 mb-6">
-              <p style="white-space: pre-wrap">
-                {{ event.extendedProps.description || 'Aucune description.' }}
-              </p>
+              <p
+                v-if="event.extendedProps.description"
+                v-html="linkify(event.extendedProps.description)"
+              />
+              <p v-else class="italic text-stone-400">Aucune description.</p>
             </div>
 
             <!-- Actions export -->
