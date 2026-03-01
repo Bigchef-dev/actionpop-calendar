@@ -42,6 +42,6 @@ export function buildOption(item: PollItem): string {
   if (item.emoji) parts.push(item.emoji)
   if (item.time) parts.push(formatTime(item.time))
   parts.push(item.title.trim())
-  if (item.referents.trim()) parts.push(`(référents: ${item.referents.trim()})`)
+  if (item.referents.trim()) parts.push(`(référent·e: ${item.referents.trim()})`)
   return parts.join(' ')
 }
