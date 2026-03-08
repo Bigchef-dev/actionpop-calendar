@@ -45,6 +45,13 @@ function timeToHHMM(d: Date): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+function toTime(d: Date | null): string {
+  if (!d) return ''
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}`
+}
+
 function copyWeek(): void {
   const api = calendarRef.value?.getApi()
   if (!api) return
@@ -86,10 +93,9 @@ function copyWeek(): void {
       if (ev.allDay) {
         lines.push(ev.title)
       } else {
-        const hhmm = timeToHHMM(ev.start)
-        const formatted = formatTime(hhmm)
+        const formatted = `${toTime(ev.start)} - ${toTime(ev.end)}`
         const referents = extractReferents(ev.description || '')
-        const line = formatted + ' : ' + ev.title + (referents ? ` (${referents})` : '')
+        const line = `${formatted} : ${ev.title}${referents ? ` (${referents})` : ''}`
         lines.push(line)
       }
     }
