@@ -81,6 +81,8 @@ function linkify(text: string): string {
   return linked.replace(/\n/g, '<br>')
 }
 
+const baseUrl = import.meta.env.BASE_URL
+
 const copied = ref(false)
 
 function copyLink(): void {
@@ -248,7 +250,7 @@ function downloadICS(): void {
               </a>
               <!-- Lien de téléchargement du script Tampermonkey -->
               <a
-                :href="`${import.meta.env.BASE_URL}Auto-fill Action Populaire depuis Adresse-1.0.user.js`"
+                :href="`${baseUrl}Auto-fill Action Populaire depuis Adresse-1.0.user.js`"
                 download
                 class="mt-2 flex items-center justify-center gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-500 dark:text-stone-400 py-2 rounded-lg font-medium text-xs hover:bg-stone-50 dark:hover:bg-stone-700 transition"
               >
