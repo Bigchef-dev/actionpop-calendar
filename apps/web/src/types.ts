@@ -20,5 +20,6 @@ export interface ModalEvent {
     status: 'CONFIRMED' | 'TENTATIVE' | 'CANCELLED'
     description: string
     location: string
+    type: string
   }
 }

@@ -44,6 +44,21 @@ const mapsLink = computed(() => {
   return loc ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` : '#'
 })
 
+const actionPopulaireLink = computed(() => {
+  if (!props.event) return '#'
+  const params = new URLSearchParams()
+
+  // Add event data with ap_ prefix
+  if (props.event.title) params.set('ap_title', props.event.title)
+  if (props.event.extendedProps.location) params.set('ap_location', props.event.extendedProps.location)
+  if (props.event.extendedProps.description) params.set('ap_description', props.event.extendedProps.description)
+  if (props.event.start) params.set('ap_start', props.event.start.toISOString())
+  if (props.event.end) params.set('ap_end', props.event.end.toISOString())
+  if (props.event.extendedProps.type) params.set('ap_calendar', props.event.extendedProps.type)
+  
+  return `https://actionpopulaire.fr/evenements/creer/?${params.toString()}`
+})
+
 const weather = computed(() =>
   props.event?.start && !props.event.allDay
     ? getWeatherForEventRange(props.event.start, props.event.end ?? null)
@@ -220,6 +235,28 @@ function downloadICS(): void {
                 </svg>
                 {{ copied ? 'Lien copié !' : 'Copier le lien vers cet événement' }}
               </button>
+              <!-- Bouton Action Populaire (prioritaire) -->
+              <a
+                :href="actionPopulaireLink"
+                target="_blank"
+                class="mt-2 flex items-center justify-center gap-2 bg-[#cccc00] text-black py-3 rounded-lg font-bold text-sm uppercase margin-2"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Action Populaire (autocomplétion)
+              </a>
+              <!-- Lien de téléchargement du script Tampermonkey -->
+              <a
+                :href="`${import.meta.env.BASE_URL}Auto-fill Action Populaire depuis Adresse-1.0.user.js`"
+                download
+                class="mt-2 flex items-center justify-center gap-2 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 text-stone-500 dark:text-stone-400 py-2 rounded-lg font-medium text-xs hover:bg-stone-50 dark:hover:bg-stone-700 transition"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Télécharger le script d'autocomplétion (Tampermonkey)
+              </a>
             </div>
           </div>
 

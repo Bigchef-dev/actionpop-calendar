@@ -76,6 +76,7 @@ export function buildEventSource(agenda: AgendaConfig) {
             color: agenda.color,
             classNames,
             extendedProps: { status, description, location },
+            type: agenda.name,
           }
         }
 
