@@ -1,0 +1,154 @@
+classDiagram
+    direction LR
+
+    namespace Domain {
+        class Scope {
+            +UUID scopeId
+            +string displayName
+            +bool active
+            +string scopeType
+            +activate()
+            +deactivate()
+        }
+
+        class ProcessingPeriod {
+            +Instant periodStartUtc
+            +Instant periodEndUtc
+            +string periodToken
+            +contains(Instant timestamp) bool
+        }
+
+        class EventRecord {
+            +UUID sourceEventId
+            +string contentHash
+            +int sequence
+            +EventStatus status
+            +Instant startTime
+            +Instant endTime
+            +string summary
+            +applyRevision(string contentHash)
+            +cancel()
+        }
+
+        class CalendarSnapshot {
+            +string snapshotId
+            +SnapshotStatus status
+            +int revision
+            +Instant generatedAt
+            +stage()
+            +complete()
+            +publish()
+        }
+    }
+
+    namespace Operations {
+        class IngestionJob {
+            +string jobId
+            +JobStatus status
+            +int attemptsMade
+            +claim()
+            +succeed()
+            +fail(string reason)
+        }
+
+        class IngestionLedger {
+            +LedgerStatus status
+            +Instant firstDispatchedAt
+            +Instant lastCompletedAt
+            +string lastError
+            +schedule()
+            +start()
+            +publish()
+            +markSucceeded()
+            +markFailed(string reason)
+        }
+
+        class RuntimeConfiguration {
+            +Duration dispatcherInterval
+            +int pageSize
+            +int retryLimit
+            +string publicBaseUrl
+        }
+    }
+
+    namespace Services {
+        class Dispatcher <<service>> {
+            +runCycle()
+            +discoverActiveScopes()
+            +createJobs()
+        }
+
+        class Worker <<service>> {
+            +process(IngestionJob job)
+            +retry(IngestionJob job)
+        }
+
+        class ActionPopulaireClient <<adapter>> {
+            +listGroups()
+            +listUpcomingEvents(UUID groupId, int page, int pageSize)
+            +getEvent(UUID eventId)
+        }
+
+        class EventMapper <<mapper>> {
+            +map(SourceEvent event) EventRecord
+        }
+
+        class SnapshotPublisher <<service>> {
+            +stage(EventRecord[] events) CalendarSnapshot
+            +publish(CalendarSnapshot snapshot)
+        }
+    }
+
+    class EventStatus {
+        <<enumeration>>
+        ACTIVE
+        CANCELLED
+    }
+
+    class SnapshotStatus {
+        <<enumeration>>
+        STAGING
+        COMPLETE
+    }
+
+    class JobStatus {
+        <<enumeration>>
+        WAITING
+        DELAYED
+        ACTIVE
+        COMPLETED
+        FAILED
+    }
+
+    class LedgerStatus {
+        <<enumeration>>
+        SCHEDULED
+        RUNNING
+        PUBLISHING
+        SUCCEEDED
+        RETRYING
+        FAILED
+    }
+
+    Scope "1" --> "many" ProcessingPeriod : schedules
+    Scope "1" --> "many" IngestionJob : owns scope jobs
+    ProcessingPeriod "1" --> "many" IngestionJob : identifies period
+    IngestionJob "1" --> "1" IngestionLedger : tracked by
+    Scope "many" --> "many" EventRecord : membership
+    CalendarSnapshot "1" o-- "many" EventRecord : publishes
+
+    Dispatcher --> RuntimeConfiguration : reads interval
+    Dispatcher --> Scope : discovers active scopes
+    Dispatcher --> IngestionJob : enqueues deterministic IDs
+    Dispatcher --> IngestionLedger : schedules
+
+    Worker --> IngestionJob : claims
+    Worker --> ActionPopulaireClient : retrieves pages
+    Worker --> EventMapper : transforms payloads
+    Worker --> SnapshotPublisher : publishes atomically
+    Worker --> IngestionLedger : updates state
+    SnapshotPublisher --> CalendarSnapshot : stages and publishes
+    EventRecord --> EventStatus : has status
+    CalendarSnapshot --> SnapshotStatus : has status
+    IngestionJob --> JobStatus : has status
+    IngestionLedger --> LedgerStatus : has status

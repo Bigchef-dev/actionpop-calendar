@@ -1,0 +1,118 @@
+erDiagram
+    direction LR
+
+    GROUP_SCOPE {
+        string scope_id PK "Action Populaire group id"
+        string display_name
+        boolean active "source is_active"
+        string scope_type
+        int source_subtype
+        boolean certified
+        string location_id FK
+        string source_link
+        string source_filter
+    }
+
+    PROCESSING_PERIOD {
+        string period_token PK "UTC slot identity"
+        datetime period_start_utc
+        datetime period_end_utc
+        datetime period_start_europe_paris
+        datetime period_end_europe_paris
+    }
+
+    INGESTION_JOB {
+        string job_id PK "deterministic scope-period id"
+        string queue_name "calendar-ingestion"
+        string job_type "sync-group-events"
+        string scope_id FK
+        string period_token FK
+        string status "waiting delayed active completed failed"
+        int attempts_made
+        int retry_limit
+        string worker_id "current owner"
+        datetime created_at
+        datetime started_at
+        datetime completed_at
+        string error_class
+        string last_error
+    }
+
+    INGESTION_LEDGER {
+        string ledger_key PK "technical processing identity"
+        string job_id FK
+        string status "scheduled running publishing succeeded retrying failed"
+        datetime first_dispatched_at
+        datetime last_completed_at
+        datetime last_failed_at
+        string last_worker_id
+        string source_revision
+        string final_error
+    }
+
+    EVENT_RECORD {
+        string source_event_id PK
+        string content_hash
+        int sequence
+        string status "ACTIVE CANCELLED"
+        datetime start_time
+        datetime end_time
+        string timezone "Europe/Paris"
+        string summary
+        string location_id FK
+        string source_url
+        string last_seen_period FK
+        datetime updated_at
+    }
+
+    LOCATION_RECORD {
+        string location_id PK "location event/group id"
+        string owner_type "EVENT or GROUP"
+        string name
+        string address1
+        string address2
+        string zip
+        string city
+        string department
+        string country
+        string full_address
+        string short_address
+        string short_location
+        string static_map_url
+    }
+
+    GEO_POINT {
+        string location_id PK, FK
+        string type "Point"
+        decimal longitude "-180..180"
+        decimal latitude "-90..90"
+    }
+
+    CACHE_ENTRY {
+        string cache_key PK
+        string value_reference
+        datetime expires_at
+    }
+
+    REDIS_STORE {
+        string store_id PK
+        string aof_mode "appendfsync everysec"
+        string eviction_policy "noeviction"
+        string docker_volume "named persistent volume"
+    }
+
+    %% INGESTION_JOB is infrastructure state, not an Action Populaire domain entity.
+    %% BullMQ delivery is at-least-once: workers may receive a job again after failure.
+    %% Redis writes triggered by the job must therefore be idempotent.
+
+    GROUP_SCOPE ||--o{ INGESTION_JOB : scopes
+    PROCESSING_PERIOD ||--o{ INGESTION_JOB : schedules
+    INGESTION_JOB ||--|| INGESTION_LEDGER : tracked_by
+    GROUP_SCOPE ||--o{ INGESTION_LEDGER : owns
+    PROCESSING_PERIOD ||--o{ INGESTION_LEDGER : records
+    PROCESSING_PERIOD ||--o{ EVENT_RECORD : last_seen
+    GROUP_SCOPE ||--|| LOCATION_RECORD : has_location
+    EVENT_RECORD ||--|| LOCATION_RECORD : has_location
+    LOCATION_RECORD ||--o| GEO_POINT : coordinates
+
+    REDIS_STORE ||--o{ CACHE_ENTRY : stores

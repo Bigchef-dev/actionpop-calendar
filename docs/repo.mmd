@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph Infrastructure ["Infrastructure Serveur (Docker)"]
+        
+        subgraph Monorepo ["Monorepo (pnpm workspaces)"]
+            subgraph Packages ["/packages"]
+                Core["@webcal/core\n(Types, Fonctions de Hash, Builder ICS)"]
+            end
+            
+            subgraph Apps ["/apps"]
+                API["@webcal/api\n(Serveur Fastify)"]
+                Dispatcher["Dispatcher\n(Planification des jobs)"]
+                Worker["@webcal/worker\n(Traitement BullMQ)"]
+            end
+
+            %% Dépendances internes pnpm
+            API -. dépend de .-> Core
+            Dispatcher -. dépend de .-> Core
+            Worker -. dépend de .-> Core
+        end
+        
+        Redis[("Redis\n(AOF: événements, cache, BullMQ)")]
+        RedisVolume[("Volume Docker nommé\n(Stockage physique persistant)")]
+    end
+
+    %% Acteurs et dépendances externes
+    AP_API["API REST\nAction Populaire"]
+    Clients["Clients d'agenda\n(Google, Apple, Outlook)"]
+
+    %% Les flux détaillés sont décrits dans dispatcher.mmd, worker.mmd et api.mmd.
+    %% Les responsabilités objet sont décrites dans object-design.mmd.
+    %% Les relations de données sont décrites dans data-oriented.mmd.
+    %% Les sous-groupes de données sont décrits dans data-domains.mmd.
+    style API fill:#0060B8,color:#fff,stroke:#fff
+    style Dispatcher fill:#198754,color:#fff,stroke:#fff
+    style Worker fill:#0060B8,color:#fff,stroke:#fff
+    style Redis fill:#dc3545,color:#fff,stroke:#fff
+    style RedisVolume fill:#6f42c1,color:#fff,stroke:#fff
+    style Core fill:#6c757d,color:#fff

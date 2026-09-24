@@ -1,0 +1,17 @@
+flowchart TB
+    subgraph Processing ["1. Worker / récupération pure"]
+        PROCESSING_PERIOD["PROCESSING_PERIOD"]
+        INGESTION_JOB["INGESTION_JOB"]
+        INGESTION_LEDGER["INGESTION_LEDGER"]
+    end
+
+    subgraph Validated ["2. Données récupérées, validées et actives"]
+        GROUP_SCOPE["GROUP_SCOPE"]
+        EVENT_RECORD["EVENT_RECORD"]
+        LOCATION_RECORD["LOCATION_RECORD"]
+        GEO_POINT["GEO_POINT"]
+    end
+
+    subgraph Business ["3. Surmétier - hors périmètre actuel"]
+        FUTURE["À définir plus tard"]
+    end

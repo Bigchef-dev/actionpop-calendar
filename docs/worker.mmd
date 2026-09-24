@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant Q as File BullMQ (Redis)
+    participant W as Worker 1..N
+    participant AP as API Action Populaire
+    participant R as Données Redis (AOF)
+    participant V as Volume Docker nommé
+
+    Note over Q,W: Le job est identifié par scope + période
+    Q->>W: Assigne le job au Worker disponible (verrouillage)
+    
+    W->>AP: HTTP GET /events?group=X
+    AP-->>W: Réponse JSON (Liste des événements)
+
+    W->>W: Valide et transforme les données
+    
+    loop Pour chaque événement reçu
+        W->>W: Génère Hash(Titre + Lieu + Dates)
+        W->>R: Récupère l'ancien Hash (s'il existe)
+        
+        alt Nouveau Hash == Ancien Hash
+            W->>W: Ignore (Aucune modification)
+        else Nouveau Hash != Ancien Hash
+            W->>W: Incrémente SEQUENCE (+1)
+            W->>R: Sauvegarde Nouvel Event + Hash + Sequence
+        else Événement supprimé de la source
+            W->>R: Modifie l'événement en STATUS:CANCELLED
+        end
+    end
+    R-->>V: Persiste les données via AOF
+    W->>Q: Job terminé après écriture (libère le Worker)
+
+    Note over Q,V: Redis stocke BullMQ, le cache et les événements sur le volume physique

@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    participant C as Client d'agenda
+    participant API as API Fastify
+    participant R as Redis (AOF)
+
+    C->>API: GET /feed/...
+    API->>R: Lit les événements et le cache
+    R-->>API: Retourne les données préparées
+    API-->>C: Réponse text/calendar
+
+    Note over R: Redis conserve les données en mémoire et les persiste
+    Note over R: sur le volume Docker nommé via AOF

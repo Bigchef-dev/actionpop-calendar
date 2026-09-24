@@ -1,0 +1,48 @@
+sequenceDiagram
+    autonumber
+    participant D as Dispatcher / Scheduler
+    participant Q as Queue BullMQ (Redis)
+    participant W as Worker 1..N
+    participant A as API Action Populaire
+    participant R as Redis (AOF + cache + datasets)
+    participant F as API Feed (Fastify)
+
+    Note over D,W: Période de traitement calculée dans Europe/Paris
+
+    D->>D: Vérifie que le cycle précédent est terminé
+    D->>D: Charge les groupes actifs et la période courante
+
+    loop Pour chaque scope actif
+        D->>D: Calcule job_id = scope_id + period_token
+        D->>Q: Upsert de la job definition (dedupe)
+        alt Job absent ou déjà terminé
+            Q-->>D: Job accepté / rien à créer
+        else Job actif ou déjà planifié
+            Q-->>D: Ignoré pour éviter le doublon
+        end
+    end
+
+    Q-->>W: Déclenche le job suivant disponible
+    W->>W: Claim du job (lock de propriété)
+    W->>A: GET /carte/liste_groupes/ ou /events?page=X&page_size=Y
+    A-->>W: Réponse JSON paginée
+    W->>W: Valide le payload, normalise, calcule content_hash
+
+    loop Pour chaque événement récupéré
+        W->>R: Lire l'ancien état / hash / sequence
+        alt Événement inchangé
+            W->>W: Ignorer la mise à jour
+        else Nouvel événement ou modifié
+            W->>R: Écrire l’événement, hash et sequence
+        else Événement annulé / supprimé
+            W->>R: Mettre STATUS = CANCELLED
+        end
+    end
+
+    W->>R: Publier le snapshot ou mettre à jour le dataset préparé
+    W->>Q: Confirmer le job comme terminé
+    Q-->>D: Cycle terminé / état visible
+    F->>R: Lire les événements préparés pour le calendrier
+    R-->>F: Données de lecture publique
+
+    Note over Q,R: Les effets sont idempotents : un retry ou une redelivrance ne doit pas créer de doublons ni de données incohérentes.
