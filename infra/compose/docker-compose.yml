@@ -1,0 +1,21 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - redis-data:/data
+      - ../redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  private:
+    internal: true
+
+volumes:
+  redis-data:

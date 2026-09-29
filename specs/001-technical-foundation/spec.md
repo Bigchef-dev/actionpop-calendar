@@ -20,6 +20,11 @@
 - Q: Comment paginer les événements des groupes Action Populaire ? → A: Paramètres `page` et `page_size`, pages commençant à 1, taille configurable plafonnée à 1000, jusqu’à une page courte ou vide.
 - Q: Comment découvrir la liste des groupes actifs à traiter ? → A: Utiliser `GET /carte/liste_groupes/` comme source d’autorité, synchroniser le catalogue dans Redis et ne planifier que les groupes dont `is_active` vaut `true`.
 - Q: Quelle source doit être considérée comme la source d’autorité pour découvrir les groupes actifs et récupérer les événements à ingérer ? → A: Le dispatcher lit le catalogue des groupes via `GET /carte/liste_groupes/`; ensuite, pour chaque groupe actif, le worker récupère les événements par pages via `GET /events?page=X&page_size=Y` jusqu’à la page courte ou vide.
+- Q: Que doit faire la validation lorsqu’une réponse JSON Action Populaire contient des champs inconnus ? → A: Valider les champs connus et supprimer les champs inconnus.
+- Q: Quelle librairie doit valider les payloads JSON externes ? → A: Zod.
+- Q: Que doit faire le worker lorsqu’un événement individuel ne respecte pas le schéma Zod ? → A: Échouer le job complet et conserver le dernier dataset valide.
+- Q: Un job qui échoue à cause d’un payload invalide doit-il être retenté automatiquement ? → A: Aucun retry automatique pour les erreurs Zod.
+- Q: Les dates des événements doivent-elles respecter strictement le format ISO 8601 avec timezone explicite ? → A: Oui, avec un timestamp ISO 8601 et une timezone obligatoire.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -186,6 +191,20 @@ and remains recoverable after a worker interruption.
   state when recovery is not possible.
 - **FR-027**: The repository MUST document the commands for local setup, type checks,
   tests, image builds, image publishing, and production startup.
+- **FR-028**: External Action Populaire JSON payloads MUST validate all fields used by
+  the application and MUST ignore unknown fields so compatible upstream additions do
+  not fail ingestion.
+- **FR-029**: External Action Populaire payload validation MUST use Zod schemas as the
+  runtime validation boundary and MUST expose the resulting validated TypeScript types
+  to the adapter layer.
+- **FR-030**: If any event in an ingestion job fails Zod validation, the worker MUST
+  fail the complete job, MUST NOT publish a partial dataset, and MUST preserve the
+  last complete valid dataset for API consumers.
+- **FR-031**: Jobs failed because of Zod validation errors MUST NOT be retried
+  automatically and MUST expose a permanent failure reason for operations.
+- **FR-032**: Event start and end values MUST be valid ISO 8601 timestamps with an
+  explicit timezone offset or UTC designator; optional upstream fields MAY be null or
+  empty when the source contract permits it.
 
 ### Key Entities
 

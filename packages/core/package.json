@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "zod": "^4.6.5"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

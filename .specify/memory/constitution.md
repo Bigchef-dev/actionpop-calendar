@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 -> 1.0.1
+- Version change: 1.0.1 -> 1.0.2
 - Modified principles: none
-- Added sections: Europe/Paris timezone constraint in Technology and Deployment
+- Added sections: explicit readability and validation guidance in Principle IV
 - Removed sections: none
 - Follow-up TODOs: none
 -->
@@ -36,8 +36,10 @@ Business modules SHOULD remain between 100 and 150 lines maximum unless a larger
 size is justified by a cohesive contract. When a module exceeds that limit, its
 responsibilities MUST be reviewed and split where the boundaries are meaningful.
 Code MUST favor simple control flow, named domain concepts, and existing project
-patterns over premature abstraction. The limit exists to preserve reviewability
-and maintenance, not to encourage artificial fragmentation.
+patterns over premature abstraction. Production code MUST prefer named intermediate
+steps and explicit validation over compact chains when a chain hides a business rule
+or silently discards invalid input. The limit exists to preserve reviewability and
+maintenance, not to encourage artificial fragmentation.
 
 ### V. Deployable by Default
 The application MUST be runnable and deployable through Docker with a documented,
@@ -80,4 +82,4 @@ tradeoff, and define a follow-up when the exception is temporary. The constituti
 MUST be reviewed whenever the project stack, deployment model, or quality gates
 change materially.
 
-**Version**: 1.0.1 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-24
+**Version**: 1.0.2 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-29
