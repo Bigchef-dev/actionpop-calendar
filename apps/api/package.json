@@ -1,0 +1,16 @@
+{
+  "name": "@actionpop/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@actionpop/core": "workspace:*",
+    "fastify": "^5.2.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "lint": "eslint src tests"
+  }
+}

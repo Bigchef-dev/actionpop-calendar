@@ -16,13 +16,13 @@ description: "Task list for the Technical Foundation feature"
 
 **Purpose**: Establish the pnpm TypeScript monorepo and reproducible developer commands.
 
-- [ ] T001 Create the pnpm workspace manifests for `packages/core`, `apps/api`, and `apps/worker` in `pnpm-workspace.yaml`, `package.json`, `packages/core/package.json`, `apps/api/package.json`, and `apps/worker/package.json`, using Node.js 20+ LTS and `workspace:` dependencies.
-- [ ] T002 [P] Create the shared strict TypeScript project-reference configuration in `tsconfig.json`, `tsconfig.base.json`, `packages/core/tsconfig.json`, `apps/api/tsconfig.json`, and `apps/worker/tsconfig.json` with ESM NodeNext module resolution and compiled `dist/` output.
-- [ ] T003 [P] Configure package-local Vitest projects and shared test conventions in `vitest.config.ts`, `packages/core/vitest.config.ts`, `apps/api/vitest.config.ts`, and `apps/worker/vitest.config.ts`.
-- [ ] T004 [P] Configure ESLint and formatting for strict TypeScript source and tests in `eslint.config.js` and `.prettierrc.json`.
-- [ ] T005 [P] Add the repository quality scripts for install, type checking, unit tests, integration tests, linting, and build validation in `package.json` and each workspace package manifest.
-- [ ] T006 [P] Add the initial source and test directory entry points in `packages/core/src/index.ts`, `packages/core/tests/index.test.ts`, `apps/api/src/index.ts`, `apps/api/tests/index.test.ts`, `apps/worker/src/index.ts`, and `apps/worker/tests/index.test.ts`.
-- [ ] T007 [P] Document Node.js 20+ LTS, Corepack/pnpm, local quality commands, and workspace package boundaries in `README.md`.
+- [X] T001 Create the pnpm workspace manifests for `packages/core`, `apps/api`, and `apps/worker` in `pnpm-workspace.yaml`, `package.json`, `packages/core/package.json`, `apps/api/package.json`, and `apps/worker/package.json`, using Node.js 20+ LTS and `workspace:` dependencies.
+- [X] T002 [P] Create the shared strict TypeScript project-reference configuration in `tsconfig.json`, `tsconfig.base.json`, `packages/core/tsconfig.json`, `apps/api/tsconfig.json`, and `apps/worker/tsconfig.json` with ESM NodeNext module resolution and compiled `dist/` output.
+- [X] T003 [P] Configure package-local Vitest projects and shared test conventions in `vitest.config.ts`, `packages/core/vitest.config.ts`, `apps/api/vitest.config.ts`, and `apps/worker/vitest.config.ts`.
+- [X] T004 [P] Configure ESLint and formatting for strict TypeScript source and tests in `eslint.config.js` and `.prettierrc.json`.
+- [X] T005 [P] Add the repository quality scripts for install, type checking, unit tests, integration tests, linting, and build validation in `package.json` and each workspace package manifest.
+- [X] T006 [P] Add the initial source and test directory entry points in `packages/core/src/index.ts`, `packages/core/tests/index.test.ts`, `apps/api/src/index.ts`, `apps/api/tests/index.test.ts`, `apps/worker/src/index.ts`, and `apps/worker/tests/index.test.ts`.
+- [X] T007 [P] Document Node.js 20+ LTS, Corepack/pnpm, local quality commands, and workspace package boundaries in `README.md`.
 
 ---
 

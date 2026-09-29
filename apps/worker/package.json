@@ -1,0 +1,17 @@
+{
+  "name": "@actionpop/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@actionpop/core": "workspace:*",
+    "bullmq": "^5.29.2",
+    "ioredis": "^5.4.1"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "lint": "eslint src tests"
+  }
+}
