@@ -14,19 +14,37 @@ endpoint. Run commands from the repository root.
 
 ```bash
 corepack enable
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm test:integration
+pnpm install --frozen-lockfile
+pnpm quality
 ```
 
 Expected outcomes:
 
-- All workspace packages install through pnpm.
+- All workspace packages install through pnpm with the lockfile enforced.
 - Strict TypeScript checking passes across `packages/core`, `apps/api`, and
   `apps/worker`.
 - Core, API, and worker tests run independently.
 - Integration tests use real Redis and clean up their test data.
+
+The individual quality commands are available when a focused failure needs to be
+diagnosed:
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm test:integration
+pnpm lint
+pnpm build
+```
+
+To verify that an invalid public type is rejected by the compiler gate:
+
+```bash
+pnpm exec vitest run tests/integration/typecheck-gate.test.ts --config vitest.config.ts
+```
+
+The test creates a temporary invalid export, runs `tsc -b`, and checks that the
+affected file and TypeScript diagnostic are reported.
 
 Focused examples:
 

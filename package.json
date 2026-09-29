@@ -7,7 +7,7 @@
   },
   "packageManager": "pnpm@12.8.1",
   "scripts": {
-    "install:workspace": "pnpm install --frozen-lockfile=false",
+    "install:workspace": "pnpm install --frozen-lockfile",
     "typecheck": "tsc -b",
     "test": "pnpm --recursive --if-present test",
     "test:integration": "vitest run --passWithNoTests tests/integration",
@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "pnpm --recursive --if-present build",
-    "quality": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "quality": "node scripts/quality.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

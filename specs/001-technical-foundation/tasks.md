@@ -59,17 +59,17 @@ description: "Task list for the Technical Foundation feature"
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Add a clean-install and workspace-package discovery check in `tests/integration/workspace-install.test.ts` covering `pnpm` workspace resolution and `workspace:` dependencies.
-- [ ] T023 [P] [US1] Add a strict typecheck regression fixture and command-level assertion in `tests/integration/typecheck-gate.test.ts` proving an invalid public type fails `tsc -b` with the affected package or file.
-- [ ] T024 [P] [US1] Add package-local smoke tests for core, API, and worker test commands in `packages/core/tests/smoke.test.ts`, `apps/api/tests/smoke.test.ts`, and `apps/worker/tests/smoke.test.ts`.
+- [X] T022 [P] [US1] Add a clean-install and workspace-package discovery check in `tests/integration/workspace-install.test.ts` covering `pnpm` workspace resolution and `workspace:` dependencies.
+- [X] T023 [P] [US1] Add a strict typecheck regression fixture and command-level assertion in `tests/integration/typecheck-gate.test.ts` proving an invalid public type fails `tsc -b` with the affected package or file.
+- [X] T024 [P] [US1] Add package-local smoke tests for core, API, and worker test commands in `packages/core/tests/smoke.test.ts`, `apps/api/tests/smoke.test.ts`, and `apps/worker/tests/smoke.test.ts`.
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Implement the root install, typecheck, test, integration-test, lint, and build command pipeline in `package.json` and `scripts/quality.mjs`.
-- [ ] T026 [US1] Add strict compiler options, project references, declaration output, and no-implicit-any enforcement to `tsconfig.base.json`, `packages/core/tsconfig.json`, `apps/api/tsconfig.json`, and `apps/worker/tsconfig.json`.
-- [ ] T027 [US1] Configure deterministic lockfile-based dependency installation and supported-engine validation in `package.json` and `pnpm-lock.yaml`.
-- [ ] T028 [US1] Document the clean-checkout workflow, expected successful output, focused package commands, and deliberate type-failure check in `README.md` and `specs/001-technical-foundation/quickstart.md`.
-- [ ] T029 [US1] Verify all three workspace units compile and publish their public exports without undeclared workspace dependencies in `packages/core/package.json`, `apps/api/package.json`, and `apps/worker/package.json`.
+- [X] T025 [US1] Implement the root install, typecheck, test, integration-test, lint, and build command pipeline in `package.json` and `scripts/quality.mjs`.
+- [X] T026 [US1] Add strict compiler options, project references, declaration output, and no-implicit-any enforcement to `tsconfig.base.json`, `packages/core/tsconfig.json`, `apps/api/tsconfig.json`, and `apps/worker/tsconfig.json`.
+- [X] T027 [US1] Configure deterministic lockfile-based dependency installation and supported-engine validation in `package.json` and `pnpm-lock.yaml`.
+- [X] T028 [US1] Document the clean-checkout workflow, expected successful output, focused package commands, and deliberate type-failure check in `README.md` and `specs/001-technical-foundation/quickstart.md`.
+- [X] T029 [US1] Verify all three workspace units compile and publish their public exports without undeclared workspace dependencies in `packages/core/package.json`, `apps/api/package.json`, and `apps/worker/package.json`.
 
 **Checkpoint**: User Story 1 is independently usable when a clean checkout installs, typechecks, tests, and reports deliberate public type failures consistently.
 

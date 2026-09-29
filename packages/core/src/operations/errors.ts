@@ -17,7 +17,7 @@ export class PayloadValidationError extends Error {
 }
 
 export class NetworkError extends Error {
-  readonly code = 'NETWORK_ERROR';
+  readonly code: string = 'NETWORK_ERROR';
 
   constructor(message: string) {
     super(message);
@@ -26,7 +26,7 @@ export class NetworkError extends Error {
 }
 
 export class TimeoutError extends NetworkError {
-  readonly code = 'TIMEOUT';
+  override readonly code = 'TIMEOUT';
 }
 
 export class HttpError extends Error {

@@ -4,6 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "noImplicitAny": true,
+    "noEmitOnError": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,

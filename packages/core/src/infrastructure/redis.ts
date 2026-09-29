@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 export function createRedisConnection(redisUrl: string): Redis {
   return new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: null });

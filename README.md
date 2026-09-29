@@ -11,18 +11,27 @@ ActionPop Calendar is a pnpm TypeScript monorepo with three workspace units:
 - Node.js 20+ LTS
 - Corepack with pnpm enabled
 
-Enable the pinned package-manager version and install dependencies:
+Enable the pinned package-manager version and install dependencies from the lockfile:
 
 ```bash
 corepack enable
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-Run the repository quality checks:
+Run the complete repository quality pipeline:
+
+```bash
+pnpm quality
+```
+
+The quality pipeline runs strict project-reference type checking, linting, package
+tests, integration tests, and builds for all workspace units. Individual checks are
+also available:
 
 ```bash
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm lint
 pnpm build
 ```
@@ -33,6 +42,14 @@ Focused package commands use pnpm filters:
 pnpm --filter @actionpop/core test
 pnpm --filter @actionpop/api test
 pnpm --filter @actionpop/worker test
+```
+
+To verify the typecheck gate, run the dedicated regression test. It creates a
+temporary public TypeScript value with an invalid type and expects `tsc -b` to report
+the affected file:
+
+```bash
+pnpm exec vitest run tests/integration/typecheck-gate.test.ts --config vitest.config.ts
 ```
 
 The workspace keeps the API and worker independently deployable. Shared code belongs
