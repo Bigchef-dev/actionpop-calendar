@@ -69,3 +69,12 @@ docker compose -f infra/compose/docker-compose.yml up -d
 The public surface is the read-only `GET /feed/{scopeId}` route. Redis, BullMQ,
 worker responsibilities, and internal health routes stay on the private network.
 Production traffic must terminate HTTPS at the deployment edge.
+
+GitHub Actions runs install, typecheck, lint, tests, integration checks, builds, and
+both Docker targets. Pushes to `main` publish immutable API and worker images to
+GHCR using the commit SHA; registry credentials are supplied by GitHub Actions.
+
+Worker operations use a 15-minute dispatcher period by default. Retry limits and
+backoff are configured with `QUEUE_ATTEMPTS` and `QUEUE_BACKOFF_MS`; inspect queue
+depth, exhausted jobs, upstream failures, and Redis readiness through the monitoring
+configuration under `infra/monitoring/`.

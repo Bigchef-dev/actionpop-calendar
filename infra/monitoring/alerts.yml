@@ -1,0 +1,28 @@
+groups:
+  - name: actionpop-worker
+    rules:
+      - alert: ActionPopApiUnavailable
+        expr: up{service="api"} == 0
+        for: 2m
+      - alert: ActionPopQueueGrowing
+        expr: actionpop_queue_depth > 100
+        for: 15m
+      - alert: ActionPopExhaustedJobs
+        expr: increase(actionpop_jobs_exhausted_total[15m]) > 0
+      - alert: ActionPopRedisUnavailable
+        expr: actionpop_redis_ready == 0
+        for: 2m
+      - alert: ActionPopUpstreamFailures
+        expr: increase(actionpop_upstream_failures_total[15m]) > 10
+      - alert: ActionPopIngestionStale
+        expr: time() - actionpop_ingestion_last_success_timestamp > 1800
+        for: 5m
+      - alert: ActionPopDiskPressure
+        expr: node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.15
+        for: 10m
+      - alert: ActionPopMemoryPressure
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.15
+        for: 10m
+      - alert: ActionPopMetricsUnavailable
+        expr: absent(actionpop_queue_depth)
+        for: 10m

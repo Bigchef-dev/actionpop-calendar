@@ -1,0 +1,9 @@
+{
+  "title": "ActionPop Calendar Worker",
+  "panels": [
+    {"title": "Queue depth", "metric": "actionpop_queue_depth"},
+    {"title": "Job duration", "metric": "actionpop_job_duration_seconds"},
+    {"title": "Exhausted jobs", "metric": "actionpop_jobs_exhausted_total"},
+    {"title": "Redis readiness", "metric": "actionpop_redis_ready"}
+  ]
+}

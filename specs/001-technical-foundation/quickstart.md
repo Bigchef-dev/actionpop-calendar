@@ -104,6 +104,23 @@ Verify that:
   configured operational limits.
 - Adding worker instances increases throughput without duplicate active ownership.
 
+Optional Redis-backed scaling and capacity checks are enabled explicitly:
+
+```bash
+RUN_REDIS_INTEGRATION=1 pnpm test:integration
+RUN_CAPACITY_TEST=1 pnpm exec vitest run tests/integration/capacity.test.ts
+```
+
+The worker defaults to a 15-minute dispatcher interval. Configure `QUEUE_ATTEMPTS`
+and `QUEUE_BACKOFF_MS`, then inspect failed jobs and queue growth using the metrics
+and alert rules in `infra/monitoring/`.
+
+## Backup and restore
+
+Validate AOF persistence and perform an external backup with the commands in
+`infra/redis/README.md`. A normal Redis container restart must preserve datasets and
+queued jobs; loss of the host or named volume is outside the recovery guarantee.
+
 ## API contract checks
 
 ```bash
