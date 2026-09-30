@@ -18,17 +18,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Normalize image owner
+        id: image
+        shell: bash
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/docker/Dockerfile
           target: api
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/actionpop-api:${{ github.sha }}
+          tags: ghcr.io/${{ steps.image.outputs.owner }}/actionpop-api:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/docker/Dockerfile
           target: worker
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/actionpop-worker:${{ github.sha }}
+          tags: ghcr.io/${{ steps.image.outputs.owner }}/actionpop-worker:${{ github.sha }}
