@@ -83,22 +83,22 @@ description: "Task list for the Technical Foundation feature"
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Add Fastify injection contract tests for `GET /feed/{scopeId}`, `ETag`/`304`, stable calendar output, invalid scope `400`, unknown scope `404`, unavailable Redis `503`, and mutation `405` in `apps/api/tests/feed.contract.test.ts`.
-- [ ] T031 [P] [US2] Add API boundary tests proving feed requests read the current Redis snapshot and never call Action Populaire in `apps/api/tests/feed-read-boundary.test.ts`.
-- [ ] T032 [P] [US2] Add worker startup/readiness tests proving BullMQ and Redis configuration is required while the worker exposes no API route in `apps/worker/tests/startup.contract.test.ts`.
-- [ ] T033 [P] [US2] Add Docker image and runtime contract tests for separate `api` and `worker` targets, non-root execution, required environment failures, and runtime-only files in `tests/integration/images.test.ts`.
-- [ ] T034 [P] [US2] Add Redis restart integration coverage proving a prepared dataset and queued test job survive a normal container restart with the named volume in `tests/integration/redis-persistence.test.ts`.
+- [X] T030 [P] [US2] Add Fastify injection contract tests for `GET /feed/{scopeId}`, `ETag`/`304`, stable calendar output, invalid scope `400`, unknown scope `404`, unavailable Redis `503`, and mutation `405` in `apps/api/tests/feed.contract.test.ts`.
+- [X] T031 [P] [US2] Add API boundary tests proving feed requests read the current Redis snapshot and never call Action Populaire in `apps/api/tests/feed-read-boundary.test.ts`.
+- [X] T032 [P] [US2] Add worker startup/readiness tests proving BullMQ and Redis configuration is required while the worker exposes no API route in `apps/worker/tests/startup.contract.test.ts`.
+- [X] T033 [P] [US2] Add Docker image and runtime contract tests for separate `api` and `worker` targets, non-root execution, required environment failures, and runtime-only files in `tests/integration/images.test.ts`.
+- [X] T034 [P] [US2] Add Redis restart integration coverage proving a prepared dataset and queued test job survive a normal container restart with the named volume in `tests/integration/redis-persistence.test.ts`.
 
 ### Implementation for User Story 2
 
-- [ ] T035 [P] [US2] Implement the calendar domain model, iCalendar escaping, CRLF serialization, stable UID/SEQUENCE, UTC `DTSTAMP`/`LAST-MODIFIED`, and feed revision generation in `packages/core/src/calendar/ical-feed.ts` and `packages/core/src/calendar/ical-feed.test.ts`.
-- [ ] T036 [P] [US2] Implement Redis snapshot read and feed cache access against `dataset:{scopeToken}:current` and complete snapshots in `packages/core/src/persistence/calendar-dataset-repository.ts` and `packages/core/src/persistence/calendar-dataset-repository.test.ts`.
-- [ ] T037 [US2] Implement the public read-only Fastify feed route, private liveness/readiness routes, conditional requests, sanitized errors, and request metrics in `apps/api/src/server.ts`, `apps/api/src/routes/feed.ts`, and `apps/api/src/routes/health.ts`.
-- [ ] T038 [US2] Implement API startup validation, Redis reconnect behavior, structured request logging, and graceful shutdown in `apps/api/src/config.ts` and `apps/api/src/main.ts`.
-- [ ] T039 [P] [US2] Implement worker process startup, private readiness/liveness checks, BullMQ connection initialization, and graceful shutdown without registering an HTTP feed server in `apps/worker/src/main.ts`, `apps/worker/src/health.ts`, and `apps/worker/src/config.ts`.
-- [ ] T040 [P] [US2] Create the multi-stage Dockerfile with separate `api` and `worker` targets, pnpm production dependency installation, compiled runtime files, and non-root Alpine runtime users in `infra/docker/Dockerfile`.
-- [ ] T041 [P] [US2] Define registry-backed API/worker image tags, HTTPS edge routing, private internal network exposure, required environment variables, restart policies, and Redis dependencies in `infra/compose/docker-compose.yml`, `infra/compose/.env.example`, and `infra/compose/README.md`.
-- [ ] T042 [US2] Add production build, registry publish, startup, healthcheck, HTTPS, and read-only public-feed validation commands to `README.md` and `specs/001-technical-foundation/quickstart.md`.
+- [X] T035 [P] [US2] Implement the calendar domain model, iCalendar escaping, CRLF serialization, stable UID/SEQUENCE, UTC `DTSTAMP`/`LAST-MODIFIED`, and feed revision generation in `packages/core/src/calendar/ical-feed.ts` and `packages/core/src/calendar/ical-feed.test.ts`.
+- [X] T036 [P] [US2] Implement Redis snapshot read and feed cache access against `dataset:{scopeToken}:current` and complete snapshots in `packages/core/src/persistence/calendar-dataset-repository.ts` and `packages/core/src/persistence/calendar-dataset-repository.test.ts`.
+- [X] T037 [US2] Implement the public read-only Fastify feed route, private liveness/readiness routes, conditional requests, sanitized errors, and request metrics in `apps/api/src/server.ts`, `apps/api/src/routes/feed.ts`, and `apps/api/src/routes/health.ts`.
+- [X] T038 [US2] Implement API startup validation, Redis reconnect behavior, structured request logging, and graceful shutdown in `apps/api/src/config.ts` and `apps/api/src/main.ts`.
+- [X] T039 [P] [US2] Implement worker process startup, private readiness/liveness checks, BullMQ connection initialization, and graceful shutdown without registering an HTTP feed server in `apps/worker/src/main.ts`, `apps/worker/src/health.ts`, and `apps/worker/src/config.ts`.
+- [X] T040 [P] [US2] Create the multi-stage Dockerfile with separate `api` and `worker` targets, pnpm production dependency installation, compiled runtime files, and non-root Alpine runtime users in `infra/docker/Dockerfile`.
+- [X] T041 [P] [US2] Define registry-backed API/worker image tags, HTTPS edge routing, private internal network exposure, required environment variables, restart policies, and Redis dependencies in `infra/compose/docker-compose.yml`, `infra/compose/.env.example`, and `infra/compose/README.md`.
+- [X] T042 [US2] Add production build, registry publish, startup, healthcheck, HTTPS, and read-only public-feed validation commands to `README.md` and `specs/001-technical-foundation/quickstart.md`.
 
 **Checkpoint**: User Story 2 is independently deployable when API and worker images build/start separately, use only environment-provided configuration, preserve Redis data, and expose only their documented surfaces.
 

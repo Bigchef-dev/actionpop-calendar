@@ -56,3 +56,16 @@ The workspace keeps the API and worker independently deployable. Shared code bel
 in `packages/core`; service-specific code stays in its application package. Runtime
 configuration and deployment details are documented in the technical foundation
 quickstart under `specs/001-technical-foundation/quickstart.md`.
+
+Build and start the independent runtime targets:
+
+```bash
+docker build --target api -t actionpop-api:test -f infra/docker/Dockerfile .
+docker build --target worker -t actionpop-worker:test -f infra/docker/Dockerfile .
+cp infra/compose/.env.example infra/compose/.env
+docker compose -f infra/compose/docker-compose.yml up -d
+```
+
+The public surface is the read-only `GET /feed/{scopeId}` route. Redis, BullMQ,
+worker responsibilities, and internal health routes stay on the private network.
+Production traffic must terminate HTTPS at the deployment edge.

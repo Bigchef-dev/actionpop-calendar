@@ -123,12 +123,18 @@ Verify:
 
 ```bash
 # Build both runtime targets.
-docker build --target api -t actionpop-api:test .
-docker build --target worker -t actionpop-worker:test .
+docker build --target api -t actionpop-api:test -f infra/docker/Dockerfile .
+docker build --target worker -t actionpop-worker:test -f infra/docker/Dockerfile .
 
 # Start the local stack and inspect health, logs, and metrics.
+cp infra/compose/.env.example infra/compose/.env
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
+
+The API exposes only `GET /feed/{scopeId}` publicly. `POST`, `PUT`, `PATCH`, and
+`DELETE` feed requests return `405`; Redis, BullMQ, worker health, and administration
+surfaces remain private. Configure registry image names with `API_IMAGE` and
+`WORKER_IMAGE`; provide secrets through the deployment environment.
 
 Verify that healthchecks distinguish liveness from readiness, JSON logs include job
 or request context without secrets, metrics expose queue and failure signals, and a

@@ -1,17 +1,49 @@
 services:
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ['redis-server', '/usr/local/etc/redis/redis.conf']
     volumes:
       - redis-data:/data
       - ../redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - private
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    image: ${API_IMAGE:-actionpop-api:latest}
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NODE_ENV: ${NODE_ENV:-production}
+      TIMEZONE: ${TIMEZONE:-Europe/Paris}
+      PORT: ${PORT:-3000}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - private
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/internal/live']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    image: ${WORKER_IMAGE:-actionpop-worker:latest}
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      NODE_ENV: ${NODE_ENV:-production}
+      TIMEZONE: ${TIMEZONE:-Europe/Paris}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - private
+    restart: unless-stopped
 
 networks:
   private:
