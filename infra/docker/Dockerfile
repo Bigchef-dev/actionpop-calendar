@@ -8,6 +8,7 @@ COPY apps/worker/package.json apps/worker/package.json
 RUN pnpm install --frozen-lockfile
 COPY packages packages
 COPY apps apps
+RUN rm -f packages/core/tsconfig.tsbuildinfo apps/api/tsconfig.tsbuildinfo apps/worker/tsconfig.tsbuildinfo
 RUN pnpm --filter @actionpop/core build && pnpm --filter @actionpop/api build && pnpm --filter @actionpop/worker build
 
 FROM node:20-alpine AS runtime-base

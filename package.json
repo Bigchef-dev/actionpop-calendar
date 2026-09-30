@@ -8,7 +8,7 @@
   "packageManager": "pnpm@12.8.1",
   "scripts": {
     "install:workspace": "pnpm install --frozen-lockfile",
-    "typecheck": "tsc -b",
+    "typecheck": "pnpm --filter @actionpop/core typecheck && pnpm --filter @actionpop/api typecheck && pnpm --filter @actionpop/worker typecheck",
     "test": "pnpm --recursive --if-present test",
     "test:integration": "vitest run --passWithNoTests tests/integration",
     "lint": "eslint .",
