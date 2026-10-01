@@ -15,11 +15,16 @@ services:
 
   api:
     image: ${API_IMAGE:-actionpop-api:latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
-      PORT: ${PORT:-3000}
+      PORT: "3000"
+    ports: 
+      - "3000:3000"
     depends_on:
       redis:
         condition: service_healthy
@@ -27,13 +32,16 @@ services:
       - private
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/internal/live']
+      test: ['CMD', 'wget', '-qO-', 'http://api:3000/internal/live']
       interval: 10s
       timeout: 3s
       retries: 5
 
   worker:
     image: ${WORKER_IMAGE:-actionpop-worker:latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       NODE_ENV: ${NODE_ENV:-production}

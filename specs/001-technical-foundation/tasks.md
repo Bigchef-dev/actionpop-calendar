@@ -96,7 +96,7 @@ description: "Task list for the Technical Foundation feature"
 - [X] T037 [US2] Implement the public read-only Fastify feed route, private liveness/readiness routes, conditional requests, sanitized errors, and request metrics in `apps/api/src/server.ts`, `apps/api/src/routes/feed.ts`, and `apps/api/src/routes/health.ts`.
 - [X] T038 [US2] Implement API startup validation, Redis reconnect behavior, structured request logging, and graceful shutdown in `apps/api/src/config.ts` and `apps/api/src/main.ts`.
 - [X] T039 [P] [US2] Implement worker process startup, private readiness/liveness checks, BullMQ connection initialization, and graceful shutdown without registering an HTTP feed server in `apps/worker/src/main.ts`, `apps/worker/src/health.ts`, and `apps/worker/src/config.ts`.
-- [X] T040 [P] [US2] Create the multi-stage Dockerfile with separate `api` and `worker` targets, pnpm production dependency installation, compiled runtime files, and non-root Alpine runtime users in `infra/docker/Dockerfile`.
+- [X] T040 [P] [US2] Create separate multi-stage Dockerfiles for `api` and `worker`, with pnpm production dependency installation, compiled runtime files, and non-root Alpine runtime users in `infra/docker/Dockerfile.api` and `infra/docker/Dockerfile.worker`.
 - [X] T041 [P] [US2] Define registry-backed API/worker image tags, HTTPS edge routing, private internal network exposure, required environment variables, restart policies, and Redis dependencies in `infra/compose/docker-compose.yml`, `infra/compose/.env.example`, and `infra/compose/README.md`.
 - [X] T042 [US2] Add production build, registry publish, startup, healthcheck, HTTPS, and read-only public-feed validation commands to `README.md` and `specs/001-technical-foundation/quickstart.md`.
 

@@ -20,7 +20,7 @@ export function createWorkerRuntime(
 
   return {
     async start() {
-      await redis.connect();
+      await worker.waitUntilReady();
     },
     async close() {
       await worker.close();

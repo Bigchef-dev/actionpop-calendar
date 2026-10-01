@@ -1,7 +1,11 @@
 import { ConfigurationError } from '../operations/errors.js';
+import { config } from 'dotenv';
+
+config();
 
 export const DEFAULT_TIMEZONE = 'Europe/Paris';
 export const DEFAULT_DISPATCHER_INTERVAL_MS = 15 * 60 * 1000;
+
 
 export interface RuntimeConfig {
   service: string;

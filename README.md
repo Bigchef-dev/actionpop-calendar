@@ -44,6 +44,20 @@ pnpm --filter @actionpop/api test
 pnpm --filter @actionpop/worker test
 ```
 
+For local API development, start the private Redis dependency with Docker, then
+run the API through pnpm in a second terminal:
+
+```bash
+pnpm dev:redis
+REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=development pnpm dev
+```
+
+The API is then available at `http://127.0.0.1:3000`. The public surface remains
+the read-only `GET /feed/{scopeId}` route; Redis, worker responsibilities, and
+internal health routes are not exposed by the development command. The dev
+override binds Redis to loopback only; the production Compose configuration keeps
+Redis private to the Docker network.
+
 To verify the typecheck gate, run the dedicated regression test. It creates a
 temporary public TypeScript value with an invalid type and expects `tsc -b` to report
 the affected file:
@@ -60,8 +74,8 @@ quickstart under `specs/001-technical-foundation/quickstart.md`.
 Build and start the independent runtime targets:
 
 ```bash
-docker build --target api -t actionpop-api:test -f infra/docker/Dockerfile .
-docker build --target worker -t actionpop-worker:test -f infra/docker/Dockerfile .
+docker build -t actionpop-api:test -f infra/docker/Dockerfile.api .
+docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 cp infra/compose/.env.example infra/compose/.env
 docker compose -f infra/compose/docker-compose.yml up -d
 ```

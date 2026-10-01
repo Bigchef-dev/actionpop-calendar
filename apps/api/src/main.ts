@@ -24,4 +24,4 @@ export async function startApi(): Promise<void> {
   await server.listen({ host: '0.0.0.0', port: Number(process.env.PORT ?? 3000) });
 }
 
-if (process.argv[1]?.endsWith('/main.js')) void startApi();
+void startApi();

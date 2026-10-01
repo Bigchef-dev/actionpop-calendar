@@ -1,0 +1,21 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+COPY packages/core/package.json packages/core/package.json
+COPY apps/api/package.json apps/api/package.json
+COPY apps/worker/package.json apps/worker/package.json
+RUN pnpm install --frozen-lockfile
+COPY packages packages
+COPY apps apps
+RUN rm -f packages/core/tsconfig.tsbuildinfo apps/api/tsconfig.tsbuildinfo apps/worker/tsconfig.tsbuildinfo
+RUN pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build
+RUN pnpm --filter @actionpop/worker deploy --prod /tmp/worker
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup -S actionpop && adduser -S actionpop -G actionpop
+COPY --from=build /tmp/worker/ ./
+USER actionpop
+CMD ["node", "dist/main.js"]

@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false --force",
     "test": "vitest run",
     "lint": "eslint src tests",
     "quality": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"

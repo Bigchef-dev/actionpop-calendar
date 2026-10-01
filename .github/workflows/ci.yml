@@ -29,5 +29,5 @@ jobs:
       - run: pnpm test
       - run: pnpm test:integration
       - run: pnpm build
-      - run: docker build --target api -t actionpop-api:${{ github.sha }} -f infra/docker/Dockerfile .
-      - run: docker build --target worker -t actionpop-worker:${{ github.sha }} -f infra/docker/Dockerfile .
+      - run: docker build -t actionpop-api:${{ github.sha }} -f infra/docker/Dockerfile.api .
+      - run: docker build -t actionpop-worker:${{ github.sha }} -f infra/docker/Dockerfile.worker .

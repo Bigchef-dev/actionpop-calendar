@@ -140,8 +140,8 @@ Verify:
 
 ```bash
 # Build both runtime targets.
-docker build --target api -t actionpop-api:test -f infra/docker/Dockerfile .
-docker build --target worker -t actionpop-worker:test -f infra/docker/Dockerfile .
+docker build -t actionpop-api:test -f infra/docker/Dockerfile.api .
+docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 
 # Start the local stack and inspect health, logs, and metrics.
 cp infra/compose/.env.example infra/compose/.env
