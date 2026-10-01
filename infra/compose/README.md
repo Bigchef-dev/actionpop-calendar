@@ -1,7 +1,9 @@
 # Deployment
 
 Copy `.env.example` to `.env`, replace the registry image names, and provide
-deployment secrets through the environment rather than committing them.
+deployment secrets through the environment rather than committing them. Set
+`UPSTREAM_BASE_URL` for the worker; `UPSTREAM_TOKEN` is optional when the source
+does not require authentication.
 
 ```bash
 docker compose -f infra/compose/docker-compose.yml up -d
@@ -14,8 +16,8 @@ From the repository root, Compose can build both application images directly:
 docker compose -f infra/compose/docker-compose.yml up --build
 ```
 
-For local development, the API is available at `http://localhost:3000`. The port
-is bound to loopback only; production traffic should use the HTTPS edge.
+For local development, use the API from the private Compose network or add a
+local-only port override. Production traffic goes through the HTTPS edge.
 
 Set `API_IMAGE` and `WORKER_IMAGE` when the services should use registry images
 instead of the local default tags.
@@ -28,4 +30,6 @@ docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 ```
 
 Redis, worker, and internal health endpoints remain on the private network. Public
-HTTPS termination belongs at the deployment edge.
+HTTPS termination belongs at the deployment edge. Provide certificates under
+`infra/compose/tls/` and start the edge explicitly with
+`docker compose --profile edge -f infra/compose/docker-compose.yml up -d`.

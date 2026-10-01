@@ -30,6 +30,15 @@ export class MetricsRegistry {
     return samples;
   }
 
+  prometheus(): string {
+    return this.snapshot().map((sample) => {
+      const labels = Object.entries(sample.labels)
+        .map(([name, value]) => `${name}="${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n')}"`)
+        .join(',');
+      return `${sample.name}${labels.length === 0 ? '' : `{${labels}}`} ${sample.value}`;
+    }).join('\n') + '\n';
+  }
+
   private update(name: string, labels: MetricLabels, amount: number): void {
     const normalized = this.normalizeLabels(labels);
     const key = this.key(name, normalized);

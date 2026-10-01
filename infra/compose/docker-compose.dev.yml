@@ -10,10 +10,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
     ports:
       - "127.0.0.1:6379:6379"
 
+  redisinsight:
+      image: redis/redisinsight:latest
+      container_name: dev-redisinsight
+      restart: unless-stopped
+      ports:
+        - "5540:5540"
+      volumes:
+        - redisinsight_data:/data
+      depends_on:
+        - redis
+
+  bull-board:
+    image: ghcr.io/felixmosh/bull-board:latest
+    container_name: bull-board
+    restart: unless-stopped
+    ports:
+      - "5541:3000"
+    command: ["--redis", "redis://redis:6379"]
+    depends_on:
+      - redis
 volumes:
   redis-data:
+  redisinsight_data:
     

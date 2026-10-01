@@ -1,5 +1,5 @@
 import { hashCalendarContent, nextEventRevision } from '@actionpop/core';
-import { buildRedisKey } from '@actionpop/core';
+import { buildRedisKey, normalizeScopeToken } from '@actionpop/core';
 
 interface IncomingEvent { id: string; name: string; startTime: string; endTime: string; description?: string }
 export interface PublishedEvent extends IncomingEvent { sourceEventId: string; contentHash: string; sequence: number }
@@ -26,14 +26,27 @@ export class SnapshotPublisher {
 }
 
 export class RedisSnapshotPublisher {
-  public constructor(private readonly redis: { get(key: string): Promise<string | null>; set(key: string, value: string): Promise<unknown> }, private readonly namespace = 'actionpop') {}
+  public constructor(private readonly redis: {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string): Promise<unknown>;
+    eval?: (script: string, keyCount: number, ...args: string[]) => Promise<unknown>;
+  }, private readonly namespace = 'actionpop') {}
 
   public async publish(scopeId: string, snapshot: PublishedSnapshot, complete = true): Promise<void> {
     if (!complete) throw new Error('only complete snapshots can be published');
-    const stagedKey = buildRedisKey(this.namespace, 'dataset', scopeId, `staging-${snapshot.revision}`);
-    const currentKey = buildRedisKey(this.namespace, 'dataset', scopeId, 'current');
-    await this.redis.set(stagedKey, JSON.stringify(snapshot));
-    await this.redis.set(currentKey, JSON.stringify(snapshot));
+    const token = normalizeScopeToken(scopeId);
+    const stagedKey = buildRedisKey(this.namespace, 'dataset', token, `staging-${snapshot.revision}`);
+    const currentKey = buildRedisKey(this.namespace, 'dataset', token, 'current');
+    const payload = JSON.stringify({ ...snapshot, status: 'complete' });
+    if (this.redis.eval !== undefined) {
+      await this.redis.eval(
+        'redis.call("SET", KEYS[1], ARGV[1]); redis.call("SET", KEYS[2], ARGV[1]); return 1',
+        2, stagedKey, currentKey, payload,
+      );
+      return;
+    }
+    await this.redis.set(stagedKey, payload);
+    await this.redis.set(currentKey, payload);
   }
 }
 

@@ -13,4 +13,13 @@ describe('metrics', () => {
       { name: 'job_total', labels: { outcome: 'other' }, value: 1 },
     ]);
   });
+
+  it('exports samples in a Prometheus-compatible format', () => {
+    const metrics = new MetricsRegistry();
+    metrics.increment('actionpop_jobs_failed_total', { reason: 'network' });
+    metrics.setGauge('actionpop_redis_ready', {}, 1);
+
+    expect(metrics.prometheus()).toContain('actionpop_jobs_failed_total{reason="network"} 1');
+    expect(metrics.prometheus()).toContain('actionpop_redis_ready 1');
+  });
 });

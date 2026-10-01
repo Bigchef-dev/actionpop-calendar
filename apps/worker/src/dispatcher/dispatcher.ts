@@ -8,9 +8,11 @@ interface DispatcherQueue {
 }
 
 interface DispatcherOptions {
-  catalogue: Pick<GroupCatalogueRepository, 'activeScopes'>;
+  catalogue: Pick<GroupCatalogueRepository, 'activeScopes'> | { activeScopes: () => Promise<string[]> };
   queue: DispatcherQueue;
   lock: Pick<RedisLock, 'acquire' | 'release'>;
+  isScheduled?: (jobId: string) => Promise<boolean>;
+  onScheduled?: (jobId: string, scopeId: string, periodToken: string) => Promise<void>;
   now?: () => Date;
   intervalMs?: number;
 }
@@ -18,7 +20,6 @@ interface DispatcherOptions {
 export function createDispatcher(options: DispatcherOptions) {
   const intervalMs = options.intervalMs ?? DEFAULT_DISPATCHER_INTERVAL_MS;
   let running = false;
-  const scheduled = new Set<string>();
   return {
     intervalMs,
     async runOnce(): Promise<void> {
@@ -28,14 +29,15 @@ export function createDispatcher(options: DispatcherOptions) {
       running = true;
       try {
         const period = calculateProcessingPeriod(options.now?.() ?? new Date(), intervalMs);
-        await Promise.all(options.catalogue.activeScopes().map(async (scopeId) => {
+        const scopes = await options.catalogue.activeScopes();
+        await Promise.all(scopes.map(async (scopeId) => {
           const jobId = buildIngestionJobId(scopeId, period.periodStartUtc);
-          if (scheduled.has(jobId)) return;
+          if (options.isScheduled !== undefined && await options.isScheduled(jobId)) return;
           await options.queue.add('calendar-ingestion', {
             scopeId, periodStartUtc: period.periodStartUtc.toISOString(), periodEndUtc: period.periodEndUtc.toISOString(),
             periodStartEuropeParis: period.periodStartEuropeParis, jobVersion: 1,
           }, { jobId });
-          scheduled.add(jobId);
+          await options.onScheduled?.(jobId, scopeId, period.periodToken);
         }));
       } finally {
         running = false;

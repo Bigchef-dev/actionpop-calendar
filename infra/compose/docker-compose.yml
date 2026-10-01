@@ -23,8 +23,6 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
       PORT: "3000"
-    ports: 
-      - "3000:3000"
     depends_on:
       redis:
         condition: service_healthy
@@ -46,8 +44,32 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
+      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:?UPSTREAM_BASE_URL is required}
+      UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
+      WORKER_HEALTH_PORT: "8081"
     depends_on:
       redis:
+        condition: service_healthy
+    networks:
+      - private
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8081/health/ready').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  edge:
+    image: nginx:1.27-alpine
+    profiles: ['edge']
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../edge/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tls:/etc/nginx/tls:ro
+    depends_on:
+      api:
         condition: service_healthy
     networks:
       - private

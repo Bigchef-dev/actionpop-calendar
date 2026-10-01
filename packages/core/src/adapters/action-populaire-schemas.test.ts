@@ -31,6 +31,19 @@ describe('Action Populaire schemas', () => {
     expect(
       validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true }])[0]?.is_active,
     ).toBe(true);
+    expect(
+      validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true, subtype: null }])[0]?.subtype,
+    ).toBeNull();
+    expect(
+      validateActionPopulaireEvent({
+        id: 'online-event',
+        name: 'Online meeting',
+        startTime: '2026-09-24T10:00:00+02:00',
+        endTime: '2026-09-24T11:00:00+02:00',
+        timezone: 'Europe/Berlin',
+        location: {},
+      }).timezone,
+    ).toBe('Europe/Berlin');
   });
 
   it('rejects out-of-range GeoJSON coordinates and malformed payloads', () => {

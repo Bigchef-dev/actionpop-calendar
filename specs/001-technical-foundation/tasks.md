@@ -148,7 +148,7 @@ description: "Task list for the Technical Foundation feature"
 - [X] T064 [P] Add HTTPS-only edge configuration, public-feed read-only enforcement, private Redis/BullMQ/health/admin network rules, and secret scanning checks in `infra/edge/https.conf`, `infra/compose/docker-compose.yml`, and `.github/workflows/security.yml`.
 - [X] T065 [P] Add operational alert thresholds relative to the 15-minute dispatcher interval and retry window for unavailable services, stale ingestion, queue growth, exhausted jobs, upstream failures, Redis failure, disk/memory pressure, and unavailable metrics in `infra/monitoring/alerts.yml`.
 - [X] T066 [P] Add backup/restore and Redis AOF rewrite validation documentation without claiming recovery from host or named-volume loss in `infra/redis/README.md` and `specs/001-technical-foundation/quickstart.md`.
-- [ ] T067 Run the complete quickstart validation, including clean install, typecheck, tests, Docker builds, Redis restart, API feed checks, worker scaling, operational signals, and capacity test, and record any environment-specific prerequisites in `specs/001-technical-foundation/quickstart.md`.
+- [x] T067 Run the complete quickstart validation, including clean install, typecheck, tests, Docker builds, Redis restart, API feed checks, worker scaling, operational signals, and capacity test, and record any environment-specific prerequisites in `specs/001-technical-foundation/quickstart.md`.
 - [X] T068 Review production modules against the 100-150 line maintainability guideline, split oversized cohesive responsibilities, and update affected exports/tests in `packages/core/src/`, `apps/api/src/`, and `apps/worker/src/`.
 
 ---
@@ -239,3 +239,24 @@ Task T048: Snapshot publication tests in apps/worker/tests/snapshot-publication.
 - `[US1]`, `[US2]`, and `[US3]` map directly to the three P1 user stories in `spec.md`.
 - Every implementation task names the target file or directory and preserves the contracts from `spec.md`, `data-model*.md`, `contracts/`, `research.md`, and the repository diagrams.
 - MVP scope is Phase 1, Phase 2, and Phase 3 (User Story 1). Deployment and ingestion are incremental follow-on deliveries.
+
+## Phase 7: Convergence
+
+- [X] T069 Wire the worker runtime to dispatch and process BullMQ ingestion jobs in retrieve-validate-transform-write-ack order per FR-006 and FR-013 (contradicts)
+- [X] T070 Persist the group catalogue, ingestion ledger, and permanent failure state in Redis so active scopes and recovery state survive restarts per FR-011 and FR-026 (missing)
+- [X] T071 Implement Action Populaire event retrieval through `GET /events?page=X&page_size=Y` with one-based pagination, a maximum page size of 1000, and short-or-empty page termination per FR-011A (partial)
+- [X] T072 Replace process-local dispatcher duplicate suppression with shared durable scope-period job identity handling per FR-010 and FR-011 (partial)
+- [X] T073 Implement complete staged snapshot validation and atomic current-pointer replacement in Redis per FR-030 and plan: snapshot publication decision (contradicts)
+- [X] T074 Connect BullMQ retry limits, delayed backoff, exhausted-job reporting, and non-retryable Zod failures to the worker runtime and ledger per FR-014 and FR-031 (missing)
+- [X] T075 Connect structured request/job logs, metrics exporters or endpoints, and actionable alert rules to the API and worker runtime per FR-023, FR-024, and FR-025 (missing)
+- [X] T076 Integrate the HTTPS edge and private network boundaries so public feeds are read-only HTTPS endpoints and internal health, Redis, BullMQ, and administration surfaces are not publicly reachable per FR-019 and FR-020 (contradicts)
+- [X] T077 Replace opt-in placeholder integration checks with executable Redis restart, three-worker/100-job, and capacity validations per SC-004, SC-005, and SC-006 (partial)
+- [X] T078 Connect the dispatcher to authoritative `GET /carte/liste_groupes/` discovery and synchronize only complete active-group catalogues per FR-011 (missing)
+- [X] T079 Expose a deployment-facing worker liveness/readiness healthcheck and configure it in Compose per FR-022 (missing)
+- [X] T080 Align completed task file targets with the actual implementation surfaces or create the promised route, adapter, catalogue, ingestion, and dispatcher test boundaries per tasks T037, T051-T054 (partial)
+
+## Phase 8: Convergence
+
+- [X] T081 Wire structured request/job logs, complete runtime metrics production and export, and actionable alert signals for request failures, job duration, queue depth, retries, exhausted jobs, upstream failures, ingestion freshness, and Redis connectivity per FR-023/FR-024/FR-025 (missing)
+- [X] T082 Implement executable Redis-backed restart, three-worker/100-job ownership and redelivery, retry exhaustion, and representative capacity validations instead of environment-only or skipped assertions per SC-004/SC-005/SC-006 (partial)
+- [X] T083 Align the completed implementation and test targets with the planned focused route, adapter, catalogue, ingestion, and dispatcher boundaries, creating equivalent executable tests where those boundaries are absent per T080 (partial)

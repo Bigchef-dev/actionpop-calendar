@@ -9,6 +9,18 @@ const isoTimestampSchema = z.string().refine(
   'must be an ISO 8601 timestamp with an explicit timezone',
 );
 
+const sourceTimezoneSchema = z.string().trim().min(1).refine(
+  value => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  'must be a valid IANA timezone',
+);
+
 const optionalText = z.preprocess(
   value => value === '' || value === null ? undefined : value,
   z.string().trim().min(1).optional(),
@@ -33,14 +45,7 @@ const locationSchema = z.object({
   city: optionalText,
   country: optionalText,
   coordinates: coordinateSchema.nullable().optional(),
-}).strip().superRefine((location, context) => {
-  if (!location.name && !location.city && !location.address1) {
-    context.addIssue({
-      code: 'custom',
-      message: 'must contain a usable name, city, or address',
-    });
-  }
-});
+}).strip();
 
 const eventGroupSchema = z.object({
   id: z.string().trim().min(1),
@@ -52,7 +57,7 @@ const actionPopulaireEventSchema = z.object({
   name: z.string().trim().min(1),
   startTime: isoTimestampSchema,
   endTime: isoTimestampSchema,
-  timezone: z.literal('Europe/Paris'),
+  timezone: sourceTimezoneSchema,
   location: locationSchema,
   groups: z.array(eventGroupSchema).default([]),
   description: optionalText,
@@ -64,7 +69,7 @@ const groupCatalogueEntrySchema = z.object({
   is_active: z.boolean(),
   coordinates: coordinateSchema.nullable().optional(),
   type: optionalText,
-  subtype: z.union([z.string().trim().min(1), z.number()]).optional(),
+  subtype: z.union([z.string().trim().min(1), z.number()]).nullable().optional(),
   subtypes: z.array(z.number().int()).optional(),
   is_certified: z.boolean().optional(),
   location_country: optionalText,
