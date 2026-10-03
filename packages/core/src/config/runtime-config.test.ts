@@ -6,9 +6,9 @@ describe('parseRuntimeConfig', () => {
   it('uses Europe/Paris and safe defaults', () => {
     const config = parseRuntimeConfig({ REDIS_URL: 'redis://localhost:6379' }, 'api');
 
-    expect(config.timezone).toBe('Europe/Paris');
-    expect(config.service).toBe('api');
-    expect(config.dispatcherIntervalMs).toBe(15 * 60 * 1000);
+    expect(config.app.timezone).toBe('Europe/Paris');
+    expect(config.app.service).toBe('api');
+    expect(config.queue.dispatcherIntervalMs).toBe(15 * 60 * 1000);
   });
 
   it('rejects missing Redis configuration and invalid values', () => {

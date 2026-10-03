@@ -1,19 +1,8 @@
-export interface CalendarFeedEvent {
-  sourceEventId: string;
-  summary: string;
-  description?: string;
-  startTime: string;
-  endTime: string;
-  sequence: number;
-  location?: string;
-}
+import { PublishedEvent, PublishedGroupSnapshot } from "../models/event.interface.js";
 
-export interface CalendarFeedInput {
-  scopeId: string;
-  revision: number;
-  generatedAt: string;
-  events: CalendarFeedEvent[];
-}
+export type CalendarFeedInput = Exclude<PublishedGroupSnapshot, 'eventIds'> & {
+  events: PublishedEvent[];
+};
 
 export interface CalendarFeed {
   revision: string;
@@ -53,11 +42,11 @@ export function buildIcalFeed(input: CalendarFeedInput): CalendarFeed {
       `LAST-MODIFIED:${toUtc(input.generatedAt)}`,
       `DTSTART:${toUtc(event.startTime)}`,
       `DTEND:${toUtc(event.endTime)}`,
-      `SUMMARY:${escapeText(event.summary)}`,
+      `SUMMARY:${escapeText(event.name)}`,
       `SEQUENCE:${event.sequence}`,
     );
     if (event.description !== undefined) lines.push(`DESCRIPTION:${escapeText(event.description)}`);
-    if (event.location !== undefined) lines.push(`LOCATION:${escapeText(event.location)}`);
+    // if (event.location !== undefined) lines.push(`LOCATION:${escapeText(event.location)}`);
     lines.push('END:VEVENT');
   }
 

@@ -1,4 +1,5 @@
 import { buildRedisKey, normalizeScopeToken } from '../index-internal.js';
+import { PublishedEvent } from '../index.js';
 
 export interface StoredCalendarEvent {
   sourceEventId: string;
@@ -14,7 +15,7 @@ export interface CalendarDataset {
   scopeId: string;
   revision: number;
   generatedAt: string;
-  events: StoredCalendarEvent[];
+  events: PublishedEvent[];
   status?: 'complete';
 }
 

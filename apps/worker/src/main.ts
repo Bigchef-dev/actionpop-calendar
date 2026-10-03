@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { buildIngestionJobId, classifyRetry, closeRedis, createRedisConnection, type ActionPopulaireEventPayload } from '@actionpop/core';
+import { buildIngestionJobId, classifyRetry, closeRedis, createRedisConnection, IncomingEvent, type ActionPopulaireEventPayload } from '@actionpop/core';
 import { Job, Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
@@ -22,7 +22,7 @@ interface IngestionJobData {
   periodStartUtc: string;
 }
 
-function toIncomingEvent(event: ActionPopulaireEventPayload) {
+function toIncomingEvent(event: ActionPopulaireEventPayload) : IncomingEvent {
   return {
     id: event.id,
     name: event.name,
@@ -42,20 +42,20 @@ export function createWorkerRuntime(
   env: Record<string, string | undefined> = process.env,
 ): WorkerRuntime {
   const config = loadWorkerConfig(env);
-  const redis: Redis = createRedisConnection(config.redisUrl);
+  const redis: Redis = createRedisConnection(config.redis.url);
   const queue = new Queue(QUEUE_NAME, {
     connection: redis,
-    ...buildQueueOptions({ attempts: config.queueAttempts, backoffMs: config.queueBackoffMs }),
+    ...buildQueueOptions({ attempts: config.queue.attempts, backoffMs: config.queue.backoffMs }),
   });
   const catalogue = new RedisGroupCatalogueRepository(redis);
   const ledger = new RedisIngestionLedgerStore(redis);
   const client = new ActionPopulaireClient({
-    baseUrl: config.upstreamBaseUrl,
+    baseUrl: config.upstream!.baseUrl,
     ...(config.upstreamToken === undefined ? {} : { token: config.upstreamToken }),
   });
   const publisher = new RedisSnapshotPublisher(redis);
   const revisions = new SnapshotPublisher();
-  const observability = createWorkerObservability(config.environment);
+  const observability = createWorkerObservability(config.app.environment);
   const worker = new Worker(QUEUE_NAME, async (job: Job<IngestionJobData>) => {
     const startedAt = Date.now();
     const jobId = String(job.id ?? buildIngestionJobId(job.data.scopeId, new Date(job.data.periodStartUtc)));
@@ -70,8 +70,8 @@ export function createWorkerRuntime(
         (page, pageSize) => client.fetchEventPage(job.data.scopeId, page, pageSize),
       );
       await ledger.transition(jobId, { status: 'publishing', attempts: job.attemptsMade + 1 });
-      const snapshot = await revisions.publish(job.data.scopeId, events.map(toIncomingEvent));
-      await publisher.publish(job.data.scopeId, snapshot);
+      const publication = await revisions.publish(job.data.scopeId, events.map(toIncomingEvent));
+      await publisher.publish(job.data.scopeId, publication.snapshot, publication.events);
       await ledger.transition(jobId, { status: 'succeeded', attempts: job.attemptsMade + 1 });
       observability.metrics.increment('actionpop_jobs_completed_total', { outcome: 'success' });
       observability.metrics.increment('actionpop_job_duration_seconds', { outcome: 'success' }, (Date.now() - startedAt) / 1000);
@@ -82,7 +82,7 @@ export function createWorkerRuntime(
       });
     } catch (error) {
       const retryDecision = classifyRetry(error);
-      const retryable = retryDecision.retryable && job.attemptsMade + 1 < (job.opts.attempts ?? config.queueAttempts);
+      const retryable = retryDecision.retryable && job.attemptsMade + 1 < (job.opts.attempts ?? config.queue.attempts);
       await ledger.transition(jobId, {
         status: retryable ? 'retrying' : 'failed',
         attempts: job.attemptsMade + 1,
@@ -110,7 +110,7 @@ export function createWorkerRuntime(
     catalogue,
     queue,
     lock,
-    intervalMs: config.dispatcherIntervalMs,
+    intervalMs: config.queue.dispatcherIntervalMs,
     isScheduled: (jobId) => ledger.isScheduled(jobId),
     onScheduled: (jobId, scopeId, periodToken) => ledger.transition(jobId, {
       scopeId, periodToken, status: 'scheduled', attempts: 0,

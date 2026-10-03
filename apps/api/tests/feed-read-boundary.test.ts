@@ -11,7 +11,7 @@ describe('feed read boundary', () => {
       events: [],
     });
     const upstream = vi.fn();
-    const server = buildServer({ datasetRepository: { getCurrent }, upstream });
+    const server = await buildServer({ datasetRepository: { getCurrent }, upstream });
 
     await server.inject({ method: 'GET', url: '/feed/group-1' });
     expect(getCurrent).toHaveBeenCalledWith('group-1');

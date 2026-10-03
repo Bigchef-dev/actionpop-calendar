@@ -1,0 +1,46 @@
+flowchart TD
+    %% Entrée & Validation
+    A[Worker : Réception du Job BullMQ] --> B[Validation du schéma Zod\nExtraction event_type & location brute]
+    B -->|Payload invalide| ERR[Échec du Job\nPas de retry automatique - FR-030/031]
+    B -->|Payload valide| C{Données de localisation\ndisponibles ?}
+
+    %% Stratégie de Résolution (Cascade / Waterfall)
+    C -->|Code INSEE présent| D[Recherche directe dans le\nRéférentiel Communes INSEE]
+    C -->|Coordonnées GPS lat/lon| E[Point-in-Polygon local\nou recherche spatiale R-Tree]
+    C -->|Code Postal + Nom Ville| F[Lookup flou / index inversé\nCode Postal + Libellé Commune]
+    C -->|Aucune donnée exploitable| G[  : Géo non résolue\nChamps administratifs null]
+
+    E -->|Polygone trouvé| D
+    F -->|Match unique ou score max| D
+    F -->|Échec matching| G
+
+    %% Résolution des Entités Administratives Directes
+    D --> H[Commune identifiée\ncode_insee, nom, code_postal]
+    H --> I[Extraction automatique 1:1\nEPCI, Département, Région]
+
+    %% Branchement Spécifique : Arrondissements (PLM)
+    H --> J{Commune à arrondissements ?\nParis, Lyon, Marseille}
+    J -->|Oui| K{Arrondissement déterminable ?\nvia code INSEE arr. ou GPS}
+    K -->|Non| M[Pas d'arrondissement spécifique]
+    J -->|Non| M
+
+    %% Branchement Spécifique : Circonscriptions Législatives
+    N{Découpage Circonscription}
+    M --> N
+
+    N -->|Commune mono-circonscription| O[Affectation circo directe 1:1\nid_circo]
+    N -->|Commune multi-circonscriptions| P{Position précise connue ?\nGPS ou Arrondissement}
+    
+    P -->|Oui : Point situé dans la circo| Q[Résolution de la circo exacte\n1:1]
+    P -->|Non : Donnée insuffisante| R[Evenement marquée hors circo NULL]
+
+    %% Consolidation & Écriture
+    O --> S[Agrégation du document enrichi]
+    Q --> S
+    R --> S
+    G --> S
+
+    S --> T[Construction des structures relationnelles / dénormalisées :\n- Propriétés métier : event_type, status, dates\n- Groupes, Circos, Arrondissements\n- Attributs hiérarchiques : Commune, EPCI, Dépt, Région]
+    
+    T --> U[Écriture transactionnelle dans Redis\nJSON.SET & Mise à jour index RediSearch]
+    U --> V[Acquittement du job BullMQ]

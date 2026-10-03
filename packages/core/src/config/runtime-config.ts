@@ -1,63 +1,72 @@
 import { ConfigurationError } from '../operations/errors.js';
-import { config } from 'dotenv';
+import { AppScopeConfig, LogLevel, QueueScopeConfig, RedisScopeConfig, RootConfig, UpstreamScopeConfig } from './config.interface.js';
 
-config();
-
-export const DEFAULT_TIMEZONE = 'Europe/Paris';
-export const DEFAULT_DISPATCHER_INTERVAL_MS = 15 * 60 * 1000;
-
-
-export interface RuntimeConfig {
-  service: string;
-  environment: string;
-  redisUrl: string;
-  timezone: string;
-  dispatcherIntervalMs: number;
-  queueAttempts: number;
-  queueBackoffMs: number;
-  upstreamBaseUrl?: string;
-  upstreamToken?: string;
-}
-
-function positiveInteger(value: string | undefined, name: string, fallback: number): number {
-  if (value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+function parsePositiveInt(val: string | undefined, name: string, fallback: number): number {
+  if (!val || val.trim() === '') return fallback;
+  const num = Number(val);
+  if (!Number.isSafeInteger(num) || num <= 0) {
     throw new ConfigurationError(`${name} must be a positive integer`);
   }
-  return parsed;
+  return num;
+}
+
+export function parseAppConfig(env: Record<string, string | undefined>, service: string): AppScopeConfig {
+  if (!service) throw new ConfigurationError('Service name is required');
+
+  const timezone = env.TIMEZONE ?? 'Europe/Paris';
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    throw new ConfigurationError(`Invalid timezone: ${timezone}`);
+  }
+
+  return {
+    service,
+    environment: (env.NODE_ENV as AppScopeConfig['environment']) ?? 'development',
+    logLevel: (env.LOG_LEVEL?.toLowerCase() as LogLevel) ?? LogLevel.INFO,
+    timezone,
+  };
+}
+
+export function parseRedisConfig(env: Record<string, string | undefined>): RedisScopeConfig {
+  const url = env.REDIS_URL;
+  if (!url) throw new ConfigurationError('REDIS_URL is required');
+
+  const parsed = new URL(url);
+  if (!['redis:', 'rediss:'].includes(parsed.protocol)) {
+    throw new ConfigurationError('REDIS_URL must use redis:// or rediss://');
+  }
+
+  return { url: parsed.toString() };
+}
+
+export function parseQueueConfig(env: Record<string, string | undefined>): QueueScopeConfig {
+  return {
+    attempts: parsePositiveInt(env.QUEUE_ATTEMPTS, 'QUEUE_ATTEMPTS', 3),
+    backoffMs: parsePositiveInt(env.QUEUE_BACKOFF_MS, 'QUEUE_BACKOFF_MS', 1000),
+    dispatcherIntervalMs: parsePositiveInt(env.DISPATCHER_INTERVAL_MS, 'DISPATCHER_INTERVAL_MS', 15 * 60 * 1000),
+  };
+}
+
+export function parseUpstreamConfig(env: Record<string, string | undefined>): UpstreamScopeConfig | undefined {
+  const baseUrl = env.UPSTREAM_BASE_URL?.trim();
+  if (!baseUrl) return undefined;
+
+  const parsed = new URL(baseUrl);
+  return {
+    baseUrl: parsed.toString(),
+    token: env.UPSTREAM_TOKEN?.trim(),
+  };
 }
 
 export function parseRuntimeConfig(
   env: Record<string, string | undefined>,
   service: string,
-): RuntimeConfig {
-  const redisUrl = env.REDIS_URL;
-  if (!redisUrl) throw new ConfigurationError('REDIS_URL is required');
-  if (env.TIMEZONE !== undefined && env.TIMEZONE !== DEFAULT_TIMEZONE) {
-    throw new ConfigurationError(`TIMEZONE must be ${DEFAULT_TIMEZONE}`);
-  }
-
-  const config: RuntimeConfig = {
-    service,
-    environment: env.NODE_ENV ?? 'development',
-    redisUrl,
-    timezone: DEFAULT_TIMEZONE,
-    dispatcherIntervalMs: positiveInteger(
-      env.DISPATCHER_INTERVAL_MS,
-      'DISPATCHER_INTERVAL_MS',
-      DEFAULT_DISPATCHER_INTERVAL_MS,
-    ),
-    queueAttempts: positiveInteger(env.QUEUE_ATTEMPTS, 'QUEUE_ATTEMPTS', 3),
-    queueBackoffMs: positiveInteger(env.QUEUE_BACKOFF_MS, 'QUEUE_BACKOFF_MS', 1000),
+): RootConfig {
+  return {
+    app: parseAppConfig(env, service),
+    redis: parseRedisConfig(env),
+    queue: parseQueueConfig(env),
+    upstream: parseUpstreamConfig(env),
   };
-
-  if (env.UPSTREAM_BASE_URL !== undefined && env.UPSTREAM_BASE_URL !== '') {
-    config.upstreamBaseUrl = env.UPSTREAM_BASE_URL;
-  }
-  if (env.UPSTREAM_TOKEN !== undefined && env.UPSTREAM_TOKEN !== '') {
-    config.upstreamToken = env.UPSTREAM_TOKEN;
-  }
-
-  return config;
 }

@@ -1,7 +1,7 @@
-import { parseRuntimeConfig, type RuntimeConfig } from '@actionpop/core';
+import { parseRuntimeConfig, RootConfig } from "@actionpop/core";
 
 export function loadApiConfig(
   env: Record<string, string | undefined> = process.env,
-): RuntimeConfig {
+): RootConfig {
   return parseRuntimeConfig(env, 'api');
 }

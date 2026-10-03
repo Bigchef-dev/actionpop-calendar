@@ -1,13 +1,10 @@
-import Fastify, { type FastifyInstance } from 'fastify';
-import {
-  buildIcalFeed,
-  MetricsRegistry,
-  createLogger,
-  runHealthCheck,
-  type CalendarDataset,
-  type HealthResult,
-  type Logger,
-} from '@actionpop/core';
+import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { MetricsRegistry, createLogger, type Logger, type CalendarDataset } from '@actionpop/core';
+
+import { createAppModule } from './app.module.js';
 
 export interface DatasetReader {
   getCurrent(scopeId: string): Promise<CalendarDataset | null>;
@@ -21,37 +18,44 @@ export interface ServerOptions {
   logger?: Logger;
 }
 
-function publicError(message: string): { error: string } {
-  return { error: message };
-}
+export async function buildApp(options: ServerOptions): Promise<NestFastifyApplication> {
+  const adapter = new FastifyAdapter({ logger: false, requestIdHeader: 'x-request-id' });
+  const fastifyInstance = adapter.getInstance();
 
-export function buildServer(options: ServerOptions): FastifyInstance {
+  // 1. Instanciation de l'app NestJS
+  const app = await NestFactory.create<NestFastifyApplication>(
+    createAppModule(options),
+    adapter,
+    { logger: false, abortOnError: false }
+  );
+
   const metrics = options.metrics ?? new MetricsRegistry();
   const logger = options.logger ?? createLogger({ service: 'api', environment: process.env.NODE_ENV ?? 'development' });
   const requestStarts = new Map<string, number>();
-  const server = Fastify({ logger: false, requestIdHeader: 'x-request-id' });
 
-  server.addHook('onRequest', async (request) => {
+  // 2. Hooks de monitoring Fastify (Attachés à l'instance sous-jacente)
+  fastifyInstance.addHook('onRequest', async (request) => {
     requestStarts.set(request.id, Date.now());
   });
 
-  server.addHook('onResponse', async (request, reply) => {
+  fastifyInstance.addHook('onResponse', async (request, reply) => {
     const durationMs = Date.now() - (requestStarts.get(request.id) ?? Date.now());
     requestStarts.delete(request.id);
     metrics.increment('actionpop_http_requests_total', {
-      outcome: reply.statusCode >= 500 ? 'failure' : 'success',
+      outcome: reply.statusCode >= 400 ? 'failure' : 'success',
       method: request.method,
     });
     metrics.increment('actionpop_http_request_duration_seconds', { method: request.method }, durationMs / 1000);
     logger.info('request completed', {
       requestId: request.id,
       operation: `${request.method} ${request.url}`,
-      outcome: reply.statusCode >= 500 ? 'failure' : 'success',
+      outcome: reply.statusCode >= 400 ? 'failure' : 'success',
+      statusCode: reply.statusCode,
       durationMs,
     });
   });
 
-  server.addHook('onError', async (request, _reply, error) => {
+  fastifyInstance.addHook('onError', async (request, _reply, error) => {
     logger.error('request failed', {
       requestId: request.id,
       operation: `${request.method} ${request.url}`,
@@ -60,59 +64,18 @@ export function buildServer(options: ServerOptions): FastifyInstance {
     });
   });
 
-  server.route({
-    method: 'GET',
-    url: '/feed/:scopeId',
-    handler: async (request, reply) => {
-      let scopeId: string;
-      try {
-        scopeId = (request.params as { scopeId: string }).scopeId;
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(scopeId)) throw new Error('invalid scope');
-      } catch {
-        return reply.code(400).send(publicError('invalid scope identifier'));
-      }
+  // 3. Swagger & Scalar (sans avoir besoin de route `/openapi.json`)
+  const document = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder().setTitle('ActionPop Calendar API').setVersion('0.1.0').build(),
+  );
 
-      let dataset: CalendarDataset | null;
-      try {
-        dataset = await options.datasetRepository.getCurrent(scopeId);
-      } catch {
-        return reply.code(503).send(publicError('calendar data unavailable'));
-      }
-      if (dataset === null) return reply.code(404).send(publicError('scope not found'));
 
-      const feed = buildIcalFeed({ ...dataset, events: dataset.events });
-      reply.header('ETag', `"${feed.revision}"`);
-      reply.header('Cache-Control', 'public, max-age=900');
-      if (request.headers['if-none-match'] === `"${feed.revision}"`) return reply.code(304).send();
-      return reply.type('text/calendar; charset=utf-8').send(feed.body);
-    },
-  });
+  // (Optionnel) Exposer le raw JSON
+  fastifyInstance.get('/openapi.json', async () => document);
 
-  server.route({
-    method: ['POST', 'PUT', 'PATCH', 'DELETE'],
-    url: '/feed/:scopeId',
-    handler: async (_request, reply) => reply.code(405).send(publicError('read-only feed')),
-  });
+  // 4. Initialisation des modules Nest
+  await app.init();
 
-  server.get('/internal/live', async () => ({ status: 'ready' }));
-  server.get('/internal/metrics', async (_request, reply) => {
-    let redisReady = 1;
-    if (options.health?.redis !== undefined) {
-      try {
-        await options.health.redis();
-      } catch {
-        redisReady = 0;
-      }
-    }
-    metrics.setGauge('actionpop_redis_ready', {}, redisReady);
-    return reply.type('text/plain; version=0.0.4').send(Buffer.from(metrics.prometheus()));
-  });
-  server.get('/internal/ready', async (_request, reply) => {
-    const checks: HealthResult[] = [];
-    if (options.health?.redis !== undefined)
-      checks.push(await runHealthCheck('redis', options.health.redis));
-    const ready = checks.every((check) => check.status === 'ready');
-    return reply.code(ready ? 200 : 503).send({ status: ready ? 'ready' : 'not_ready', checks });
-  });
-  return server;
+  return app;
 }

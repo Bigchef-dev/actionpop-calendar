@@ -11,14 +11,16 @@ describe('iCalendar feed', () => {
       events: [
         {
           sourceEventId: 'event-1',
-          summary: 'Réunion; équipe',
+          name: 'Réunion; équipe',
           description: 'Line one\nLine two',
           startTime: '2026-10-01T10:00:00+02:00',
           endTime: '2026-10-01T11:00:00+02:00',
           sequence: 2,
-          location: 'Paris, FR',
+          contentHash: 'abc123',
+          id: 'event-1',
+          //location: 'Paris, FR',
         },
-      ],
+      ]
     });
 
     expect(feed.revision).toBe('group-1-4');

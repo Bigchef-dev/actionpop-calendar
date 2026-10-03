@@ -1,4 +1,4 @@
-export type LogLevel = 'info' | 'warn' | 'error';
+import { LogLevel } from "../config/config.interface.js";
 
 export interface LogContext {
   requestId?: string;
@@ -50,8 +50,8 @@ export function createLogger({ service, environment, sink = console.log }: Logge
     sink(JSON.stringify(record));
   };
   return {
-    info: (message, context = {}) => write('info', message, context),
-    warn: (message, context = {}) => write('warn', message, context),
-    error: (message, context = {}) => write('error', message, context),
+    info: (message, context = {}) => write(LogLevel.INFO, message, context),
+    warn: (message, context = {}) => write(LogLevel.WARN, message, context),
+    error: (message, context = {}) => write(LogLevel.ERROR, message, context),
   };
 }

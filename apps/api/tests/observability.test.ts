@@ -5,7 +5,7 @@ import { buildServer } from '../src/server.js';
 describe('API observability', () => {
   it('logs request context and exports request metrics', async () => {
     const logs: string[] = [];
-    const server = buildServer({
+    const server = await buildServer({
       datasetRepository: {
         getCurrent: async () => ({
           scopeId: 'group-1', revision: 1, generatedAt: new Date().toISOString(), events: [],

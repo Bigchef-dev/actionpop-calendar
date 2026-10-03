@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
+        "--tsconfig",
+        "${workspaceFolder}/apps/api/tsconfig.json",
+        "${workspaceFolder}/apps/api/src/main.ts"
+      ],
+      "cwd": "${workspaceFolder}/apps/api",
+      "envFile": "${workspaceFolder}/apps/api/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Worker",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
+      "args": [
+        "--tsconfig",
+        "${workspaceFolder}/apps/worker/tsconfig.json",
+        "${workspaceFolder}/apps/worker/src/main.ts"
+      ],
+      "cwd": "${workspaceFolder}/apps/worker",
+      "envFile": "${workspaceFolder}/apps/worker/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
