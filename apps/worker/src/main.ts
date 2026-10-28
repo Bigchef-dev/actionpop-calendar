@@ -1,18 +1,34 @@
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { buildIngestionJobId, classifyRetry, closeRedis, createRedisConnection, IncomingEvent, type ActionPopulaireEventPayload } from '@actionpop/core';
+import {
+  buildIngestionJobId,
+  checkPostgresHealth,
+  classifyRetry,
+  closePostgres,
+  closeRedis,
+  createPostgresClient,
+  createRedisConnection,
+  describeDependencyFailures,
+  IncomingEvent,
+  LocationEvent,
+  loadEnvFile,
+  probeRedis,
+  runPreflight,
+  type ActionPopulaireEventPayload,
+  PostgresCalendarDatasetRepository,
+} from '@actionpop/core';
 import { Job, Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 import { ActionPopulaireClient } from './adapters/action-populaire-client.js';
-import { RedisGroupCatalogueRepository } from './catalogue/group-catalogue.js';
+import { PostgresGroupCatalogueRepository } from './catalogue/group-catalogue.js';
 import { loadWorkerConfig } from './config.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
 import { RedisLock } from './dispatcher/lock.js';
 import { collectEventPages } from './ingestion/event-pages.js';
-import { RedisIngestionLedgerStore } from './operations/ingestion-ledger.js';
+import { PostgresIngestionLedgerStore } from './operations/ingestion-ledger.js';
 import { createWorkerObservability } from './operations/observability.js';
-import { RedisSnapshotPublisher, SnapshotPublisher } from './persistence/snapshot-publisher.js';
+import { PostgresSnapshotPublisher, SnapshotPublisher } from './persistence/snapshot-publisher.js';
 import { buildQueueOptions } from './queue/queue.js';
 
 const QUEUE_NAME = 'calendar-ingestion';
@@ -23,12 +39,21 @@ interface IngestionJobData {
 }
 
 function toIncomingEvent(event: ActionPopulaireEventPayload) : IncomingEvent {
+
+  const location : LocationEvent | null = event.location === null ? null : {
+    address1: event.location.address1,
+    city: event.location.city,
+    zip: event.location.zip,
+    coordinates: event.location.coordinates,
+  };
+
   return {
     id: event.id,
     name: event.name,
     startTime: event.startTime,
     endTime: event.endTime,
     ...(event.description === undefined ? {} : { description: event.description }),
+    location,
   };
 }
 
@@ -43,17 +68,19 @@ export function createWorkerRuntime(
 ): WorkerRuntime {
   const config = loadWorkerConfig(env);
   const redis: Redis = createRedisConnection(config.redis.url);
+  const databaseUrl = env.DATABASE_URL;
+  const postgres = createPostgresClient(databaseUrl ?? 'postgresql://localhost:5432/actionpop');
   const queue = new Queue(QUEUE_NAME, {
     connection: redis,
     ...buildQueueOptions({ attempts: config.queue.attempts, backoffMs: config.queue.backoffMs }),
   });
-  const catalogue = new RedisGroupCatalogueRepository(redis);
-  const ledger = new RedisIngestionLedgerStore(redis);
+  const catalogue = new PostgresGroupCatalogueRepository(postgres);
+  const ledger = new PostgresIngestionLedgerStore(postgres);
   const client = new ActionPopulaireClient({
     baseUrl: config.upstream!.baseUrl,
     ...(config.upstreamToken === undefined ? {} : { token: config.upstreamToken }),
   });
-  const publisher = new RedisSnapshotPublisher(redis);
+  const publisher = new PostgresSnapshotPublisher(new PostgresCalendarDatasetRepository(postgres));
   const revisions = new SnapshotPublisher();
   const observability = createWorkerObservability(config.app.environment);
   const worker = new Worker(QUEUE_NAME, async (job: Job<IngestionJobData>) => {
@@ -120,14 +147,30 @@ export function createWorkerRuntime(
   let healthServer: Server | undefined;
   const readiness = async (): Promise<boolean> => new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(false), 2_000);
-    redis.ping()
-      .then(result => resolve(result === 'PONG'))
+    Promise.all([redis.ping(), checkPostgresHealth(postgres)])
+      .then(([result]) => resolve(result === 'PONG'))
       .catch(() => resolve(false))
       .finally(() => clearTimeout(timeout));
   });
 
   return {
     async start() {
+      if (databaseUrl === undefined) {
+        throw new Error('DATABASE_URL is required');
+      }
+      const failures = await runPreflight([
+        { name: 'redis', probe: () => probeRedis(config.redis.url) },
+        { name: 'postgres', probe: () => checkPostgresHealth(postgres) },
+      ]);
+      if (failures.length > 0) {
+        observability.logger.error('worker startup aborted', {
+          operation: 'startup',
+          outcome: 'dependency_failure',
+          dependencies: failures,
+          hint: describeDependencyFailures(failures),
+        });
+        throw new Error(describeDependencyFailures(failures));
+      }
       observability.logger.info('worker starting', {
         operation: 'startup',
         outcome: 'started',
@@ -159,7 +202,10 @@ export function createWorkerRuntime(
         operation: 'startup',
         outcome: 'redis_ready',
       });
-      await catalogue.synchronize(await client.fetchGroupCatalogue());
+
+      const catalogueData = await client.fetchGroupCatalogue();
+
+      await catalogue.synchronize(catalogueData);
       await dispatcher.runOnce();
       timer = setInterval(async () => {
         await catalogue.synchronize(await client.fetchGroupCatalogue());
@@ -176,6 +222,7 @@ export function createWorkerRuntime(
       await worker.close();
       await queue.close();
       await closeRedis(redis);
+      await closePostgres(postgres);
     },
     async readiness() {
       return readiness();
@@ -184,6 +231,7 @@ export function createWorkerRuntime(
 }
 
 export async function startWorker(): Promise<void> {
+  loadEnvFile();
   const runtime = createWorkerRuntime();
   await runtime.start();
   const shutdown = async () => {

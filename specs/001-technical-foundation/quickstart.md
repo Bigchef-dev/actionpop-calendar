@@ -66,9 +66,49 @@ docker compose -f infra/compose/docker-compose.yml down
 docker compose -f infra/compose/docker-compose.yml up -d redis
 ```
 
-The persistence test must verify that a prepared dataset and a queued test job remain
-available after a normal Redis container restart. It must not claim disaster recovery
-from host or volume loss.
+`pnpm dev` starts the Redis and Postgres containers, applies pending Prisma
+migrations, then builds the API. If Docker needs elevated rights, run
+`sudo pnpm dev:infra` once first; startup then aborts with one message naming any
+unreachable dependency instead of retrying.
+
+For local Postgres inspection, start the development dependencies and apply the
+Prisma migration:
+
+```bash
+pnpm dev:tools
+pnpm db:setup
+pnpm dev:studio
+```
+
+`pnpm db:setup` starts the dependencies itself when Docker is reachable, and prints the
+exact `docker compose` command to run when it is not.
+
+`pnpm dev:tools` starts Redis, Postgres, RedisInsight
+(`http://127.0.0.1:5540`) and Bull Board (`http://127.0.0.1:5541`). Stop the stack
+with `pnpm dev:down`, or with `docker compose down` from `infra/compose`; no
+environment variable is required to stop or inspect the stack.
+
+Open `http://127.0.0.1:5552` to inspect groups, events, subscriptions, ingestion
+ledgers, and calendar snapshots in Prisma Studio. The loopback binding keeps the
+visualization tool and database inaccessible from the network; Prisma Studio is a
+development-only tool and is not started by the production Compose stack. A Prisma
+Client error such as `EventGroupLink.findMany` means the migrations are not applied
+yet: run `pnpm prisma:migrate:status`, then `pnpm db:setup`.
+
+## Local runtime configuration
+
+The API, the worker, and every `pnpm prisma:*` script load `.env` and then the
+optional `.env.local`, so native runs and Studio use the same database:
+
+```bash
+cp .env.example .env
+printf 'REDIS_URL=redis://127.0.0.1:6379\nDATABASE_URL=postgresql://actionpop:actionpop@127.0.0.1:5432/actionpop\nNODE_ENV=development\n' > .env.local
+pnpm db:setup
+```
+
+Each Prisma script prints the resolved target host and database, without credentials.
+`.env` provides shared defaults and never overrides variables already exported in the
+shell; `.env.local` overrides both. Both files are git-ignored except `.env.example`.
 
 ## Dispatcher and worker checks
 

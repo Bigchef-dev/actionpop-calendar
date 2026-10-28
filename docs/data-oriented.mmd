@@ -5,12 +5,6 @@ erDiagram
     %% COUCHE 1 : RACINES & ORCHESTRATION (NIVEAU HAUT)
     %% =========================================================
 
-    REDIS_STORE {
-        string store_id PK
-        string aof_mode "appendfsync everysec"
-        string docker_volume "named persistent volume"
-    }
-
     PROCESSING_PERIOD {
         string period_token PK "UTC slot identity"
         datetime period_start_utc
@@ -29,35 +23,9 @@ erDiagram
         string source_filter
     }
 
-    REGION {
-        string code_region PK
-        string nom
-    }
-
-    EPCI {
-        string id_epci PK
-        string nom
-        string type_epci "Métropole, CC..."
-    }
-
     %% =========================================================
     %% COUCHE 2 : INTERMÉDIAIRES, JOBS & NIVEAUX DÉPARTEMENTAUX
     %% =========================================================
-
-    CACHE_ENTRY {
-        string cache_key PK
-        string value_reference
-        datetime expires_at
-    }
-
-    INGESTION_JOB {
-        string job_id PK "deterministic scope-period id"
-        string scope_id FK
-        string period_token FK
-        string status "waiting delayed active completed failed"
-        int attempts_made
-        string worker_id "current owner"
-    }
 
     DEPARTEMENT {
         string code_departement PK
@@ -69,12 +37,7 @@ erDiagram
     %% COUCHE 3 : TRAÇABILITÉ, ENTITÉS LOCALES & ADRESSES
     %% =========================================================
 
-    INGESTION_LEDGER {
-        string ledger_key PK "technical processing identity"
-        string job_id FK
-        string status "scheduled running publishing succeeded retrying failed"
-        datetime last_completed_at
-    }
+
 
     LOCATION_RECORD {
         string location_id PK "location event/group id"
@@ -96,13 +59,6 @@ erDiagram
         decimal latitude "-90..90"
     }
 
-    CIRCONSCRIPTION {
-        string id_circo PK
-        int numero
-        string nom
-        string code_departement FK
-    }
-
     COMMUNE {
         string code_insee PK
         string nom
@@ -112,14 +68,8 @@ erDiagram
     }
 
     %% =========================================================
-    %% COUCHE 4 : L'ÉVÉNEMENT (AGRÉGAT CENTRAL) & ARRONDISSEMENTS
+    %% COUCHE 4 : L'ÉVÉNEMENT (AGRÉGAT CENTRAL)
     %% =========================================================
-
-    ARRONDISSEMENT {
-        string code_insee_ar PK
-        string nom
-        string code_insee_commune FK
-    }
 
     EVENT_RECORD {
         string source_event_id PK
@@ -162,12 +112,7 @@ erDiagram
     %% =========================================================
 
     %% 1. Pipeline Ingestion & Cache (Gauche)
-    REDIS_STORE ||--o{ CACHE_ENTRY : stores
-    PROCESSING_PERIOD ||--o{ INGESTION_JOB : schedules
-    PROCESSING_PERIOD ||--o{ INGESTION_LEDGER : records
-    GROUP_SCOPE ||--o{ INGESTION_JOB : scopes
-    GROUP_SCOPE ||--o{ INGESTION_LEDGER : owns
-    INGESTION_JOB ||--|| INGESTION_LEDGER : tracked_by
+
 
     %% 2. Adresses & Géolocalisation brute (Centre-Gauche)
     GROUP_SCOPE ||--|| LOCATION_RECORD : group_location
@@ -176,9 +121,7 @@ erDiagram
 
     %% 3. Référentiel Administratif (Droite)
     REGION ||--o{ DEPARTEMENT : composes
-    DEPARTEMENT ||--|{ CIRCONSCRIPTION : is_split_into
     DEPARTEMENT ||--o{ COMMUNE : contains
-    EPCI ||--o{ COMMUNE : groups
     COMMUNE ||--o{ ARRONDISSEMENT : divides
 
     %% 4. Rattachement de l'Événement (Centre)
@@ -188,9 +131,3 @@ erDiagram
     %% 5. Tables de Liaison N:M (Bas du diagramme)
     GROUP_SCOPE ||--|{ EVENT_GROUP_LINK : organizes
     EVENT_RECORD ||--|{ EVENT_GROUP_LINK : belongs_to
-
-    CIRCONSCRIPTION ||--|{ EVENT_CIRCO_LINK : includes
-    EVENT_RECORD ||--|{ EVENT_CIRCO_LINK : covers
-
-    ARRONDISSEMENT ||--|{ EVENT_ARRONDISSEMENT_LINK : includes
-    EVENT_RECORD ||--o{ EVENT_ARRONDISSEMENT_LINK : covers

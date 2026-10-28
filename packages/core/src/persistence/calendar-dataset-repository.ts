@@ -4,6 +4,7 @@ import { PublishedEvent } from '../index.js';
 export interface StoredCalendarEvent {
   sourceEventId: string;
   summary: string;
+  city?: string;
   description?: string;
   startTime: string;
   endTime: string;

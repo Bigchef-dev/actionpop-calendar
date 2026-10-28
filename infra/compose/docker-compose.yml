@@ -1,3 +1,5 @@
+name: actionpop
+
 services:
   redis:
     image: redis:7-alpine
@@ -13,6 +15,23 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-actionpop}
+      POSTGRES_USER: ${POSTGRES_USER:-actionpop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-actionpop}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - private
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     image: ${API_IMAGE:-actionpop-api:latest}
     build:
@@ -20,11 +39,14 @@ services:
       dockerfile: infra/docker/Dockerfile.api
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
       PORT: "3000"
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - private
@@ -42,13 +64,16 @@ services:
       dockerfile: infra/docker/Dockerfile.worker
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
-      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:?UPSTREAM_BASE_URL is required}
+      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:-}
       UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
       WORKER_HEALTH_PORT: "8081"
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - private
@@ -81,3 +106,4 @@ networks:
 
 volumes:
   redis-data:
+  postgres-data:

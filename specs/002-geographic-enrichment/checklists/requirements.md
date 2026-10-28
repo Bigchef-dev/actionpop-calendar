@@ -21,6 +21,7 @@
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded
 - [x] Dependencies and assumptions identified
+- [x] Formats de données explicités pour chaque étape : source, validation, référentiel, normalisation, enrichissement, publication, requête et diagnostic
 
 ## Feature Readiness
 
@@ -31,4 +32,4 @@
 
 ## Notes
 
-All checklist items pass. The specification is ready for `/speckit-plan`.
+All checklist items pass. La révision du 2026-10-28 restreint le périmètre à commune + département + pays et ajoute la section « Data Formats by Stage ». The specification is ready for `/speckit-plan`.

@@ -1,0 +1,32 @@
+erDiagram
+    direction TB
+
+
+    PROCESSING_PERIOD {
+        string period_token PK "UTC slot identity"
+        datetime period_start_utc
+        datetime period_end_utc
+    }
+
+    INGESTION_LEDGER {
+        string ledger_key PK "technical processing identity"
+        string job_id FK
+        string status "scheduled running publishing succeeded retrying failed"
+        datetime last_completed_at
+    }
+
+    INGESTION_JOB {
+        string job_id PK "deterministic scope-period id"
+        string scope_id FK
+        string period_token FK
+        string status "waiting delayed active completed failed"
+        int attempts_made
+        string worker_id "current owner"
+    }
+
+
+    GROUP_SCOPE ||--o{ INGESTION_JOB : scopes
+    GROUP_SCOPE ||--o{ INGESTION_LEDGER : owns
+    INGESTION_JOB ||--|| INGESTION_LEDGER : tracked_by
+    PROCESSING_PERIOD ||--o{ INGESTION_JOB : schedules
+    PROCESSING_PERIOD ||--o{ INGESTION_LEDGER : records

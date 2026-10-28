@@ -1,40 +1,67 @@
 # Implementation Plan: Geographic Enrichment and Event Filtering
 
-**Branch**: `002-geographic-enrichment` | **Date**: 2026-10-02 | **Spec**: [spec.md](spec.md)
+**Branch**: `002-geographic-enrichment` | **Date**: 2026-10-28 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from `/specs/002-geographic-enrichment/spec.md`
 
 ## Summary
 
-Implement geographic enrichment as independently testable TypeScript domain modules in `packages/core`, then connect them to the worker's staged Redis publication flow. The local commune CSV is parsed as a quoted, streaming CSV and indexed by exact postal-code plus city; the supplied constituency GeoJSON is validated and normalized into Polygon/MultiPolygon geometry. Constituency resolution remains separate from commune resolution and returns every matching polygon, including boundary matches. Geographic reference versions are staged immutably and activated through one Redis Lua pointer switch so failed refreshes cannot replace the active version.
+Implement geographic enrichment as independently testable TypeScript domain modules in `packages/core`, then persist the result through the project's existing Prisma/PostgreSQL stack. The geography comes exclusively from the Action Populaire event contract: `location.country`, `location.departement`, `location.commune.name`, `location.city` and `location.zip`. The local commune CSV is parsed as a quoted, streaming CSV into versioned PostgreSQL reference tables; lookups are indexed SQL queries, so no cache layer is introduced. Enrichment writes denormalized columns on `event_record`, committed in the same transaction as the published snapshot, so readers cannot observe a partially enriched event. Reference versions are staged, validated, then activated by switching a status inside one transaction guarded by a partial unique index. Redis keeps serving BullMQ only.
+
+Each stage keeps an explicit representation (raw source payload, validated record, reference row, comparison key, enrichment result, published document, query criteria, diagnostic), so codes never lose leading zeroes, raw values are never overwritten, and every boundary is directly testable.
 
 ## Technical Context
 
 **Language/Version**: TypeScript on Node.js >=20, strict compiler settings
 
-**Primary Dependencies**: Existing Zod, ioredis, BullMQ, Fastify, and Vitest; Node.js `fs`/`readline` for local data ingestion; no new geometry or CSV dependency in the first release
+**Primary Dependencies**: Existing Zod, Prisma, `@prisma/client`, BullMQ (Redis for the job queue only), Fastify, and Vitest; Node.js `fs`/`readline` for local CSV ingestion; no new CSV, geometry, geocoding or caching dependency
 
-**Storage**: Redis for immutable geographic reference versions, active-version pointer, event snapshots, and link records; local `data/communes-france-2026.csv` and `data/circonscriptions-legislatives-p20.geojson` as refresh inputs
+**Storage**: PostgreSQL as the single source of truth, accessed through Prisma. New tables hold versioned commune and department references plus a reference-version table; `event_record` gains denormalized geographic columns. Redis remains the BullMQ transport and stores no event or geographic data
 
-**Testing**: Vitest unit and contract tests, existing Redis integration tests, strict TypeScript typecheck, ESLint, and the documented quickstart validation flow
+**Testing**: Vitest unit tests for pure parsing, normalization, resolution and classification; contract tests for the Prisma repository and the query contract; PostgreSQL integration tests through a new harness reading `TEST_DATABASE_URL` (the existing `tests/integration` harness covers Redis only) that applies `prisma migrate deploy` to a disposable database; strict TypeScript typecheck; ESLint; the documented quickstart validation flow
 
 **Target Platform**: Linux containers and local Node.js worker/API processes
 
 **Project Type**: TypeScript monorepo with core library, API service, and BullMQ worker
 
-**Performance Goals**: At least 95% of usual geographic searches complete within one second at the reference volume; linear point-in-polygon scanning is acceptable for 559 constituency features when guarded by bounding boxes
+**Performance Goals**: At least 95% of usual geographic searches complete within one second at the reference volume; commune name and postal lookups rely on B-tree indexes rather than table scans; filtering is a single indexed SQL predicate set on `event_record`
 
-**Constraints**: Exact postal-code plus city matching only; no fuzzy or postal-only commune assignment; postal data wins over conflicting GPS; boundary points may create multiple constituency links; refresh is operator-triggered; activation and enriched publication are atomic; business modules target <=100 lines where practical; raw source location and stable event identifiers must survive re-enrichment
+**Constraints**: The existing `LocationRecord.geoPoint` / `geo_point` coordinate storage stays unchanged and is never read for enrichment; exact normalized commune-name matching first; postal-code plus city only as a fallback and only when unique; no fuzzy, phonetic, or coordinate-based matching; stated department code validated against the reference with discrepancy diagnostics; no region, EPCI, constituency, or arrondissement assignment; refresh is operator-triggered; activation and enriched publication are atomic PostgreSQL transactions; business modules target 100–150 lines as the constitution requires; raw source location and stable event identifiers must survive re-enrichment; department, INSEE and postal codes remain strings at every stage
 
-**Scale/Scope**: The supplied reference contains 34,868 CSV rows and 559 Polygon/MultiPolygon constituency features. The first release covers events, not group geographic enrichment, and uses the supplied reference datasets as the reproducible test fixture.
+**Scale/Scope**: The supplied reference contains one header plus 34,868 commune rows (UTF-8, quoted `codes_postaux`). The first release covers events, not group geographic enrichment, and covers only commune, department, and country levels.
+
+### Data Formats by Stage
+
+The spec's _Data Formats by Stage_ section is the contract between stages; the table below maps each stage to the code boundary that owns it.
+
+| Stage (spec)         | Owning boundary                                                               | Representation produced                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Source retrieval     | `apps/worker/src/adapters/action-populaire-client.ts`                         | Event JSON: one object from the event endpoint, a paginated array from the group events endpoints                  |
+| Payload validation   | `packages/core/src/adapters/action-populaire-schemas.ts`                      | Validated event object with raw `country`, `departement`, `commune.name`, `city`, `zip` retained as strings        |
+| Geographic reference | `packages/core/src/geography/commune-csv-parser.ts` + Prisma models           | Typed CSV rows; persisted as `geographic_reference_version`, `department_reference`, `commune_reference` rows      |
+| Normalization        | `packages/core/src/domain/geographic-identity.ts` and `commune-name-index.ts` | Comparison keys (NFC, case-folded, accent- and punctuation-folded), computed once when the version is staged       |
+| Enrichment           | `country-classifier.ts`, `commune-resolver.ts`, `department-validator.ts`     | Typed attachment: `countryCode`, `communeId`, `departmentCode`, `departmentSource`, raw copies, diagnostics        |
+| Publication          | `PostgresCalendarDatasetRepository` / `PostgresSnapshotPublisher` transaction | `event_record` row with location link, geographic columns and `reference_version`, committed atomically            |
+| Filtering            | `packages/core` query contract, executed by the API through Prisma            | `eventRecord.findMany` with `AND` predicates on geographic columns; no join fan-out, therefore no duplicate events |
+| Diagnostics          | shared `Diagnostic` type, stored as JSON on the event row                     | `{ code, field, message, severity }` with `warning` or `error`                                                     |
+
+Stage rules that must not drift:
+
+- Codes (`"69"`, `"2A"`, `"01001"`, `"01400"`) are strings from CSV parsing to SQL to query output and are never coerced to numbers.
+- Raw source values are preserved next to derived values; normalization only produces index keys.
+- Absent, `null` and empty string all mean "not stated" and never trigger a default.
+- Coordinates remain stored raw and untouched: this release adds no coordinate column, alters none, and never reads them.
+- Geography lives in PostgreSQL only; Redis carries no geographic state and no resolved-lookup cache.
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-- **Independent Features**: PASS. Geography parsing, resolution, validation, filtering, and persistence are separate contracts with pure-core tests and worker integration tests.
-- **TypeScript and Verified Types**: PASS. New public domain records and adapter boundaries are explicitly typed; untrusted CSV/GeoJSON values are validated before use.
-- **Test-First Quality**: PASS. Each parser, geometry rule, reference activation path, enrichment rule, and filter contract has a named test surface before implementation tasks are generated.
-- **Small and Maintainable Business Logic**: PASS. Postal and constituency rules are separate modules with a <=100-line target; geometry normalization and persistence are not mixed with business resolution.
-- **Deployable by Default**: PASS. The design uses existing Redis/Docker configuration and environment-based runtime settings; no host-specific path is required at runtime beyond configured data inputs.
+- **Independent Features**: PASS. Geography parsing, commune resolution, department validation, country classification, filtering, and persistence are separate contracts with pure-core tests and Prisma-integration tests.
+- **TypeScript and Verified Types**: PASS. Every stage boundary has an explicit type (raw payload, validated record, reference row, comparison key, attachment, published document, diagnostic); untrusted CSV and event values are validated before use, and Prisma-generated row types are mapped explicitly to domain records.
+- **Test-First Quality**: PASS. Each parser, normalization rule, resolution rule, reference activation path, transaction publication path, and filter contract has a named test surface before implementation tasks are generated.
+- **Small and Maintainable Business Logic**: PASS. Commune name resolution, postal fallback, department validation, and country classification are separate modules within the constitution's 100–150-line limit; Prisma access is confined to the repository, never mixed with business rules.
+- **Deployable by Default**: PASS. The feature reuses the existing PostgreSQL service, `DATABASE_URL` configuration and Prisma migration workflow; no new container or host-specific path is required.
 
 ## Project Structure
 
@@ -55,52 +82,76 @@ specs/002-geographic-enrichment/
 ### Source Code (repository root)
 
 ```text
+prisma/
+├── schema.prisma                      # + GeographicReferenceVersion, CommuneReference, DepartmentReference,
+│                                      #   geographic columns on EventRecord
+└── migrations/
+    └── 0002_geographic_reference/     # tables, indexes, partial unique index on the active version
+
 packages/core/src/
+├── domain/
+│   └── geographic-identity.ts         # existing normalizeCommuneKey helper
 ├── geography/
 │   ├── reference-types.ts
 │   ├── commune-csv-parser.ts
-│   ├── geojson-validator.ts
-│   ├── point-in-polygon.ts
-│   ├── postal-commune-resolver.ts
-│   ├── constituency-resolver.ts
+│   ├── commune-name-index.ts
+│   ├── commune-resolver.ts
+│   ├── department-validator.ts
+│   ├── country-classifier.ts
+│   ├── geographic-formats.ts          # raw field extraction and stage output shapes
 │   └── geographic-enricher.ts
+├── adapters/
+│   └── action-populaire-schemas.ts    # must retain departement, commune and presentation fields
 ├── persistence/
+│   ├── postgres-calendar-repository.ts
 │   └── geographic-reference-repository.ts
 └── infrastructure/
-    └── redis.ts
+    └── postgres.ts
 
 apps/worker/src/
+├── adapters/
+│   └── action-populaire-client.ts
 ├── geography/
 │   ├── reference-refresh.ts
 │   └── re-enrichment.ts
 └── persistence/
-    └── enriched-event-repository.ts
+    └── snapshot-publisher.ts
 
 packages/core/tests/ and apps/worker/tests/
-└── unit, contract, and publication tests for the modules above
+└── unit and contract tests for the modules above
+
+tests/integration/
+├── postgres-setup.ts                  # new: TEST_DATABASE_URL, migrate deploy, truncate between tests
+└── geographic-reference.test.ts       # staging, activation, retention, re-enrichment
 ```
 
-**Structure Decision**: Keep pure parsing, validation, normalization, resolution, and domain types in `packages/core`; keep Redis orchestration, operator refresh, queueing, and re-enrichment in `apps/worker`. The API consumes published snapshots and must not own geographic business rules.
+**Structure Decision**: Keep pure parsing, normalization, name resolution and domain types in `packages/core`; keep Prisma queries in `packages/core/src/persistence` repositories; keep operator refresh, queueing and re-enrichment orchestration in `apps/worker`. The API consumes published rows and must not own geographic business rules. Redis is imported only by queue code.
 
 ## Complexity Tracking
 
-No constitution violations require a waiver. The repository pattern for versioned reference data is required to preserve atomic activation and reader consistency; direct Redis access from enrichment code would couple business rules to persistence and violate the independent-boundary requirement.
+No constitution violations require a waiver.
+
+| Decision                                          | Why needed                                                                                                                                             | Simpler alternative rejected because                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Partial unique index in raw SQL migration         | Prisma's schema language cannot express `UNIQUE (status) WHERE status = 'active'`; the invariant "one active version" must be enforced by the database | A plain boolean or an application-only check allows two active versions after a failed concurrent refresh     |
+| Denormalized geographic columns on `event_record` | Filtering and reads need no join, so no duplicate suppression is required and snapshot publication stays transactional                                 | Link tables introduce many-to-many fan-out and duplicate rows in filtered results                             |
+| Repository confined to Prisma                     | Business rules stay free of database concerns and remain testable without PostgreSQL                                                                   | Direct Prisma calls inside resolvers make unit tests require a database and mix persistence with domain logic |
 
 ## Phase 0: Research Output
 
-See [research.md](research.md). All technical-context unknowns are resolved there, including CSV parsing, GeoJSON boundary semantics, reference versioning, atomic activation, and re-enrichment sequencing.
+See [research.md](research.md). All technical-context unknowns are resolved there, including CSV parsing, name normalization, ambiguity handling, stage representations, adapter field retention, PostgreSQL reference storage, indexed lookup, transactional activation, and re-enrichment sequencing.
 
 ## Phase 1: Design Output
 
-- [data-model.md](data-model.md) defines reference entities, enriched event links, diagnostics, identity rules, and lifecycle states.
+- [data-model.md](data-model.md) defines the Prisma tables, event geographic columns, diagnostics, identity rules, and lifecycle states.
 - [contracts/geographic-filter.md](contracts/geographic-filter.md) defines intersection filtering and duplicate suppression.
-- [contracts/geographic-refresh.md](contracts/geographic-refresh.md) defines operator refresh input, validation diagnostics, staging, and atomic activation.
+- [contracts/geographic-refresh.md](contracts/geographic-refresh.md) defines operator refresh input, validation diagnostics, staging, and transactional activation.
 - [quickstart.md](quickstart.md) defines runnable unit, integration, and dataset validation scenarios.
 
 ## Post-Design Constitution Check
 
-- **Independent Features**: PASS. Core modules have no Redis or Fastify dependency; adapters are at the worker boundary.
-- **TypeScript and Verified Types**: PASS. CSV rows, GeoJSON properties, Redis manifests, diagnostics, and contracts all have explicit types.
-- **Test-First Quality**: PASS. The quickstart maps every high-risk rule to a test command or fixture scenario.
-- **Small and Maintainable Business Logic**: PASS. No module combines CSV parsing, polygon math, postal resolution, constituency resolution, and persistence.
-- **Deployable by Default**: PASS. Activation uses the existing Redis service and a configured data directory; failure leaves the prior active pointer intact.
+- **Independent Features**: PASS. Core modules have no Prisma, Redis or Fastify dependency; Prisma access sits behind the repository, and queue code is the only Redis consumer.
+- **TypeScript and Verified Types**: PASS. CSV rows, Prisma rows, diagnostics, stage outputs, and contracts all have explicit types.
+- **Test-First Quality**: PASS. The quickstart maps every high-risk rule to a test command or fixture scenario, including a disposable database for repository tests.
+- **Small and Maintainable Business Logic**: PASS. No module combines CSV parsing, name resolution, department validation, and persistence.
+- **Deployable by Default**: PASS. Activation and publication run in the existing PostgreSQL service inside documented Prisma migrations; failure leaves the previous active version intact.

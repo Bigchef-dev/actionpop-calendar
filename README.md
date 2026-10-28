@@ -44,13 +44,59 @@ pnpm --filter @actionpop/api test
 pnpm --filter @actionpop/worker test
 ```
 
-For local API development, start the private Redis dependency with Docker, then
-run the API through pnpm in a second terminal:
+`pnpm dev` starts the Redis and Postgres containers, applies pending Prisma
+migrations, then builds and runs the API. If Docker requires elevated rights on your
+machine, start the dependencies once with `sudo pnpm dev:infra` (or add your user to
+the `docker` group) before running `pnpm dev`. Startup aborts with a single message
+naming the unreachable dependency instead of retrying forever.
+
+Prisma Studio provides a local visual interface for the persisted Postgres data and
+`pnpm dev:tools` additionally starts RedisInsight and Bull Board:
 
 ```bash
-pnpm dev:redis
-REDIS_URL=redis://127.0.0.1:6379 NODE_ENV=development pnpm dev
+pnpm dev:tools
+pnpm db:setup
+pnpm dev:studio
 ```
+
+`pnpm db:setup` also tries to start the dependencies, so it can be used on its own.
+When Docker requires elevated rights it prints a warning and the migration fails with
+an explicit hint naming the unreachable Postgres.
+
+`pnpm dev:tools` starts Redis, Postgres, RedisInsight (`http://127.0.0.1:5540`) and
+Bull Board (`http://127.0.0.1:5541`). Stop the development stack with `pnpm dev:down`,
+or run `docker compose down` from `infra/compose`; no environment variable is needed
+to stop or inspect the stack.
+
+Containers are named after the Compose project (`actionpop`), so no explicit
+`container_name` is used. If a container created by an older revision of this
+repository still holds a fixed name, remove it once:
+
+```bash
+docker rm -f bull-board dev-redisinsight
+```
+
+Prisma Studio is available at `http://127.0.0.1:5552` and binds only to loopback.
+The API can then be started in a second terminal:
+
+```bash
+pnpm dev
+```
+
+Environment files are loaded by the API and worker entry points and by every
+`pnpm prisma:*` script: `.env` holds shared defaults and the optional `.env.local`
+holds machine-specific overrides such as loopback hostnames. Recreate them once with:
+
+```bash
+cp .env.example .env
+printf 'REDIS_URL=redis://127.0.0.1:6379\nDATABASE_URL=postgresql://actionpop:actionpop@127.0.0.1:5432/actionpop\nNODE_ENV=development\n' > .env.local
+pnpm db:setup
+```
+
+Both files are git-ignored except `.env.example`. Every Prisma script prints the
+resolved target (host and database only) so migrations, Studio, and the application
+are guaranteed to use the same database. `pnpm prisma:migrate:status` reports pending
+migrations when Studio shows an empty or missing table.
 
 The API is then available at `http://127.0.0.1:3000`. The public surface remains
 the read-only `GET /feed/{scopeId}` route; Redis, worker responsibilities, and

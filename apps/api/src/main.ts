@@ -1,4 +1,14 @@
-import { createRedisConnection, RedisCalendarDatasetRepository } from '@actionpop/core';
+import {
+  checkPostgresHealth,
+  closePostgres,
+  createPostgresClient,
+  createRedisConnection,
+  describeDependencyFailures,
+  loadEnvFile,
+  PostgresCalendarDatasetRepository,
+  probeRedis,
+  runPreflight,
+} from '@actionpop/core';
 import { buildApp } from './server.js';
 import { loadApiConfig } from './config.js';
 import { logger } from './logger.js';
@@ -15,29 +25,46 @@ process.on('unhandledRejection', (reason: unknown) => {
 });
 
 export async function startApi(): Promise<void> {
+  loadEnvFile();
   logger.info('Starting API');
   const config = loadApiConfig();
+  const postgres = createPostgresClient();
   logger.info({
     environment: config.app.environment,
     timezone: config.app.timezone,
   }, 'API configuration loaded');
 
+  const failures = await runPreflight([
+    { name: 'redis', probe: () => probeRedis(config.redis.url) },
+    { name: 'postgres', probe: () => checkPostgresHealth(postgres) },
+  ]);
+
+  if (failures.length > 0) {
+    logger.error(
+      { dependencies: failures, hint: describeDependencyFailures(failures) },
+      'API startup aborted',
+    );
+    await closePostgres(postgres);
+    process.exitCode = 1;
+    return;
+  }
+
+  logger.info('Dependencies ready');
+
   const redis = createRedisConnection(config.redis.url);
   redis.on('error', (error: Error) => {
     logger.error({ err: error }, 'Redis connection error');
   });
-
-  logger.info('Connecting to Redis');
   await redis.connect();
-  logger.info('Redis connected');
 
   logger.info('Building API application');
   const app = await buildApp({
-    datasetRepository: new RedisCalendarDatasetRepository(redis),
+    datasetRepository: new PostgresCalendarDatasetRepository(postgres),
     health: {
       redis: async () => {
         await redis.ping();
       },
+      postgres: () => checkPostgresHealth(postgres),
     },
   });
 
@@ -45,6 +72,7 @@ export async function startApi(): Promise<void> {
     logger.info('Shutting down gracefully...');
     await app.close();
     await redis.quit();
+    await closePostgres(postgres);
   };
 
   process.once('SIGTERM', shutdown);

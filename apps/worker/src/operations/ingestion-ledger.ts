@@ -1,5 +1,6 @@
 import type { IngestionLedgerStatus } from '@actionpop/core';
 import { buildRedisKey } from '@actionpop/core';
+import type { PrismaClient } from '@prisma/client';
 
 interface LedgerPatch {
   scopeId?: string;
@@ -9,39 +10,50 @@ interface LedgerPatch {
   error?: string;
 }
 
+type StoredLedger = LedgerPatch & { attempts: number; error?: string };
+
 export class IngestionLedgerStore {
-  private readonly values = new Map<string, LedgerPatch & { attempts: number; error?: string }>();
+  private readonly values = new Map<string, StoredLedger>();
 
   public transition(jobId: string, patch: LedgerPatch): void {
     const previous = this.values.get(jobId);
     const error = patch.error?.replace(/upstream token=.* failed/i, 'upstream failed');
     this.values.set(jobId, {
-      ...previous, ...patch, attempts: patch.attempts ?? previous?.attempts ?? 0,
+      ...previous,
+      ...patch,
+      attempts: patch.attempts ?? previous?.attempts ?? 0,
       ...(error === undefined ? {} : { error }),
     });
   }
 
-  public get(jobId: string) { return this.values.get(jobId); }
+  public get(jobId: string): StoredLedger | undefined {
+    return this.values.get(jobId);
+  }
 }
 
 export class RedisIngestionLedgerStore {
-  public constructor(private readonly redis: {
-    get(key: string): Promise<string | null>;
-    set(key: string, value: string): Promise<unknown>;
-  }, private readonly namespace = 'actionpop') {}
+  public constructor(
+    private readonly redis: {
+      get(key: string): Promise<string | null>;
+      set(key: string, value: string): Promise<unknown>;
+    },
+    private readonly namespace = 'actionpop',
+  ) {}
 
   public async transition(jobId: string, patch: LedgerPatch): Promise<void> {
     const previous = await this.get(jobId);
     const error = patch.error?.replace(/upstream token=.* failed/i, 'upstream failed');
     await this.redis.set(this.key(jobId), JSON.stringify({
-      ...previous, ...patch, attempts: patch.attempts ?? previous?.attempts ?? 0,
+      ...previous,
+      ...patch,
+      attempts: patch.attempts ?? previous?.attempts ?? 0,
       ...(error === undefined ? {} : { error }),
     }));
   }
 
-  public async get(jobId: string): Promise<(LedgerPatch & { attempts: number; error?: string }) | undefined> {
+  public async get(jobId: string): Promise<StoredLedger | undefined> {
     const value = await this.redis.get(this.key(jobId));
-    return value === null ? undefined : JSON.parse(value) as LedgerPatch & { attempts: number; error?: string };
+    return value === null ? undefined : JSON.parse(value) as StoredLedger;
   }
 
   public async isScheduled(jobId: string): Promise<boolean> {
@@ -51,5 +63,70 @@ export class RedisIngestionLedgerStore {
 
   private key(jobId: string): string {
     return buildRedisKey(this.namespace, 'ledger', jobId);
+  }
+}
+
+export class PostgresIngestionLedgerStore {
+  public constructor(private readonly prisma: PrismaClient) {}
+
+  public async transition(jobId: string, patch: LedgerPatch): Promise<void> {
+    const previous = await this.get(jobId);
+    const error = patch.error?.replace(/upstream token=.* failed/i, 'upstream failed');
+    const scopeId = patch.scopeId ?? previous?.scopeId;
+    const periodToken = patch.periodToken ?? previous?.periodToken;
+    if (scopeId === undefined || periodToken === undefined) {
+      throw new Error(`ledger ${jobId} requires scopeId and periodToken`);
+    }
+
+    const start = new Date(periodToken);
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.groupScope.upsert({
+        where: { scopeId },
+        create: { scopeId, active: true },
+        update: {},
+      });
+      await transaction.processingPeriod.upsert({
+        where: { periodToken },
+        create: {
+          periodToken,
+          periodStartUtc: start,
+          periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
+        },
+        update: {},
+      });
+      await transaction.ingestionLedger.upsert({
+        where: { jobId },
+        create: {
+          jobId,
+          scopeId,
+          periodToken,
+          status: patch.status,
+          attempts: patch.attempts ?? 0,
+          lastError: error ?? null,
+        },
+        update: {
+          status: patch.status,
+          attempts: patch.attempts ?? previous?.attempts ?? 0,
+          lastError: error ?? null,
+        },
+      });
+    });
+  }
+
+  public async get(jobId: string): Promise<StoredLedger | undefined> {
+    const value = await this.prisma.ingestionLedger.findUnique({ where: { jobId } });
+    if (value === null) return undefined;
+    return {
+      scopeId: value.scopeId,
+      periodToken: value.periodToken,
+      status: value.status as IngestionLedgerStatus,
+      attempts: value.attempts,
+      ...(value.lastError === null ? {} : { error: value.lastError }),
+    };
+  }
+
+  public async isScheduled(jobId: string): Promise<boolean> {
+    const value = await this.get(jobId);
+    return value?.status === 'scheduled' || value?.status === 'running' || value?.status === 'retrying';
   }
 }

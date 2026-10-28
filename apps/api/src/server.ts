@@ -12,7 +12,7 @@ export interface DatasetReader {
 
 export interface ServerOptions {
   datasetRepository: DatasetReader;
-  health?: { redis?: () => Promise<void> };
+  health?: { redis?: () => Promise<void>; postgres?: () => Promise<void> };
   upstream?: (...args: unknown[]) => unknown;
   metrics?: MetricsRegistry;
   logger?: Logger;

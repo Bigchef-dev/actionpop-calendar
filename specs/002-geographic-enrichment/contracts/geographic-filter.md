@@ -2,22 +2,22 @@
 
 ## Purpose
 
-Return each event once when it satisfies every supplied geographic and event-type criterion. The API or query service must consume published link records and must not perform postal lookup or polygon math during a read.
+Return each event once when it satisfies every supplied geographic and event-type criterion. The API or query service reads the geographic columns already published on the event row and must not perform reference lookup during a read.
 
 ## Request
 
 Conceptual query shape:
 
 ```http
-GET /events?country=FR&commune=69123&constituency=6901&department=69&region=84&epci=200046977&event_type=tractage
+GET /events?country=FR&department=69&commune=69123&event_type=tractage
 ```
 
-Each parameter is optional and repeatable only when the implementation explicitly supports a set. A missing parameter imposes no criterion. Values are stable reference identifiers or the validated event-type enum.
+Each parameter is optional and repeatable only when the implementation explicitly supports a set. A missing parameter imposes no criterion. Values are stable reference identifiers (`country` is the stated ISO 3166-1 alpha-2 code, `department` is a department code, `commune` is an INSEE code) or the validated event-type enum. `region`, `epci`, `constituency`, and coordinate parameters are not part of this version.
 
 ## Semantics
 
 - All supplied criteria use `AND` semantics.
-- A matching link is sufficient for its criterion; multiple links do not duplicate an event.
+- Each criterion maps to an equality predicate on a published column (`country_code`, `department_code`, `commune_id`) or on `event_type`, so one event row is returned at most once.
 - No match returns an empty result, not neighboring areas or a relaxed query.
 - Unknown or malformed identifiers return a validation error rather than a broad query.
 - Results preserve stable event identity and expose geographic diagnostics when requested by the response contract.
@@ -30,13 +30,15 @@ Each parameter is optional and repeatable only when the implementation explicitl
     {
       "sourceEventId": "event-1",
       "eventType": "tractage",
+      "countryCode": "FR",
+      "departmentCode": "69",
       "communeId": "69123",
-      "constituencyIds": ["6901"],
-      "referenceVersion": "communes-2026-circo-p20-<checksum>"
+      "geographicStatus": "resolved",
+      "referenceVersion": "communes-2026-<checksum>"
     }
   ],
   "total": 1,
-  "referenceVersion": "communes-2026-circo-p20-<checksum>"
+  "referenceVersion": "communes-2026-<checksum>"
 }
 ```
 
@@ -44,7 +46,10 @@ The existing public iCalendar feed remains read-only. A future HTTP adapter may 
 
 ## Acceptance examples
 
-- Constituency `6901` plus commune `69123` returns only the intersection.
+- Department `69` plus commune `69123` returns only the intersection.
 - A non-matching second criterion returns `items: []`.
-- Two matching constituency links for one event return one item.
 - `event_type=tractage` and `country=FR` filter independently and together.
+- An event stating country `BE` never matches `department=69`, because no French department link exists for it.
+- An event whose commune is unresolved but whose department is stated still matches `department=69` and never matches a commune criterion.
+- An event published in `national events` has no `country_code`, `department_code` or `commune_id` and therefore matches no geographic criterion.
+- Filtering is served by indexes on the published columns; no reference table join is required for a geographic read.

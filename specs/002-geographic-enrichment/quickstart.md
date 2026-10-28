@@ -4,25 +4,45 @@
 
 - Node.js >=20 and pnpm 12.8.1
 - Workspace dependencies installed with `pnpm install --frozen-lockfile`
-- Optional Redis integration environment using the repository Docker compose files
-- Local fixtures present:
-  - `data/communes-france-2026.csv`
-  - `data/circonscriptions-legislatives-p20.geojson`
+- PostgreSQL reachable through `DATABASE_URL` (local Docker compose or a disposable test
+  database); Redis is needed only for the BullMQ queue and not for geographic validation
+- PostgreSQL integration tests read `TEST_DATABASE_URL`; the existing `tests/integration`
+  harness only provisions Redis, so this feature adds a PostgreSQL harness that applies the
+  migrations and cleans the reference and event tables between tests
+- Local fixture present: `data/communes-france-2026.csv`
+
+The constituency GeoJSON file in `data/` is not used by this version.
 
 ## Static fixture checks
 
-Confirm the supplied references are readable and have the expected shape:
+Confirm the supplied reference is readable and has the expected shape:
 
 ```bash
-node --input-type=module -e "import fs from 'node:fs'; const g=JSON.parse(fs.readFileSync('data/circonscriptions-legislatives-p20.geojson','utf8')); if (g.type !== 'FeatureCollection' || g.features.length !== 559) process.exit(1); console.log(g.features.length)"
-wc -l data/communes-france-2026.csv
+head -1 data/communes-france-2026.csv | tr ',' '\n' | grep -nE '^(code_insee|nom_standard|nom_sans_pronom|code_postal|codes_postaux|dep_code|dep_nom)$'
+wc -l < data/communes-france-2026.csv
 ```
 
-Expected: a GeoJSON `FeatureCollection` with 559 features and a CSV with 34,868 lines including its header.
+Expected: all required columns present and 34,869 lines including the header.
+
+## Schema and migration checks
+
+```bash
+pnpm prisma:validate
+pnpm prisma:generate
+pnpm prisma:migrate
+```
+
+Expected: the new `geographic_reference_version`, `department_reference` and
+`commune_reference` tables exist, `event_record` exposes the geographic columns, and the
+partial unique index `geographic_reference_version_one_active` is present:
+
+```bash
+psql "$DATABASE_URL" -c "\d geographic_reference_version" -c "\d commune_reference"
+```
 
 ## Unit and contract validation
 
-Run the pure rules first:
+Run the pure rules first — no database required:
 
 ```bash
 pnpm --filter @actionpop/core typecheck
@@ -30,17 +50,26 @@ pnpm --filter @actionpop/core test
 pnpm --filter @actionpop/core lint
 ```
 
-The tests must cover quoted CSV fields, duplicate identifiers, exact postal + city lookup, postal-only unresolved state, postal/GPS conflict, Polygon and MultiPolygon geometry, holes, edge/vertex boundaries, multiple boundary matches, invalid GeoJSON, and diagnostic preservation.
+The tests must cover quoted CSV fields, duplicate identifiers, department extraction, exact
+normalized name matching (case, accents, articles, hyphens), pronoun-free aliases, homonyms
+disambiguated by department code, ambiguity diagnostics, postal plus city fallback and its
+non-uniqueness, unknown department codes, department/commune discrepancy diagnostics,
+country classification, and diagnostic preservation.
 
-## Worker refresh and publication validation
+## Repository and worker validation
+
+Run against a disposable PostgreSQL database:
 
 ```bash
+pnpm prisma:migrate
 pnpm --filter @actionpop/worker typecheck
 pnpm --filter @actionpop/worker test
 pnpm --filter @actionpop/worker lint
 ```
 
-Use a fake Redis store for unit tests to verify staging isolation and failed activation. Use the existing Redis integration setup for atomic pointer replacement, previous-version retention, replay, and re-enrichment publication.
+Repository tests must verify staged inserts are invisible to readers, activation inside one
+transaction, the unique-violation behaviour on concurrent activation, previous-version
+retention, and enriched publication committed together with the snapshot.
 
 ## End-to-end checks
 
@@ -54,10 +83,15 @@ pnpm quality
 
 Expected outcomes:
 
-- An exact postal-code + city match resolves a commune; postal-only and ambiguous matches remain unresolved.
-- Postal data wins over conflicting GPS and emits a diagnostic.
-- A point inside a constituency resolves it; a point on a shared boundary retains every matching constituency link.
-- A multi-constituency commune without a precise point has no constituency link and exposes `constituency_unresolved`.
+- `location.commune.name = "Lyon"` with `location.departement = "69"` and `location.country = "FR"` resolves the commune `69123`, department `69`, and country `FR`.
+- A commune name shared by several communes resolves only through a valid stated department code; without one it stays unresolved with an ambiguity diagnostic.
+- Without a commune name, an exact unique `zip` + `city` pair resolves the commune; a non-unique pair does not.
+- An unknown department code with a resolved commune links the commune's reference department and emits `department_code_unknown`.
+- A stated department that disagrees with the resolved commune emits `department_commune_mismatch` and keeps both raw values.
+- A stated country outside France produces an international classification and no French commune or department.
+- An event with no country, department, or commune is published in `national events`.
+- A department code such as `"01"` stays `"01"` from CSV parsing through publication and query output, and an empty `location.departement` produces no department link and no error diagnostic.
+- Raw values (`raw_department_code`, `raw_commune_name`) match the payload exactly while derived keys are used only for lookup.
 - A failed refresh leaves the previous active reference and event snapshot readable.
-- A successful refresh changes `referenceVersion` and geographic links without changing `sourceEventId`, raw location, dates, or event type.
+- A successful refresh changes `reference_version` and geographic links without changing `source_event_id`, raw location, dates, or event type.
 - Combined queries return only the intersection and never duplicate an event.

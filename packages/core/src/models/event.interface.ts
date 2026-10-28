@@ -1,6 +1,10 @@
-import { ActionPopulaireEventPayload } from "../adapters/action-populaire-schemas.js";
+import { ActionPopulaireEventPayload, ActionPopulaireLocation } from "../adapters/action-populaire-schemas.js";
 
-export interface IncomingEvent extends Pick<ActionPopulaireEventPayload, 'id' | 'name' | 'startTime' | 'endTime' | 'description'> {}
+export interface LocationEvent extends Pick<ActionPopulaireLocation, 'address1' | 'city' | 'zip' | 'coordinates'> {}
+
+export interface IncomingEvent extends Pick<ActionPopulaireEventPayload, 'id' | 'name' | 'startTime' | 'endTime' | 'description'> {
+    location: LocationEvent | null;
+}
 
 export interface PublishedEvent extends IncomingEvent {
   sourceEventId: string;

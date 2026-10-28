@@ -44,7 +44,11 @@ export class InternalController {
     if (this.options.health?.redis !== undefined) {
       checks.push(await runHealthCheck('redis', this.options.health.redis));
     }
-    
+
+    if (this.options.health?.postgres !== undefined) {
+      checks.push(await runHealthCheck('postgres', this.options.health.postgres));
+    }
+
     const ready = checks.every((check) => check.status === 'ready');
     
     return reply

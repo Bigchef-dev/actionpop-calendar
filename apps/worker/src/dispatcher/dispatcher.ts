@@ -8,7 +8,10 @@ interface DispatcherQueue {
 }
 
 interface DispatcherOptions {
-  catalogue: Pick<GroupCatalogueRepository, 'activeScopes'> | { activeScopes: () => Promise<string[]> };
+  catalogue:
+    | Pick<GroupCatalogueRepository, 'allIds'>
+    | { allIds: () => Promise<string[]> }
+    | { activeScopes: () => string[] | Promise<string[]> };
   queue: DispatcherQueue;
   lock: Pick<RedisLock, 'acquire' | 'release'>;
   isScheduled?: (jobId: string) => Promise<boolean>;
@@ -29,7 +32,9 @@ export function createDispatcher(options: DispatcherOptions) {
       running = true;
       try {
         const period = calculateProcessingPeriod(options.now?.() ?? new Date(), intervalMs);
-        const scopes = await options.catalogue.activeScopes();
+        const scopes = 'activeScopes' in options.catalogue
+          ? await options.catalogue.activeScopes()
+          : await options.catalogue.allIds();
         await Promise.all(scopes.map(async (scopeId) => {
           const jobId = buildIngestionJobId(scopeId, period.periodStartUtc);
           if (options.isScheduled !== undefined && await options.isScheduled(jobId)) return;

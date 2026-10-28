@@ -43,12 +43,12 @@ The source response is an array item with the following shape:
     "name": "string",
     "address1": "string",
     "address2": "string",
-    "zip": "string",
-    "city": "string",
-    "departement": "string",
+    "zip": "69001",
+    "city": "Lyon",
+    "departement": "69",
     "country": "FR",
     "address": "string",
-    "commune": { "name": "string", "nameOf": "string" },
+    "commune": { "name": "Lyon", "nameOf": "string" },
     "shortAddress": "string",
     "shortLocation": "string",
     "coordinates": { "type": "Point", "coordinates": [0.0, 0.0] },
@@ -88,15 +88,30 @@ empty.
 Coordinates are GeoJSON-like `[longitude, latitude]` values with finite numbers in
 longitude `-180..180` and latitude `-90..90`.
 
-| Source field | Internal use |
-|---|---|
-| `id` | Stable `EventRecord.sourceEventId` and calendar UID source |
-| `name` | Summary |
-| `startTime`, `endTime`, `timezone` | Timezone-aware event times |
-| `location.shortLocation` / `shortAddress` | Calendar location |
-| `groups[].id` | Scope membership |
-| `subtype.label`, `description`, `emoji` | Optional calendar metadata |
-| normalized content | Content hash and sequence change detection |
+Geographic raw formats:
+
+- `location.country` is an ISO 3166-1 alpha-2 code as stated by the platform
+  (`"FR"`). It may be empty; no country is deduced locally.
+- `location.departement` is a department code, not a free-form name, and is kept as
+  a string so leading zeroes and Corsican codes (`"2A"`, `"2B"`) survive.
+- `location.commune.name` is the stated commune name used first for geographic
+  enrichment; `location.city` and `location.zip` are the fallback pair.
+- `location.coordinates` is validated as payload data but is not used to attach an
+  event to a geographic area (see `specs/002-geographic-enrichment/spec.md`).
+
+| Source field                              | Internal use                                                |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| `id`                                      | Stable `EventRecord.sourceEventId` and calendar UID source  |
+| `name`                                    | Summary                                                     |
+| `startTime`, `endTime`, `timezone`        | Timezone-aware event times                                  |
+| `location.shortLocation` / `shortAddress` | Calendar location                                           |
+| `location.country`                        | Country classification (ISO 3166-1 alpha-2)                 |
+| `location.departement`                    | Department link, validated against the geographic reference |
+| `location.commune.name`                   | Primary commune resolution input                            |
+| `location.zip` + `location.city`          | Commune resolution fallback when no commune name is stated  |
+| `groups[].id`                             | Scope membership                                            |
+| `subtype.label`, `description`, `emoji`   | Optional calendar metadata                                  |
+| normalized content                        | Content hash and sequence change detection                  |
 
 A failed or partial retrieval must not cancel missing events. Cancellation requires a
 complete successful source snapshot.

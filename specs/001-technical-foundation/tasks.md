@@ -28,7 +28,7 @@ description: "Task list for the Technical Foundation feature"
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Implement shared configuration, domain contracts, Redis access, and operational primitives required by all user stories.
+**Purpose**: Implement shared configuration, domain contracts, Redis/BullMQ execution primitives, Prisma/Postgres persistence, and operational primitives required by all user stories.
 
 **Critical**: No user story implementation starts until this phase is complete.
 
@@ -44,6 +44,11 @@ description: "Task list for the Technical Foundation feature"
 - [X] T017 [P] Add shared error classes and retry classification for network failures, timeouts, HTTP 429/5xx, temporary Redis failures, malformed payloads, invalid scope configuration, and permanent authentication failures in `packages/core/src/operations/errors.ts` and `packages/core/src/operations/retry-policy.ts`.
 - [X] T018 Create the core package public exports and package build boundary in `packages/core/src/index.ts` and `packages/core/package.json`.
 - [X] T019 [P] Add the Redis AOF configuration, `noeviction` policy, named volume, private network, and service healthcheck in `infra/redis/redis.conf` and `infra/compose/docker-compose.yml`.
+- [X] T084 [P] Add Prisma, `@prisma/client`, Postgres runtime configuration, and Prisma generation/migration scripts in `package.json`, `packages/core/package.json`, and `infra/compose/.env.example`.
+- [X] T085 [P] Define Prisma models for groups, events, subscriptions, locations, ingestion ledgers, and calendar snapshots with source identifiers, relationships, status fields, and unique constraints in `prisma/schema.prisma`.
+- [X] T086 [P] Add Postgres service configuration, named volume, private network, and readiness healthcheck in `infra/compose/docker-compose.yml` and `infra/postgres/`.
+- [X] T087 [P] Implement the typed Prisma client factory, health check, transaction helper, and graceful shutdown in `packages/core/src/infrastructure/postgres.ts` and `packages/core/src/infrastructure/postgres.test.ts`.
+- [X] T102 [P] Add loopback-only Prisma Studio and local Postgres startup commands in `package.json`, `README.md`, and `infra/compose/docker-compose.dev.yml`.
 - [X] T020 [P] Add the integration-test Redis lifecycle, isolated key namespace, and environment setup in `tests/integration/setup.ts` and `tests/integration/test-environment.ts`.
 - [X] T021 [P] Define shared HTTP, worker, and Redis liveness/readiness/startup check contracts in `packages/core/src/operations/health.ts` and `packages/core/src/operations/health.test.ts`.
 
@@ -141,7 +146,7 @@ description: "Task list for the Technical Foundation feature"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-**Purpose**: Close quality, security, documentation, and operational-readiness gaps across all stories.
+**Purpose**: Close quality, security, documentation, operational-readiness, and Redis/Postgres migration gaps across all stories.
 
 - [X] T062 [P] Add CI jobs for install, strict typecheck, lint, package tests, integration tests with Redis, Docker builds, and artifact validation in `.github/workflows/ci.yml`.
 - [X] T063 [P] Add registry publishing with immutable commit-based API and worker tags and environment-provided credentials in `.github/workflows/publish-images.yml`.
@@ -161,11 +166,12 @@ description: "Task list for the Technical Foundation feature"
 - **Phase 2 Foundational**: Depends on Phase 1; T008-T017, T019-T021 can proceed in parallel by area, while T018 completes the core public boundary after core implementation tasks exist.
 - **User Stories**: All depend on Phase 2. User Story 1 is the smallest validation increment; User Stories 2 and 3 can proceed in parallel after the shared foundation, with US3 using the Redis and observability contracts established by Phase 2.
 - **Phase 6 Polish**: Depends on the desired user stories being complete; CI and documentation tasks can proceed in parallel, while T067 and T068 are final validation/review tasks.
+- **Phase 9 Persistence Migration**: Depends on Phase 2 and the existing worker/API boundaries; T084-T087 establish Prisma/Postgres infrastructure, then T088-T101 migrate durable data and validate Redis queue recovery.
 
 ### User Story Dependencies
 
 - **User Story 1 (P1)**: Starts after Phase 2; no dependency on another story. Recommended first increment and MVP.
-- **User Story 2 (P1)**: Starts after Phase 2; consumes core calendar and Redis snapshot contracts, but is independently testable with prepared Redis data and does not require the worker to fetch upstream data.
+- **User Story 2 (P1)**: Starts after Phase 2; consumes core calendar and Postgres snapshot contracts, but is independently testable with prepared Postgres data and does not require the worker to fetch upstream data.
 - **User Story 3 (P1)**: Starts after Phase 2; consumes core configuration, Redis, job identity, errors, metrics, and health contracts. It can be developed in parallel with US2 and must not couple the worker to the public API server.
 
 ### Within Each User Story
@@ -231,7 +237,7 @@ Task T048: Snapshot publication tests in apps/worker/tests/snapshot-publication.
 
 - **US1**: Clean supported checkout installs with pnpm; `pnpm typecheck` and `pnpm test` pass; a deliberate invalid public type fails with an actionable package/file diagnostic.
 - **US2**: Separate API and worker images build/start independently; API serves prepared `text/calendar` data with `ETag`/`304` and rejects mutation/private access; worker starts queue responsibilities without an API surface; Redis data and jobs survive a normal named-volume restart.
-- **US3**: Three workers process 100 jobs without simultaneous ownership; interrupted jobs are redelivered; retryable failures obey configured limits and expose exhausted state; complete paginated data publishes atomically and replay is idempotent; queued work and datasets recover after Redis restart.
+- **US3**: Three workers process 100 jobs without simultaneous ownership; interrupted jobs are redelivered; retryable failures obey configured limits and expose exhausted state; complete paginated data publishes atomically and replay is idempotent; queued work recovers after Redis restart while durable datasets remain in Postgres.
 
 ## Notes
 
@@ -243,10 +249,10 @@ Task T048: Snapshot publication tests in apps/worker/tests/snapshot-publication.
 ## Phase 7: Convergence
 
 - [X] T069 Wire the worker runtime to dispatch and process BullMQ ingestion jobs in retrieve-validate-transform-write-ack order per FR-006 and FR-013 (contradicts)
-- [X] T070 Persist the group catalogue, ingestion ledger, and permanent failure state in Redis so active scopes and recovery state survive restarts per FR-011 and FR-026 (missing)
+- [X] T070 Persist the group catalogue, ingestion ledger, and permanent failure state in Prisma/Postgres; retain BullMQ execution state in Redis so active scopes and recovery state survive restarts per FR-011 and FR-026 (migration follow-up in Phase 9)
 - [X] T071 Implement Action Populaire event retrieval through `GET /events?page=X&page_size=Y` with one-based pagination, a maximum page size of 1000, and short-or-empty page termination per FR-011A (partial)
 - [X] T072 Replace process-local dispatcher duplicate suppression with shared durable scope-period job identity handling per FR-010 and FR-011 (partial)
-- [X] T073 Implement complete staged snapshot validation and atomic current-pointer replacement in Redis per FR-030 and plan: snapshot publication decision (contradicts)
+- [X] T073 Implement complete staged snapshot validation and atomic current-pointer replacement in Prisma/Postgres per FR-030 and plan: snapshot publication decision (migration follow-up in Phase 9)
 - [X] T074 Connect BullMQ retry limits, delayed backoff, exhausted-job reporting, and non-retryable Zod failures to the worker runtime and ledger per FR-014 and FR-031 (missing)
 - [X] T075 Connect structured request/job logs, metrics exporters or endpoints, and actionable alert rules to the API and worker runtime per FR-023, FR-024, and FR-025 (missing)
 - [X] T076 Integrate the HTTPS edge and private network boundaries so public feeds are read-only HTTPS endpoints and internal health, Redis, BullMQ, and administration surfaces are not publicly reachable per FR-019 and FR-020 (contradicts)
@@ -259,4 +265,30 @@ Task T048: Snapshot publication tests in apps/worker/tests/snapshot-publication.
 
 - [X] T081 Wire structured request/job logs, complete runtime metrics production and export, and actionable alert signals for request failures, job duration, queue depth, retries, exhausted jobs, upstream failures, ingestion freshness, and Redis connectivity per FR-023/FR-024/FR-025 (missing)
 - [X] T082 Implement executable Redis-backed restart, three-worker/100-job ownership and redelivery, retry exhaustion, and representative capacity validations instead of environment-only or skipped assertions per SC-004/SC-005/SC-006 (partial)
-- [X] T083 Align the completed implementation and test targets with the planned focused route, adapter, catalogue, ingestion, and dispatcher boundaries, creating equivalent executable tests where those boundaries are absent per T080 (partial)
+- [X] T083 Align the completed implementation and test targets with the planned focused route, adapter, catalogue, ingestion, and dispatcher boundaries, creating equivalent executable tests where those boundaries are absent per T080 (partial; durable persistence migration remains in Phase 9)
+
+## Phase 9: Redis/Postgres Persistence Migration
+
+**Purpose**: Migrate durable groups, events, subscriptions, ingestion state, and calendar snapshots from Redis to Prisma/Postgres while retaining Redis/BullMQ for job execution state, queue coordination, retries, and transient cache.
+
+- [ ] T088 [P] Add Prisma client generation and clean-database migration checks in `tests/integration/prisma-migration.test.ts` and `scripts/quality.mjs`.
+- [ ] T089 [P] Implement Postgres repositories for groups, events, subscriptions, locations, and calendar snapshots with transaction boundaries in `packages/core/src/persistence/`.
+- [X] T090 [P] Replace Redis group catalogue persistence with Prisma/Postgres upserts while preserving the authoritative `GET /carte/liste_groupes/` discovery flow in `apps/worker/src/services/group-catalogue.ts`.
+- [X] T091 [P] Replace Redis event, subscription, and location persistence with Prisma/Postgres upserts, preserving stable source IDs and idempotent event sequence updates in `apps/worker/src/ingestion/` and `packages/core/src/persistence/`.
+- [X] T092 [P] Move the durable ingestion ledger and permanent failure state to Prisma/Postgres; retain BullMQ status, attempts, and redelivery state in Redis in `packages/core/src/persistence/ingestion-repository.ts` and `apps/worker/src/queue/`.
+- [X] T093 Replace Redis staged dataset and current-pointer publication with transactional Prisma/Postgres calendar snapshots while preserving complete-snapshot-only API visibility in `packages/core/src/persistence/snapshot-repository.ts` and `apps/worker/src/ingestion/`.
+- [X] T094 Update the ingestion processor to execute retrieve, validate, transform, persist to Postgres, then acknowledge BullMQ in `apps/worker/src/ingestion/processor.ts`.
+- [X] T095 Update the API feed service to read only complete calendar snapshots from Prisma/Postgres and use Redis only for explicitly transient cache behavior in `apps/api/src/services/calendar-feed.ts` and `apps/api/src/routes/feed.ts`.
+- [ ] T096 Update Redis key builders and repository tests so no durable group, event, subscription, ledger, or snapshot data is written to Redis in `packages/core/src/infrastructure/redis.ts`, `packages/core/src/persistence/`, and `apps/worker/tests/`.
+- [ ] T097 [P] Add integration coverage for Postgres transaction rollback, idempotent upserts, stale-event preservation, snapshot publication, and API reads in `tests/integration/postgres-persistence.test.ts`.
+- [ ] T098 [P] Update Redis restart and worker-scaling tests to assert queued jobs recover while durable business data remains in Postgres in `tests/integration/redis-persistence.test.ts` and `tests/integration/worker-scaling.test.ts`.
+- [ ] T099 [P] Add Postgres backup/restore documentation and revise Redis recovery documentation to cover queue state and transient cache only in `infra/postgres/README.md`, `infra/redis/README.md`, and `specs/001-technical-foundation/quickstart.md`.
+- [ ] T100 Update the plan, data-model files, contracts, and quickstart references that still identify Redis as durable storage in `plan.md`, `data-model-*.md`, `contracts/`, and `quickstart.md`.
+- [ ] T101 Run the focused migration validation (`pnpm prisma:generate`, migrations, typecheck, Postgres integration tests, Redis queue recovery tests) and record results in `specs/001-technical-foundation/quickstart.md`.
+- [X] T103 Add Prisma Studio verification to the development quickstart, including loopback binding and inspection of groups, events, subscriptions, ledgers, and snapshots in `specs/001-technical-foundation/quickstart.md`.
+- [ ] T104 Validate the local visualization workflow with Postgres startup, migration deployment, Prisma Studio startup, and documentation checks; record the result in `specs/001-technical-foundation/quickstart.md` (blocked until Docker access is available).
+- [X] T105 Load `.env` and optional `.env.local` automatically in the API and worker entry points, resolving the workspace root so native runs work from any package directory, in `packages/core/src/config/load-env.ts`, `apps/api/src/main.ts`, and `apps/worker/src/main.ts`.
+- [X] T106 Add a startup preflight for Redis and Postgres so the API and worker abort with one actionable message, and start local dependencies from `pnpm dev`, in `packages/core/src/operations/preflight.ts`, `packages/core/src/infrastructure/redis.ts`, `apps/api/src/main.ts`, `apps/worker/src/main.ts`, and `package.json`.
+- [X] T107 Make Prisma CLI, Studio, and migrations load `.env`/`.env.local` through `scripts/prisma.mjs`, add `db:setup` and `prisma:migrate:status`, and apply migrations from `pnpm dev`, so Studio cannot query an unmigrated or different database.
+- [X] T108 Attach loopback-published dev services to a non-internal Compose network so Docker can publish ports from the private network in `infra/compose/docker-compose.dev.yml`.
+- [X] T109 Register the internal health controller and include Postgres in readiness checks in `apps/api/src/app.module.ts` and `apps/api/src/internal/internal.controller.ts`.

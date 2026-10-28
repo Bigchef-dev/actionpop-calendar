@@ -1,11 +1,13 @@
 import { buildRedisKey, normalizeScopeToken } from '../index-internal.js';
-import { PublishedEvent } from '../index.js';
-import type { CalendarDataset, StoredCalendarEvent } from './calendar-dataset-repository.js';
+import { normalizeCommuneKey } from '../domain/geographic-identity.js';
+import type { CalendarDataset } from './calendar-dataset-repository.js';
+import type { PublishedEvent } from '../models/event.interface.js';
 
 interface RedisCalendarStore {
   get(key: string): Promise<string | null>;
   smembers(key: string): Promise<string[]>;
   mget(...keys: string[]): Promise<(string | null)[]>;
+  sinter(...keys: string[]): Promise<string[]>;
 }
 
 interface PublishedGroupSnapshot {
@@ -78,5 +80,26 @@ export class RedisCalendarDatasetRepository {
       events,
       status: 'complete',
     };
+  }
+
+  public async getByProperties(
+    scopeId: string,
+    properties: { commune?: string },
+  ): Promise<PublishedEvent[]> {
+    const token = normalizeScopeToken(scopeId);
+    const keys = [buildRedisKey(this.namespace, 'group', token, 'events')];
+    if (properties.commune !== undefined) {
+      keys.push(buildRedisKey(this.namespace, 'idx', 'commune', normalizeCommuneKey(properties.commune)));
+    }
+    const ids = await this.redis.sinter(...keys);
+    if (ids.length === 0) return [];
+
+    const values = await this.redis.mget(
+      ...ids.map((id) => buildRedisKey(this.namespace, 'event', id)),
+    );
+    return values.map((value, index) => {
+      if (value === null) throw new Error(`missing event ${ids[index]} for scope ${scopeId}`);
+      return JSON.parse(value) as PublishedEvent;
+    });
   }
 }

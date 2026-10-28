@@ -18,7 +18,15 @@ describe('iCalendar feed', () => {
           sequence: 2,
           contentHash: 'abc123',
           id: 'event-1',
-          //location: 'Paris, FR',
+          location: {
+            address1: '123 Main St, Paris',
+            city: 'Paris',
+            zip: '75001',
+            coordinates: {
+              type: 'Point',
+              coordinates: [48.8566, 2.3522],
+            },
+          },
         },
       ]
     });

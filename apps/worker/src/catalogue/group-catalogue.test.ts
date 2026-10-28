@@ -15,7 +15,7 @@ describe('Redis group catalogue', () => {
       { id: 'group-2', name: 'Inactive', is_active: false },
     ]);
 
-    expect(await repository.activeScopes()).toEqual(['group-1']);
+    expect(await repository.allIds()).toEqual(['group-1', 'group-2']);
     expect(await repository.get('group-2')).toMatchObject({ is_active: false });
   });
 });

@@ -1,46 +1,42 @@
 flowchart TD
     %% Entrée & Validation
-    A[Worker : Réception du Job BullMQ] --> B[Validation du schéma Zod\nExtraction event_type & location brute]
+    A[Worker : Réception du Job BullMQ] --> B[Validation du schéma Zod\nExtraction event_type, country, departement,\ncommune.name, city et zip]
     B -->|Payload invalide| ERR[Échec du Job\nPas de retry automatique - FR-030/031]
-    B -->|Payload valide| C{Données de localisation\ndisponibles ?}
+    B -->|Payload valide| C{location.country renseigné ?}
 
-    %% Stratégie de Résolution (Cascade / Waterfall)
-    C -->|Code INSEE présent| D[Recherche directe dans le\nRéférentiel Communes INSEE]
-    C -->|Coordonnées GPS lat/lon| E[Point-in-Polygon local\nou recherche spatiale R-Tree]
-    C -->|Code Postal + Nom Ville| F[Lookup flou / index inversé\nCode Postal + Libellé Commune]
-    C -->|Aucune donnée exploitable| G[  : Géo non résolue\nChamps administratifs null]
+    %% Classement pays
+    C -->|Hors France| INTL[Classement international\nPays seul, aucune entité française]
+    C -->|France| D{location.commune.name fourni ?}
+    C -->|Absent ou vide| NC[Aucun pays déduit\nAucune déduction de la France]
+    NC --> D
 
-    E -->|Polygone trouvé| D
-    F -->|Match unique ou score max| D
-    F -->|Échec matching| G
+    %% Résolution de la commune (champs source uniquement)
+    D -->|Oui| E[Correspondance exacte normalisée\nnom_standard ou nom_sans_pronom]
+    D -->|Non| F{location.zip + location.city\ncorrespondance unique ?}
 
-    %% Résolution des Entités Administratives Directes
-    D --> H[Commune identifiée\ncode_insee, nom, code_postal]
-    H --> I[Extraction automatique 1:1\nEPCI, Département, Région]
+    E -->|Une seule commune| H[Commune résolue\ncode_insee]
+    E -->|Plusieurs communes| G{Code département valide\ntranche l'ambiguïté ?}
+    G -->|Oui| H
+    G -->|Non| I[Commune non résolue\ndiagnostic commune_match_ambiguous]
+    F -->|Oui| H
+    F -->|Non| I
 
-    %% Branchement Spécifique : Arrondissements (PLM)
-    H --> J{Commune à arrondissements ?\nParis, Lyon, Marseille}
-    J -->|Oui| K{Arrondissement déterminable ?\nvia code INSEE arr. ou GPS}
-    K -->|Non| M[Pas d'arrondissement spécifique]
-    J -->|Non| M
+    %% Validation du département
+    H --> J{location.departement\nvalide dans le référentiel ?}
+    I --> J
+    J -->|Oui| K[Département lié\ndepuis le code source]
+    J -->|Non, commune résolue| L[Département lié\ndepuis le référentiel\n+ diagnostic department_code_unknown]
+    J -->|Non, aucune commune| M[Aucun département\nenrichissement incomplet]
 
-    %% Branchement Spécifique : Circonscriptions Législatives
-    N{Découpage Circonscription}
+    %% Consolidation
+    K --> N[Agrégation du document enrichi\ncommune, département, pays, diagnostics]
+    L --> N
     M --> N
-
-    N -->|Commune mono-circonscription| O[Affectation circo directe 1:1\nid_circo]
-    N -->|Commune multi-circonscriptions| P{Position précise connue ?\nGPS ou Arrondissement}
-    
-    P -->|Oui : Point situé dans la circo| Q[Résolution de la circo exacte\n1:1]
-    P -->|Non : Donnée insuffisante| R[Evenement marquée hors circo NULL]
-
-    %% Consolidation & Écriture
-    O --> S[Agrégation du document enrichi]
-    Q --> S
-    R --> S
-    G --> S
-
-    S --> T[Construction des structures relationnelles / dénormalisées :\n- Propriétés métier : event_type, status, dates\n- Groupes, Circos, Arrondissements\n- Attributs hiérarchiques : Commune, EPCI, Dépt, Région]
-    
-    T --> U[Écriture transactionnelle dans Redis\nJSON.SET & Mise à jour index RediSearch]
-    U --> V[Acquittement du job BullMQ]
+    I --> N
+    INTL --> N
+    N --> O{Sans pays, sans commune\net sans département ?}
+    O -->|Oui| P[Catégorie national events]
+    O -->|Non| Q[Enrichissement résolu ou incomplet]
+    P --> R[Écriture atomique PostgreSQL\nPostgres/Prisma : colonnes géo event_record\ndans la même transaction que le snapshot]
+    Q --> R
+    R --> S[Acquittement du job BullMQ\nRedis = file uniquement]

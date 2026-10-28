@@ -1,57 +1,121 @@
 # Research: Geographic Enrichment
 
+## Decision: Derive geography from the stated event fields, not from coordinates
+
+**Decision**: Attach events using `location.country`, `location.departement`, `location.commune.name`, and the `location.zip` + `location.city` fallback pair, all already provided by the Action Populaire events contract. Do not read `location.coordinates` for enrichment, and require no geocoding or spatial dataset.
+
+**Rationale**: The contract exposes country, department code, commune name, city, and postal code directly. Matching coordinates against a boundary dataset adds a source of error and a heavy dataset for information the source already states. A stated country makes the French/international decision deterministic.
+
+**Alternatives considered**: Coordinate matching against constituency or commune geometries is rejected for this version because it introduces spatial ambiguity, extra reference data, and failure modes without improving the fields the source already provides. Coordinates remain raw source data: the existing `geo_point` storage is neither dropped nor modified in this release.
+
+## Decision: Store the geographic reference in PostgreSQL through Prisma
+
+**Decision**: Model the reference as three Prisma models — `GeographicReferenceVersion`, `DepartmentReference` and `CommuneReference` — created by a dedicated migration and accessed through the existing Prisma client. Do not store reference or event geography in Redis, and do not read the CSV at enrichment time.
+
+**Rationale**: PostgreSQL is already the project's source of truth (`prisma/schema.prisma`, `0001_initial_postgres_persistence`, `PostgresCalendarDatasetRepository`, `PostgresSnapshotPublisher`, `PostgresIngestionLedgerStore`). Keeping the reference in the same transactional store lets activation and publication share one consistency model, avoids a second persistence technology to operate, and reuses the existing migration and health-check workflow.
+
+**Alternatives considered**: Redis references plus a pointer key are rejected because Redis is now only the BullMQ transport, and a second store would reintroduce dual-write risk. Reading the CSV on every enrichment is rejected because it removes versioning, provenance, and validation guarantees.
+
 ## Decision: Keep the first release dependency-light
 
-**Decision**: Use TypeScript/Node.js 20, Zod, ioredis, BullMQ, Fastify, and Vitest already present in the workspace. Add no CSV or geometry package for the first release.
+**Decision**: Use TypeScript/Node.js 20, Zod, Prisma, BullMQ, Fastify, and Vitest already present in the workspace. Add no CSV, geometry, geocoding or caching package.
 
-**Rationale**: The input set is bounded at 34,868 CSV rows and 559 constituency features. The repository has no parser or geometry dependency today, and small pure modules are easier to test and keep below the project's maintainability target.
+**Rationale**: The input set is a single bounded CSV file with 34,868 data rows. The repository has no parser dependency today, and small pure modules are easier to test and keep below the project's maintainability target.
 
-**Alternatives considered**: `csv-parse` would reduce parser code but adds a dependency for a controlled local file. Turf or `rbush` would add geometry/indexing weight before measurement shows a need. Revisit either option if source formats become less controlled or the reference volume grows materially.
+**Alternatives considered**: `csv-parse` would reduce parser code but adds a dependency for a controlled local file. Revisit it if source formats become less controlled or the reference volume grows materially.
 
 ## Decision: Parse the commune CSV with a streaming RFC 4180 state machine
 
-**Decision**: Read the CSV with `node:fs` and `node:readline` using `crlfDelay: Infinity`; parse quoted commas, escaped quotes, and multiline quoted fields. Validate the header and field count, and retain codes as strings. Index only the required columns: `code_insee`, commune name, region, department, EPCI, `code_postal`, and `codes_postaux`.
+**Decision**: Read the CSV with `node:fs` and `node:readline` using `crlfDelay: Infinity`; parse quoted commas, escaped quotes, and multiline quoted fields. Validate the header and field count, and retain codes as strings. Index the required columns: `code_insee`, `nom_standard`, `nom_sans_pronom`, `code_postal`, `codes_postaux`, `dep_code`, and `dep_nom`.
 
 **Rationale**: The `codes_postaux` field contains quoted comma-separated values, so `split(',')` is invalid. Streaming bounds memory and makes malformed-row diagnostics explicit.
 
 **Alternatives considered**: Loading the entire file and using a simple split is smaller but incorrect for quoted fields. A full generic import framework is unnecessary for one local reference source.
 
-## Decision: Resolve communes by exact postal-code plus city
+## Decision: Write reference versions with batched `createMany` inside one transaction
 
-**Decision**: Normalize input with trim, Unicode NFC, and case-insensitive comparison without removing accents. Expand `codes_postaux` into individual index entries. Return a commune only for one unique exact match. Postal-only, fuzzy, homonymous, or ambiguous matches return an unresolved diagnostic. If the exact postal match conflicts with GPS, postal data wins and GPS remains raw.
+**Decision**: Insert one `geographic_reference_version` row, then its department and commune rows in batched `createMany` calls (about 1,000 rows per batch) inside a single Prisma transaction, with normalization keys computed before the write. Version rows start as `staged`; no commit makes a version partly active.
 
-**Rationale**: This follows the clarified business rule and prevents silent assignment to the wrong commune. Stable INSEE identifiers remain reference-data identifiers, not required incoming event fields.
+**Rationale**: 34,868 commune rows fit comfortably in batched inserts, so a raw `COPY` escape hatch is unnecessary. A single transaction keeps staging invisible and avoids orphan rows if validation or insertion fails mid-way.
 
-**Alternatives considered**: Fuzzy matching and postal-only matching are rejected because they can select a wrong commune. GPS-first resolution is rejected because the specification makes the exact postal match authoritative.
+**Alternatives considered**: `COPY FROM STDIN` would be faster but bypasses Prisma, needs raw SQL and a separate code path, and buys little at this volume. Row-by-row `upsert` is rejected because it multiplies round trips by 34,868.
 
-## Decision: Normalize and validate Polygon/MultiPolygon GeoJSON before querying
+## Decision: Resolve communes by exact normalized name, then by unique postal code plus city
 
-**Decision**: Validate a `FeatureCollection`, required `codeCirconscription`, department and name properties, finite coordinates, closed rings, and minimum ring sizes. Normalize Polygon and MultiPolygon features to one internal polygon representation with bounding boxes and holes. Use bounding-box rejection followed by ray casting; check `onSegment` before ray casting so boundary points are included. Return every matching constituency ID.
+**Decision**: Normalize both sides with trim, Unicode NFC, case folding, accent removal, and punctuation/whitespace folding. Match `location.commune.name` first against `normalized_name` or `pronoun_free_normalized_name` of the active version. Use `location.zip` + `location.city` only when no commune name is provided, and require exactly one match. When a normalized name matches several communes, disambiguate with the validated department code; if ambiguity remains, return an unresolved diagnostic.
 
-**Rationale**: The supplied GeoJSON has 559 features and both Polygon and MultiPolygon geometries. A linear scan with bounding boxes is sufficient at this size and makes boundary semantics explicit and testable.
+**Rationale**: The source states the commune name for most events, so using it first reflects the most precise available field and avoids depending on postal data. Restricting matching to exact normalized equality prevents silent assignment to a similarly named commune.
 
-**Alternatives considered**: An R-tree or Turf-based implementation may improve large datasets but is unnecessary before a measured performance failure. Returning the first match is rejected because boundary points can legitimately produce multiple links.
+**Alternatives considered**: Fuzzy or phonetic matching is rejected because it can select the wrong commune. Postal-first resolution is rejected because the name is the more direct source signal. Ignoring homonyms by picking the first match is rejected as non-deterministic. Holding an in-memory index of the active version was rejected because PostgreSQL B-tree indexes answer the same question without an invalidation problem.
 
-## Decision: Version references with immutable Redis data and an atomic pointer
+## Decision: Query the reference through indexed SQL, without a cache
 
-**Decision**: Store immutable staged version data under `actionpop:geo:reference:{version}:...`, a manifest with `status`, provenance, counts, and checksums, and one active pointer at `actionpop:geo:reference:active`. Activate only with a Redis Lua script that verifies the staged manifest and sets the pointer atomically. Retain the previous version until explicit cleanup.
+**Decision**: Resolve the active version once per enrichment transaction with a filtered lookup, then run indexed queries: `(version_id, normalized_name)`, `(version_id, pronoun_free_normalized_name)`, `(version_id, department_code)`, and a postal fallback query on `(version_id, postal_code)` with an exact city comparison. Do not add Redis or in-process caching.
 
-**Rationale**: Readers always resolve one complete version, and failed refreshes cannot expose partial data. This avoids the existing snapshot publisher's unsafe non-EVAL fallback for this contract.
+**Rationale**: Indexed equality lookups are predictable, always reflect the active version, and remove cache invalidation as a failure mode. Ingestion is batched and nowhere near the scale where a cache matters.
 
-**Alternatives considered**: Independent GET/SET activation is rejected because readers can observe a mixed version. Replacing the current version in place is rejected because rollback and failed-refresh guarantees would be lost.
+**Alternatives considered**: An in-memory index loaded at worker startup adds a stale-data window after activation and duplicates the reference in process memory. Redis caching contradicts the decision to keep geographic state in one store.
+
+## Decision: Validate the stated department code and keep discrepancies visible
+
+**Decision**: Link the department whose code equals `location.departement` when the code exists in the active reference. When the code is unknown and a commune is resolved, link the commune's reference department and emit a diagnostic. When the stated code and the resolved commune's department disagree, keep both raw values, link the stated department, and emit `department_commune_mismatch`. Department codes are strings, including `2A` and `2B`.
+
+**Rationale**: The department is a stated business attribute that users filter on; discarding it would lose source intent, while silently reconciling it would hide data-quality problems. Diagnostics make the conflict actionable.
+
+**Alternatives considered**: Deriving the department only from the commune hides a stated source field. Trusting the code without validation can surface a department that does not exist.
+
+## Decision: Classify countries only from the stated value
+
+**Decision**: Uppercase and retain the stated `location.country`. Treat `FR` as France, any other valid ISO 3166-1 alpha-2 value as an international classification with no French administrative link, and an absent, blank, or unsupported value as a diagnostic with no deduced country. Events with no country and no resolvable commune or department fall into `national events`.
+
+**Rationale**: Guessing France from a blank field would produce false domestic events at the borders and for international events. A strict stated-value rule keeps the classification explainable.
+
+**Alternatives considered**: Defaulting a blank country to `FR` is rejected because it fabricates data. Matching the country by city or postal code is rejected because no reliable international reference is part of this version.
+
+## Decision: Denormalize the attachment on the event row
+
+**Decision**: Store `reference_version`, `geographic_status`, `country_code`, `department_code`, `department_source`, `raw_department_code`, `raw_commune_name`, `commune_id` and `geographic_diagnostics` as columns on `event_record`, written in the same transaction as the snapshot publication. No foreign key to the reference tables is declared.
+
+**Rationale**: One event has at most one country, one department and one commune, so columns match the cardinality, keep filtering join-free, and make duplicate results impossible. Reference versions are retained for replay and may later be pruned, so a foreign key would either block cleanup or force rewriting old events.
+
+**Alternatives considered**: Link tables (`event_commune_link`, `event_department_link`) imply many-to-many and reintroduce the duplicate-suppression rule the spec had for constituencies. Storing geography on `location_record` was rejected because the same location can be shared while group-level geography is out of scope, and because filtering would then require a join for every query.
+
+## Decision: Activate a version with one transaction and a partial unique index
+
+**Decision**: Keep a `status` column (`staged`, `active`, `rejected`) on `geographic_reference_version` and add, in the migration's raw SQL, a unique partial index on `status` where `status = 'active'`. Activation runs inside one transaction: mark the previous active row as `superseded`, mark the validated row as `active`, then enqueue re-enrichment after commit.
+
+**Rationale**: The database itself guarantees at most one active version, so a concurrent or crashed refresh cannot produce two competing references. Because the reference and the events live in the same database, activation and the subsequent publication are covered by one transactional consistency model.
+
+**Alternatives considered**: A one-row pointer table works but adds a join to every lookup. An application-level check without a database constraint was rejected because it fails under concurrency. Prisma's schema language cannot express the partial index, so the migration must contain raw SQL; this is documented in the plan's complexity tracking.
 
 ## Decision: Re-enrich asynchronously after activation
 
-**Decision**: Store `referenceVersion` and enrichment diagnostics on enriched events. After a valid reference becomes active, enqueue re-enrichment; preserve source ID, raw location, dates, and event identity while updating geographic links. The first release may identify affected events with a full scan; reverse indexes can be added after measurement.
+**Decision**: After a version is activated, enqueue re-enrichment through the existing BullMQ pipeline; recompute each affected event from its retained raw location and update the geographic columns without changing `source_event_id`, dates, event type or raw location. The first release may identify affected events with a query on `reference_version`.
 
-**Rationale**: Dataset activation remains fast and atomic, while affected events can be repaired with durable worker processing.
+**Rationale**: Activation stays fast and atomic, while affected events are repaired by durable worker processing that already exists in the project.
 
-**Alternatives considered**: Blocking activation until all events are re-enriched increases operational risk and makes rollback harder. Re-fetching source events is rejected because raw location data is retained specifically to support replay.
+**Alternatives considered**: Blocking activation until every event is re-enriched increases operational risk and makes rollback harder. Re-fetching source events is rejected because raw location data is retained specifically to support replay.
 
-## Decision: Keep postal and constituency business rules separate
+## Decision: Keep country, commune, and department rules separate
 
-**Decision**: Postal commune resolution accepts address fields and a postal reference index only. Constituency resolution accepts a GeoJSON-derived geometry index and a point only. Department/region/EPCI relationships are resolved from reference records. The modules are independently testable and kept within the 100-line target where practical.
+**Decision**: Country classification consumes only the stated country value. Commune resolution consumes a commune name, or a postal code plus city pair, and the reference repository. Department validation consumes a stated department code and the reference relationships. Each module is independently testable and kept within the constitution's 100–150-line target where practical.
 
-**Rationale**: This directly enforces the clarified clean-business boundary and keeps changes in the supplied datasets from coupling unrelated rules.
+**Rationale**: This enforces the clarified clean business boundary and keeps changes in the supplied dataset from coupling unrelated rules.
 
-**Alternatives considered**: A single cascade service containing parsing, geometry, postal lookup, and persistence would be shorter initially but violates independent testing and maintainability goals.
+**Alternatives considered**: A single cascade service containing parsing, name matching, department validation, and persistence would be shorter initially but violates independent testing and maintainability goals.
+
+## Decision: One explicit representation per stage
+
+**Decision**: Give every stage its own named type: raw source payload, validated event record, reference row, comparison key, geographic attachment, published document, query criteria, and diagnostic. Codes are strings at every stage, absent/`null`/empty all mean "not stated", and raw values are kept beside derived ones.
+
+**Rationale**: Codes such as `01`, `2A` and postal codes lose information when coerced to numbers, and overwriting raw values makes a wrong attachment impossible to explain or replay. Named stage types also make the boundary tests in the quickstart direct instead of implicit.
+
+**Alternatives considered**: Passing free-form objects between stages is shorter but silently converts codes and makes format drift undetectable. Storing only normalized values loses the source of truth needed for diagnostics and re-enrichment.
+
+## Decision: Extend the event adapter to retain the raw geographic fields
+
+**Decision**: The event location schema must expose `departement`, `commune.name`, `shortAddress` and `shortLocation` alongside the already-present `country`, `city` and `zip`; unknown fields stay ignored and a malformed payload still fails validation.
+
+**Rationale**: The current location schema strips `departement` and `commune`, so enrichment would have no source value to read. Keeping the single validation boundary avoids re-reading raw payloads in domain code.
+
+**Alternatives considered**: Re-parsing the raw payload downstream duplicates validation and couples modules. Making the schema passthrough is rejected because unknown fields would leak into the domain model without types.

@@ -36,6 +36,7 @@ const coordinateSchema = z.object({
 
 const locationSchema = z.object({
   name: optionalText,
+  address: optionalText,
   address1: optionalText,
   address2: z.preprocess(
     value => value === '' ? undefined : value,

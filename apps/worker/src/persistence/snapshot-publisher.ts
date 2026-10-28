@@ -1,5 +1,13 @@
-import { ActionPopulaireEventPayload, hashCalendarContent, nextEventRevision } from '@actionpop/core';
-import { buildRedisKey, normalizeScopeToken, PublishedGroupSnapshot, IncomingEvent, PublishedEvent } from '@actionpop/core';
+import { hashCalendarContent, nextEventRevision } from '@actionpop/core';
+import { PostgresCalendarDatasetRepository } from '@actionpop/core';
+import {
+  buildRedisKey,
+  normalizeCommuneKey,
+  normalizeScopeToken,
+  type PublishedGroupSnapshot,
+  type IncomingEvent,
+  type PublishedEvent,
+} from '@actionpop/core';
 
 
 interface PublishedGroupSnapshotEventIds extends PublishedGroupSnapshot {
@@ -94,36 +102,88 @@ export class RedisSnapshotPublisher {
     const eventArgs: string[] = [];
     for (const event of events) {
       const eventKey = buildRedisKey(this.namespace, 'event', String(event.id));
-      eventArgs.push(eventKey, JSON.stringify(event));
+      const eventCommuneKey = buildRedisKey(this.namespace, 'event', String(event.id), 'commune');
+      const communeKey = event.location?.city === undefined
+        ? ''
+        : buildRedisKey(this.namespace, 'idx', 'commune', normalizeCommuneKey(event.location.city));
+      eventArgs.push(eventKey, JSON.stringify(event), communeKey, eventCommuneKey);
     }
 
     const luaScript = `
-      local groupSetKey = KEYS[1]
-      local snapshotMetaKey = KEYS[2]
-      local metadataPayload = ARGV[1]
-      local newIdsCount = tonumber(ARGV[2])
+local groupSetKey = KEYS[1]
+local snapshotMetaKey = KEYS[2]
+local metadataPayload = ARGV[1]
+local newIdsCount = tonumber(ARGV[2])
+local namespace = ARGV[3 + newIdsCount] -- On récupère le namespace dynamiquement
 
-      -- Réécriture du Set du groupe
-      redis.call('DEL', groupSetKey)
-      if newIdsCount > 0 then
-        local idsToAdd = {}
-        for i = 1, newIdsCount do
-          table.insert(idsToAdd, ARGV[2 + i])
-        end
-        redis.call('SADD', groupSetKey, unpack(idsToAdd))
-      end
+-- 1. Récupération des anciens événements pour calculer le diff
+local oldIds = redis.call('SMEMBERS', groupSetKey)
+local newIdsSet = {}
+if newIdsCount > 0 then
+  for i = 1, newIdsCount do
+    newIdsSet[ARGV[2 + i]] = true
+  end
+end
 
-      -- Enregistrement des événements individuels. Les anciennes clés ne
-      -- sont pas supprimées : un événement peut être partagé par plusieurs groupes.
-      local eventsStartIndex = 3 + newIdsCount + 1
-      for i = eventsStartIndex, #ARGV, 2 do
-        redis.call('SET', ARGV[i], ARGV[i + 1])
-      end
+-- 2. Nettoyage des événements supprimés (Orphelins)
+for _, oldId in ipairs(oldIds) do
+  if not newIdsSet[oldId] then
+    local eventKey = namespace .. ':event:' .. oldId
+    local eventCommuneKey = eventKey .. ':commune'
+    
+    local oldCommuneKey = redis.call('GET', eventCommuneKey)
+    if oldCommuneKey then
+      redis.call('SREM', oldCommuneKey, oldId)
+    end
+    
+    redis.call('DEL', eventKey)
+    redis.call('DEL', eventCommuneKey)
+  end
+end
 
-      -- Mise à jour des métadonnées du snapshot
-      redis.call('SET', snapshotMetaKey, metadataPayload)
-      return 1
-    `;
+-- 3. Réécriture du Set du groupe (Sécurisé contre les limites de "unpack")
+redis.call('DEL', groupSetKey)
+if newIdsCount > 0 then
+  local batch = {}
+  for i = 1, newIdsCount do
+    table.insert(batch, ARGV[2 + i])
+    if #batch >= 5000 then
+      redis.call('SADD', groupSetKey, unpack(batch))
+      batch = {}
+    end
+  end
+  if #batch > 0 then
+    redis.call('SADD', groupSetKey, unpack(batch))
+  end
+end
+
+-- 4. Insertion des événements et mise à jour des index de communes
+local eventsStartIndex = 4 + newIdsCount
+for i = eventsStartIndex, #ARGV, 4 do
+  local eventKey = ARGV[i]
+  -- Correction regex : capture tout après :event:
+  local eventId = string.match(eventKey, ':event:(.+)$') 
+  local payload = ARGV[i + 1]
+  local newCommuneKey = ARGV[i + 2]
+  local eventCommuneKey = ARGV[i + 3]
+
+  local oldCommuneKey = redis.call('GET', eventCommuneKey)
+  if oldCommuneKey and oldCommuneKey ~= newCommuneKey then
+    redis.call('SREM', oldCommuneKey, eventId)
+  end
+
+  redis.call('SET', eventKey, payload)
+  if newCommuneKey ~= '' then
+    redis.call('SADD', newCommuneKey, eventId)
+    redis.call('SET', eventCommuneKey, newCommuneKey)
+  else
+    redis.call('DEL', eventCommuneKey)
+  end
+end
+
+-- 5. Mise à jour des métadonnées
+redis.call('SET', snapshotMetaKey, metadataPayload)
+return 1`;
 
     const args = [
       JSON.stringify(snapshot),
@@ -134,6 +194,26 @@ export class RedisSnapshotPublisher {
     ];
 
     await this.redis.eval(luaScript, 2, groupSetKey, snapshotMetaKey, ...args);
+  }
+}
+
+export class PostgresSnapshotPublisher {
+  public constructor(private readonly repository: PostgresCalendarDatasetRepository) {}
+
+  public async publish(
+    scopeId: string,
+    snapshot: PublishedGroupSnapshotEventIds,
+    events: PublishedEvent[],
+    complete = true,
+  ): Promise<void> {
+    if (!complete) throw new Error('only complete snapshots can be published');
+    await this.repository.saveCurrent({
+      scopeId,
+      revision: snapshot.revision,
+      generatedAt: snapshot.generatedAt,
+      events,
+      status: 'complete',
+    });
   }
 }
 

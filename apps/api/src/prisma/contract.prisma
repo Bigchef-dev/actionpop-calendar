@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // À adapter selon ton SGBD (mysql, sqlite, etc.)
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================
+// COUCHE 1 : RACINES & ORCHESTRATION
+// =========================================================
+
+model ProcessingPeriod {
+  periodToken    String        @id @map("period_token")
+  periodStartUtc DateTime      @map("period_start_utc")
+  periodEndUtc   DateTime      @map("period_end_utc")
+
+  events         EventRecord[] // Relation: PROCESSING_PERIOD ||--o{ EVENT_RECORD
+
+  @@map("PROCESSING_PERIOD")
+}
+
+model GroupScope {
+  scopeId       String  @id @map("scope_id")
+  displayName   String? @map("display_name")
+  active        Boolean
+  scopeType     String? @map("scope_type")
+  sourceSubtype Int?    @map("source_subtype")
+  certified     Boolean?
+  locationId    String? @map("location_id")
+  sourceLink    String? @map("source_link")
+  sourceFilter  String? @map("source_filter")
+
+  location      LocationRecord?  @relation(fields: [locationId], references: [locationId])
+  eventLinks    EventGroupLink[]
+
+  @@map("GROUP_SCOPE")
+}
+
+// =========================================================
+// COUCHE 2 : INTERMÉDIAIRES, JOBS & NIVEAUX DÉPARTEMENTAUX
+// =========================================================
+
+model Departement {
+  codeDepartement String    @id @map("code_departement")
+  nom             String
+  codeRegion      String?   @map("code_region")
+  
+  region          Region?   @relation(fields: [codeRegion], references: [codeRegion])
+  communes        Commune[]
+
+  @@map("DEPARTEMENT")
+}
+
+// =========================================================
+// COUCHE 3 : TRAÇABILITÉ, ENTITÉS LOCALES & ADRESSES
+// =========================================================
+
+model LocationRecord {
+  locationId   String  @id @map("location_id")
+  ownerType    String? @map("owner_type") // "EVENT" or "GROUP"
+  name         String?
+  address1     String?
+  address2     String?
+  zip          String?
+  city         String?
+  fullAddress  String? @map("full_address")
+  shortAddress String? @map("short_address")
+  staticMapUrl String? @map("static_map_url")
+
+  geoPoint     GeoPoint?
+  groups       GroupScope[]
+  events       EventRecord[]
+
+  @@map("LOCATION_RECORD")
+}
+
+model GeoPoint {
+  locationId String  @id @map("location_id")
+  type       String  @default("Point")
+  longitude  Decimal // "-180..180"
+  latitude   Decimal // "-90..90"
+
+  location   LocationRecord @relation(fields: [locationId], references: [locationId])
+
+  @@map("GEO_POINT")
+}
+
+model Commune {
+  codeInsee       String  @id @map("code_insee")
+  nom             String
+  codePostal      String? @map("code_postal")
+  idEpci          String? @map("id_epci")
+  codeDepartement String? @map("code_departement")
+
+  departement     Departement?     @relation(fields: [codeDepartement], references: [codeDepartement])
+  arrondissements Arrondissement[]
+  events          EventRecord[]
+
+  @@map("COMMUNE")
+}
+
+// =========================================================
+// COUCHE 4 : L'ÉVÉNEMENT (AGRÉGAT CENTRAL) & ARRONDISSEMENTS
+// =========================================================
+
+model EventRecord {
+  sourceEventId  String    @id @map("source_event_id")
+  contentHash    String?   @map("content_hash")
+  sequence       Int?
+  status         String?   // "ACTIVE", "CANCELLED"
+  startTime      DateTime? @map("start_time")
+  endTime        DateTime? @map("end_time")
+  eventType      String?   @map("event_type")
+  timezone       String?   @default("Europe/Paris")
+  summary        String?
+  locationId     String?   @map("location_id")
+  codeInsee      String?   @map("code_insee")
+  sourceUrl      String?   @map("source_url")
+  lastSeenPeriod String?   @map("last_seen_period")
+  updatedAt      DateTime? @updatedAt @map("updated_at")
+
+  location LocationRecord?   @relation(fields: [locationId], references: [locationId])
+  commune  Commune?          @relation(fields: [codeInsee], references: [codeInsee])
+  period   ProcessingPeriod? @relation(fields: [lastSeenPeriod], references: [periodToken])
+
+  groupLinks          EventGroupLink[]
+  circoLinks          EventCircoLink[]
+  arrondissementLinks EventArrondissementLink[]
+
+  @@map("EVENT_RECORD")
+}
+
+// =========================================================
+// COUCHE 5 : TABLES DE LIAISON (PIVOTS N:M, NIVEAU BAS)
+// =========================================================
+
+model EventGroupLink {
+  eventId String @map("event_id")
+  scopeId String @map("scope_id")
+
+  event EventRecord @relation(fields: [eventId], references: [sourceEventId])
+  group GroupScope  @relation(fields: [scopeId], references: [scopeId])
+
+  @@id([eventId, scopeId])
+  @@map("EVENT_GROUP_LINK")
+}
+
+model EventCircoLink {
+  eventId String @map("event_id")
+  idCirco String @map("id_circo")
+
+  event EventRecord @relation(fields: [eventId], references: [sourceEventId])
+  // circo Circonscription @relation(fields: [idCirco], references: [idCirco]) // À décommenter si la table existe
+
+  @@id([eventId, idCirco])
+  @@map("EVENT_CIRCO_LINK")
+}
+
+model EventArrondissementLink {
+  eventId     String @map("event_id")
+  codeInseeAr String @map("code_insee_ar")
+
+  event          EventRecord    @relation(fields: [eventId], references: [sourceEventId])
+  arrondissement Arrondissement @relation(fields: [codeInseeAr], references: [codeInseeAr])
+
+  @@id([eventId, codeInseeAr])
+  @@map("EVENT_ARRONDISSEMENT_LINK")
+}
+
+// =========================================================
+// ENTITÉS IMPLICITES (Déduites des relations du diagramme)
+// =========================================================
+
+model Region {
+  codeRegion   String        @id @map("code_region")
+  nom          String?
+  departements Departement[]
+
+  @@map("REGION")
+}
+
+model Arrondissement {
+  codeInseeAr String  @id @map("code_insee_ar")
+  nom         String?
+  codeInsee   String? @map("code_insee") // Lien vers la commune
+
+  commune     Commune?                  @relation(fields: [codeInsee], references: [codeInsee])
+  eventLinks  EventArrondissementLink[]
+
+  @@map("ARRONDISSEMENT")
+}
