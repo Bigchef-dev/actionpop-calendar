@@ -15,6 +15,56 @@ const location = {
   coordinates: { type: 'Point', coordinates: [2.35, 48.85] },
 };
 
+describe('Action Populaire geographic raw fields', () => {
+  const base = {
+    id: 'event-geo',
+    name: 'Tractage',
+    startTime: '2026-09-24T10:00:00+02:00',
+    endTime: '2026-09-24T11:00:00+02:00',
+    timezone: 'Europe/Paris',
+  };
+
+  it('retains departement, commune name and presentation labels as strings', () => {
+    const parsed = validateActionPopulaireEvent({
+      ...base,
+      location: {
+        ...location,
+        departement: '75',
+        commune: { name: 'Paris', nameOf: 'de Paris' },
+        shortAddress: '1 Main Street, Paris',
+        shortLocation: 'Town hall',
+      },
+    });
+
+    expect(parsed.location.departement).toBe('75');
+    expect(parsed.location.commune?.name).toBe('Paris');
+    expect(parsed.location.shortAddress).toBe('1 Main Street, Paris');
+    expect(parsed.location.shortLocation).toBe('Town hall');
+  });
+
+  it('preserves leading zeroes and alphanumeric department codes', () => {
+    expect(
+      validateActionPopulaireEvent({ ...base, location: { ...location, departement: '01' } })
+        .location.departement,
+    ).toBe('01');
+    expect(
+      validateActionPopulaireEvent({ ...base, location: { ...location, departement: '2A' } })
+        .location.departement,
+    ).toBe('2A');
+  });
+
+  it('treats blank or empty geographic fields as not stated', () => {
+    const parsed = validateActionPopulaireEvent({
+      ...base,
+      location: { ...location, departement: '', country: '', commune: null },
+    });
+
+    expect(parsed.location.departement).toBeUndefined();
+    expect(parsed.location.country).toBeUndefined();
+    expect(parsed.location.commune).toBeUndefined();
+  });
+});
+
 describe('Action Populaire schemas', () => {
   it('accepts valid events and group catalogues', () => {
     expect(
@@ -32,7 +82,8 @@ describe('Action Populaire schemas', () => {
       validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true }])[0]?.is_active,
     ).toBe(true);
     expect(
-      validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true, subtype: null }])[0]?.subtype,
+      validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true, subtype: null }])[0]
+        ?.subtype,
     ).toBeNull();
     expect(
       validateActionPopulaireEvent({
@@ -59,7 +110,9 @@ describe('Action Populaire schemas', () => {
     ).toThrow(/coordinates/i);
     expect(() => validateGroupCatalogue([{ id: 'group-1' }])).toThrow(/name|is_active/);
     expect(() =>
-      validateGroupCatalogue([{ id: 'group-1', name: 'Group', is_active: true, subtypes: ['invalid'] }]),
+      validateGroupCatalogue([
+        { id: 'group-1', name: 'Group', is_active: true, subtypes: ['invalid'] },
+      ]),
     ).toThrow(/subtypes/);
     expect(() =>
       validateActionPopulaireEvent({

@@ -42,15 +42,15 @@
 
 ## Decision: Resolve communes by exact normalized name, then by unique postal code plus city
 
-**Decision**: Normalize both sides with trim, Unicode NFC, case folding, accent removal, and punctuation/whitespace folding. Match `location.commune.name` first against `normalized_name` or `pronoun_free_normalized_name` of the active version. Use `location.zip` + `location.city` only when no commune name is provided, and require exactly one match. When a normalized name matches several communes, disambiguate with the validated department code; if ambiguity remains, return an unresolved diagnostic.
+**Decision**: Normalize both sides with trim, Unicode NFC, case folding, accent removal, and punctuation/whitespace folding. Match `location.commune.name` first against `normalized_name` or `pronoun_free_normalized_name` of the active version, then `location.city` with the same rule when no commune name is stated. Require exactly one match; when several communes share the normalized name, disambiguate with the stated department code or the department implied by the postal prefix. The postal code never selects a commune.
 
-**Rationale**: The source states the commune name for most events, so using it first reflects the most precise available field and avoids depending on postal data. Restricting matching to exact normalized equality prevents silent assignment to a similarly named commune.
+**Rationale**: The source states the commune name for most events, so using it first reflects the most precise available field. The supplied dataset holds a single generic postal code for multi-postal communes (`69000`, `75000`, `13000`) and contains no arrondissement rows, so an equality match on `zip` would never attach Paris, Lyon or Marseille; deriving only the department prefix from the postal code keeps `75005 Paris` attachable while staying deterministic. Restricting matching to exact normalized names prevents silent assignment to a similarly named commune.
 
-**Alternatives considered**: Fuzzy or phonetic matching is rejected because it can select the wrong commune. Postal-first resolution is rejected because the name is the more direct source signal. Ignoring homonyms by picking the first match is rejected as non-deterministic. Holding an in-memory index of the active version was rejected because PostgreSQL B-tree indexes answer the same question without an invalidation problem.
+**Alternatives considered**: Fuzzy or phonetic matching is rejected because it can select the wrong commune. Postal-first resolution is rejected because the dataset cannot express multi-postal communes. Treating `Paris 1er` as `Paris` was rejected because arrondissement modelling is deferred; the event stays unresolved with a diagnostic. Holding an in-memory index of the active version was rejected because PostgreSQL B-tree indexes answer the same question without an invalidation problem.
 
 ## Decision: Query the reference through indexed SQL, without a cache
 
-**Decision**: Resolve the active version once per enrichment transaction with a filtered lookup, then run indexed queries: `(version_id, normalized_name)`, `(version_id, pronoun_free_normalized_name)`, `(version_id, department_code)`, and a postal fallback query on `(version_id, postal_code)` with an exact city comparison. Do not add Redis or in-process caching.
+**Decision**: Resolve the active version once per enrichment transaction with a filtered lookup, then run indexed queries: `(version_id, normalized_name)`, `(version_id, pronoun_free_normalized_name)` and `(version_id, department_code)`. Do not add Redis or in-process caching.
 
 **Rationale**: Indexed equality lookups are predictable, always reflect the active version, and remove cache invalidation as a failure mode. Ingestion is batched and nowhere near the scale where a cache matters.
 
@@ -96,6 +96,14 @@
 
 **Alternatives considered**: Blocking activation until every event is re-enriched increases operational risk and makes rollback harder. Re-fetching source events is rejected because raw location data is retained specifically to support replay.
 
+## Decision: Keep the stated country when the reference is unavailable
+
+**Decision**: Classify the country before resolving the reference. When no version is active, publish the event with `geographic_status = unavailable`, keep `countryCode`, `rawDepartmentCode` and `rawCommuneName`, leave commune and department links empty, and emit a `reference_unavailable` error diagnostic.
+
+**Rationale**: Country classification needs no reference data, so dropping it would discard correct information and make an outage look like a data defect. Administrative links still require the reference and stay empty, which keeps the failure explainable.
+
+**Alternatives considered**: Failing the whole job blocks publication for every scope until an operator reacts. Publishing with no geography at all loses the one field that can still be computed.
+
 ## Decision: Keep country, commune, and department rules separate
 
 **Decision**: Country classification consumes only the stated country value. Commune resolution consumes a commune name, or a postal code plus city pair, and the reference repository. Department validation consumes a stated department code and the reference relationships. Each module is independently testable and kept within the constitution's 100–150-line target where practical.
@@ -119,3 +127,11 @@
 **Rationale**: The current location schema strips `departement` and `commune`, so enrichment would have no source value to read. Keeping the single validation boundary avoids re-reading raw payloads in domain code.
 
 **Alternatives considered**: Re-parsing the raw payload downstream duplicates validation and couples modules. Making the schema passthrough is rejected because unknown fields would leak into the domain model without types.
+
+## Decision: Validate event types against the observed source catalogue
+
+**Decision**: Store `event_type` on the event row from `location.subtype.label`, and keep an `event_type_reference` table as a discovery registry. A well-formed label (lowercase words separated by hyphens) is accepted and registered on first sight; only a malformed label is rejected with `event_type_invalid` naming `subtype.label`. An event without a stated type is accepted.
+
+**Rationale**: The platform owns an extensible enum the project cannot enumerate locally. Requiring a pre-registered value turned every platform addition into an ingestion outage — observed in practice with `meeting-presidentielle-2027`, `porte-a-porte`, `presentation-livre` and `reunion-groupe`. Validating the shape instead keeps garbage out, keeps ingestion resilient, and still records the vocabulary for filtering and discovery.
+
+**Alternatives considered**: A hardcoded allowlist needs a deployment per addition. Rejecting unregistered values needs an operator sync before the first event of every new type. Accepting any string without a shape check admits arbitrary content into a filterable column.

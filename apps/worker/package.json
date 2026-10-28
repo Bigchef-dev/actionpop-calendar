@@ -18,7 +18,9 @@
     }
   },
   "scripts": {
+    "dev": "tsx watch src/main.ts",
     "build": "tsc -b",
+    "start": "node dist/main.js",
     "typecheck": "tsc -b --pretty false --force",
     "test": "vitest run",
     "lint": "eslint src tests",

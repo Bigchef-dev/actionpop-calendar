@@ -82,13 +82,13 @@ Lookup indexes:
 - `(versionId, normalizedName)`
 - `(versionId, pronounFreeNormalizedName)`
 - `(versionId, departmentCode)`
-- `(versionId)` plus a GIN index on `postalCodes` for the postal fallback candidate set
-  (`@@index([postalCodes], type: Gin)`; the active version filter stays on the same table,
-  so no `btree_gin` extension is required)
+- `(versionId)` plus a GIN index on `postalCodes` (`@@index([postalCodes], type: Gin)`) retained
+  for reference inspection; postal codes never select a commune and are not a lookup key
 
 Homonyms are expected: a normalized name may match several rows and stays distinguishable
-by `inseeCode` and `departmentCode`. The postal fallback requires exactly one candidate
-after exact city comparison.
+by `inseeCode` and `departmentCode`. `postalCodes` records what the source states, including its single generic
+code for multi-postal communes (`69000` for Lyon). Resolution uses `location.commune.name` or
+`location.city`; the postal code only contributes the department prefix used to disambiguate.
 
 Uniqueness: one `inseeCode` per version, guaranteed by the composite primary key.
 
@@ -128,9 +128,8 @@ updates; geographic columns and `referenceVersion` may change.
 `{ code: string; field: string; message: string; severity: 'warning' | 'error' }`.
 
 Examples: `country_missing`, `country_unsupported`, `commune_name_missing`,
-`commune_unknown`, `commune_match_ambiguous`, `postal_city_missing`,
-`postal_match_ambiguous`, `department_code_unknown`, `department_commune_mismatch`,
-`reference_unavailable`, and `event_type_unknown`.
+`commune_unknown`, `commune_match_ambiguous`, `department_code_unknown`,
+`department_commune_mismatch`, `reference_unavailable`, and `event_type_invalid`.
 
 ## Lifecycle
 

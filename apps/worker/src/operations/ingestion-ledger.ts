@@ -1,5 +1,5 @@
 import type { IngestionLedgerStatus } from '@actionpop/core';
-import { buildRedisKey } from '@actionpop/core';
+import { buildRedisKey, parsePeriodToken } from '@actionpop/core';
 import type { PrismaClient } from '@prisma/client';
 
 interface LedgerPatch {
@@ -43,22 +43,27 @@ export class RedisIngestionLedgerStore {
   public async transition(jobId: string, patch: LedgerPatch): Promise<void> {
     const previous = await this.get(jobId);
     const error = patch.error?.replace(/upstream token=.* failed/i, 'upstream failed');
-    await this.redis.set(this.key(jobId), JSON.stringify({
-      ...previous,
-      ...patch,
-      attempts: patch.attempts ?? previous?.attempts ?? 0,
-      ...(error === undefined ? {} : { error }),
-    }));
+    await this.redis.set(
+      this.key(jobId),
+      JSON.stringify({
+        ...previous,
+        ...patch,
+        attempts: patch.attempts ?? previous?.attempts ?? 0,
+        ...(error === undefined ? {} : { error }),
+      }),
+    );
   }
 
   public async get(jobId: string): Promise<StoredLedger | undefined> {
     const value = await this.redis.get(this.key(jobId));
-    return value === null ? undefined : JSON.parse(value) as StoredLedger;
+    return value === null ? undefined : (JSON.parse(value) as StoredLedger);
   }
 
   public async isScheduled(jobId: string): Promise<boolean> {
     const value = await this.get(jobId);
-    return value?.status === 'scheduled' || value?.status === 'running' || value?.status === 'retrying';
+    return (
+      value?.status === 'scheduled' || value?.status === 'running' || value?.status === 'retrying'
+    );
   }
 
   private key(jobId: string): string {
@@ -78,35 +83,49 @@ export class PostgresIngestionLedgerStore {
       throw new Error(`ledger ${jobId} requires scopeId and periodToken`);
     }
 
-    const start = new Date(periodToken);
+    const start = parsePeriodToken(periodToken);
+    const canonicalToken = start.toISOString();
+    const attempts = patch.attempts ?? previous?.attempts ?? 0;
+
+    // Concurrent jobs share the same scope and period rows, so every parent is inserted
+    // idempotently with `createMany({ skipDuplicates })`; an upsert would race and fail
+    // on the primary key instead of updating.
     await this.prisma.$transaction(async (transaction) => {
-      await transaction.groupScope.upsert({
-        where: { scopeId },
-        create: { scopeId, active: true },
-        update: {},
+      await transaction.groupScope.createMany({
+        data: [{ scopeId, active: true }],
+        skipDuplicates: true,
       });
-      await transaction.processingPeriod.upsert({
-        where: { periodToken },
-        create: {
-          periodToken,
-          periodStartUtc: start,
-          periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
-        },
-        update: {},
+      await transaction.processingPeriod.createMany({
+        data: [
+          {
+            periodToken: canonicalToken,
+            periodStartUtc: start,
+            periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
+          },
+        ],
+        skipDuplicates: true,
       });
-      await transaction.ingestionLedger.upsert({
+      await transaction.ingestionLedger.createMany({
+        data: [
+          {
+            jobId,
+            scopeId,
+            periodToken: canonicalToken,
+            status: patch.status,
+            attempts,
+            lastError: error ?? null,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      // updateMany never throws when the row was skipped above, which keeps a concurrent
+      // transition from turning into a hard failure.
+      await transaction.ingestionLedger.updateMany({
         where: { jobId },
-        create: {
-          jobId,
-          scopeId,
-          periodToken,
+        data: {
           status: patch.status,
-          attempts: patch.attempts ?? 0,
-          lastError: error ?? null,
-        },
-        update: {
-          status: patch.status,
-          attempts: patch.attempts ?? previous?.attempts ?? 0,
+          periodToken: canonicalToken,
+          attempts,
           lastError: error ?? null,
         },
       });
@@ -127,6 +146,8 @@ export class PostgresIngestionLedgerStore {
 
   public async isScheduled(jobId: string): Promise<boolean> {
     const value = await this.get(jobId);
-    return value?.status === 'scheduled' || value?.status === 'running' || value?.status === 'retrying';
+    return (
+      value?.status === 'scheduled' || value?.status === 'running' || value?.status === 'retrying'
+    );
   }
 }

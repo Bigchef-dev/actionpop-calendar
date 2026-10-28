@@ -23,12 +23,15 @@
 
 - Q: D'où viennent les données de rattachement géographique ? → A: Des champs bruts déjà fournis par le contrat Action Populaire (`location.country`, `location.departement`, `location.commune.name`, `location.city`, `location.zip`) ; aucun matching de coordonnées n'est nécessaire.
 - Q: Quels niveaux administratifs cette version couvre-t-elle ? → A: Commune, département et pays uniquement ; la région, l'EPCI, la circonscription et l'arrondissement sont hors périmètre.
-- Q: Comment la commune est-elle résolue ? → A: `location.commune.name` en priorité, sinon le couple `location.zip` + `location.city` en correspondance unique.
+- Q: Comment la commune est-elle résolue ? → A: `location.commune.name` en priorité, sinon le nom de `location.city`. Le code postal ne sélectionne jamais une commune ; il ne sert qu'à lever une homonymie via son préfixe de département, de sorte qu'un code d'arrondissement (`75005`, `69003`, `13008`) rattache bien l'événement à Paris, Lyon ou Marseille.
 - Q: Quel rôle joue `location.departement` ? → A: Le code fourni par la source est utilisé puis validé contre le référentiel ; un écart avec la commune résolue est diagnostiqué.
 - Q: Quel est le format brut du département ? → A: Un code de département fourni en chaîne (`"69"`, `"2A"`), zéros initiaux conservés ; ce format est celui du contrat `action-populaire-events.md`.
 - Q: Que faire lorsque `location.country` est absent ou vide ? → A: Aucun pays n'est déduit ; à défaut de tout rattachement utilisable, l'événement rejoint `national events`.
 - Q: Que deviennent les coordonnées GPS ? → A: Elles sortent du périmètre de la spec ; aucune résolution spatiale n'est utilisée dans cette version.
+- Q: Comment traiter les arrondissements municipaux (Paris, Lyon, Marseille) ? → A: Les modéliser est reporté ; `commune.name = "Paris 1er"` reste non résolu avec un diagnostic, alors que `city = "Paris"` rattache la commune `75056` quel que soit le code postal d'arrondissement.
 - Q: Comment les formats de données sont-ils définis d'une étape à l'autre ? → A: Une section « Data Formats by Stage » fixe la représentation attendue à chaque étape (source, validation, référentiel, normalisation, enrichissement, publication, requête, diagnostic) et les conventions de valeur partagées.
+- Q: Que faire d'un type d'événement que le registre local ne connaît pas encore ? → A: Le libellé bien formé est accepté et enregistré à sa première observation ; seul un libellé mal formé est rejeté, afin qu'une nouveauté côté plateforme ne casse jamais l'ingestion.
+- Q: Que publier lorsqu'aucune version du référentiel géographique n'est active ? → A: L'événement est publié avec `geographic_status = unavailable` et conserve le pays déclaré, qui ne dépend d'aucune donnée de référence.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -44,7 +47,7 @@ As a calendar user, I want each event to keep its raw source location and to be 
 
 1. **Given** an event with `location.country = "FR"`, `location.departement = "69"` and `location.commune.name = "Lyon"`, **When** it is ingested, **Then** it is linked to France, to department `69` and to the commune whose INSEE code is `69123`.
 2. **Given** an event whose `location.commune.name` matches several homonymous communes and whose `location.departement` is a valid code, **When** it is ingested, **Then** the commune of that department is selected.
-3. **Given** an event without `location.commune.name` whose `location.zip` and `location.city` match exactly one commune, **When** it is ingested, **Then** that commune is resolved.
+3. **Given** an event without `location.commune.name` whose `location.city` names exactly one commune in the applicable department, **When** it is ingested, **Then** that commune is resolved, even when the stated postal code is an arrondissement code absent from the reference.
 4. **Given** an event whose commune cannot be determined, **When** it is ingested, **Then** the event remains published with its raw location, keeps any department link it could establish, and exposes an incomplete-enrichment diagnostic.
 5. **Given** an event whose `location.country` is outside France, **When** it is ingested, **Then** it is classified by that country without being assigned a French commune or department.
 6. **Given** an event with neither a stated country, nor a department code, nor a commune name, **When** it is ingested, **Then** it is published in the `national events` category.
@@ -109,16 +112,16 @@ flowchart TD
 	NO_COUNTRY --> COMMUNE_NAME
 
 	COMMUNE_NAME -->|"Yes"| NAME_MATCH["Exact normalized name match\nin active commune reference"]
-	COMMUNE_NAME -->|"No"| POSTAL{"location.zip + location.city\nunique exact match?"}
+	COMMUNE_NAME -->|"No"| CITY{"location.city names\nexactly one commune?"}
 
 	NAME_MATCH --> AMBIGUOUS{"Single match?"}
-	AMBIGUOUS -->|"No"| DISAMBIGUATE{"Valid department code\nselects one commune?"}
+	AMBIGUOUS -->|"No"| DISAMBIGUATE{"Stated department, or the one\nimplied by the postal prefix,\nselects one commune?"}
 	DISAMBIGUATE -->|"No"| NO_COMMUNE["No commune link\nambiguous diagnostic"]
 	DISAMBIGUATE -->|"Yes"| COMMUNE_RESOLVED
 	AMBIGUOUS -->|"Yes"| COMMUNE_RESOLVED["COMMUNE resolved\nINSEE code"]
 
-	POSTAL -->|"Yes"| COMMUNE_RESOLVED
-	POSTAL -->|"No"| NO_COMMUNE
+	CITY -->|"Yes"| COMMUNE_RESOLVED
+	CITY -->|"No"| NO_COMMUNE
 
 	COMMUNE_RESOLVED --> DEPARTMENT{"location.departement\nvalid in reference?"}
 	NO_COMMUNE --> DEPARTMENT
@@ -135,7 +138,7 @@ flowchart TD
 	INTERNATIONAL --> PUBLISH
 ```
 
-The stated country, department code and commune name are the only geographic inputs. A stated country outside France is authoritative and excludes all French administrative links. When the source states France, the commune is resolved from `location.commune.name` first and from an exact unique `zip` + `city` pair second; the stated department code is used independently, validated against the active reference, and any inconsistency with the resolved commune is diagnosed rather than silently corrected. Events with no usable geographic field are published in `national events`; map coordinates never participate in the decision.
+The stated country, department code and commune name are the only geographic inputs. A stated country outside France is authoritative and excludes all French administrative links. When the source states France, the commune is resolved from `location.commune.name` first and from the `location.city` name second; the postal code never selects a commune and only disambiguates through its department prefix, so an arrondissement code still attaches Paris, Lyon or Marseille; the stated department code is used independently, validated against the active reference, and any inconsistency with the resolved commune is diagnosed rather than silently corrected. Events with no usable geographic field are published in `national events`; map coordinates never participate in the decision.
 
 The representation expected at each step of this flow is defined in [Data Formats by Stage](#data-formats-by-stage).
 
@@ -144,15 +147,15 @@ The representation expected at each step of this flow is defined in [Data Format
 - Commune names may contain accents, apostrophes, hyphens or articles; comparison must normalize case, accents, punctuation and whitespace without changing the stored official name.
 - Two communes with the same display name must remain distinguishable by their INSEE codes; only a validated department code may disambiguate them.
 - Department and INSEE codes may contain leading zeroes and must remain strings; Corsican codes may be alphanumeric (`2A`, `2B`).
-- A postal code may cover several communes; a non-unique `zip` + `city` match must not select one arbitrarily.
-- `location.city` may differ from the official commune name (spelling, article, former name); the fallback match is exact after normalization, never approximate.
+- A postal code may be a generic or arrondissement-level value absent from the reference (`75000` vs `75005`); it must never prevent a name-based match nor select a commune on its own.
+- `location.city` may differ from the official commune name (spelling, article, former name); the fallback match is exact after normalization, never approximate, and a municipal arrondissement name such as `Paris 1er` stays unresolved until arrondissements are modelled.
 - `location.commune.name` may be present while the commune is absent from the active reference; the event keeps its raw location and any department link, with an unresolved diagnostic.
 - `location.country` may be absent, blank or unsupported; no country may be invented, and an unsupported value is diagnosed.
 - The stated department code may disagree with the resolved commune's reference department; both raw values stay traceable.
 - An event may have one raw location record and several group or administrative link records; the event must remain one event.
 - An event with multiple group links must not be returned more than once by a search.
 - A combined query must not change `AND` semantics to `OR` when one criterion has no match.
-- An event type list must remain extensible without accepting undocumented arbitrary values.
+- An event type list must remain extensible without accepting malformed values; a newly published label is registered on first sight.
 - Missing or outdated reference data must prevent only the affected attachment and must not delete valid raw event data.
 - A failed dataset refresh must not expose a partially activated geographic reference.
 
@@ -221,7 +224,7 @@ The same event, at the source and after enrichment:
 - **FR-008**: The system MUST classify an event whose stated country is outside France by that country and MUST NOT assign it a French commune or department.
 - **FR-009**: When the country is absent or blank, the system MUST deduce no country, MUST still attempt commune and department links from the stated source fields, and MUST classify the event in the `national events` category when no such link can be established.
 - **FR-010**: The system MUST resolve the commune from `location.commune.name` first, using an exact match after normalization of case, accents, punctuation and whitespace against the official commune name or its pronoun-free alias in the active reference, and MUST NOT use fuzzy or approximate matching.
-- **FR-011**: The system MUST fall back to `location.zip` combined with `location.city` only when no commune name is provided, and MUST require a unique exact match after normalization.
+- **FR-011**: When no commune name is provided, the system MUST resolve the commune from `location.city` using the same exact normalized name rule, MUST use the stated department code or the department implied by the postal code prefix to disambiguate homonyms, and MUST NOT use the postal code itself to select a commune.
 - **FR-012**: When a commune name matches several reference communes, the system MUST use the validated department code to disambiguate and MUST leave the commune unresolved with an actionable diagnostic when ambiguity remains or no department code is available.
 - **FR-013**: The system MUST link the stated department code when it exists in the active reference, and MUST derive the department from the resolved commune's reference relationship, with a diagnostic, when the stated code is unknown and a commune is resolved.
 - **FR-014**: When the stated department code disagrees with the department of the resolved commune, the system MUST preserve both raw values and expose a diagnostic naming the discrepancy.
@@ -229,12 +232,13 @@ The same event, at the source and after enrichment:
 - **FR-016**: The system MUST represent event-to-group relationships through independently identifiable link records so that many-to-many coverage is preserved.
 - **FR-017**: The system MUST preserve an event's stable source identifier, dates and event type when geographic enrichment or reference data changes.
 - **FR-018**: The system MUST retain the event's source period and update metadata so that the latest successful observation can be identified.
-- **FR-019**: The system MUST validate event types against the current extensible Action Populaire event-type enum, accept newly published enum values after the source catalogue is updated, and reject values absent from that enum with an actionable diagnostic.
+- **FR-019**: The system MUST accept every well-formed event-type label the source publishes, register it on first observation, and reject only a malformed label with an actionable diagnostic naming `subtype.label`; a platform addition MUST NOT break ingestion.
 - **FR-020**: The system MUST preserve administrative and postal codes as strings, including leading zeroes.
 - **FR-021**: The system MUST allow filtering events by country, commune, department and event type when the relevant references are available.
 - **FR-022**: The system MUST combine supplied filters with intersection semantics: an event MUST satisfy every supplied criterion.
 - **FR-023**: The system MUST return zero results when no event satisfies all supplied criteria and MUST avoid duplicate events caused by multiple matching link records.
-- **FR-024**: The system MUST distinguish missing, invalid, non-applicable and not-yet-enriched geographic data, and MUST place events without any reliable geographic attachment in the dedicated `national events` category.
+- **FR-024**: The system MUST distinguish missing, invalid, non-applicable, not-yet-enriched and reference-unavailable geographic data, and MUST place events without any reliable geographic attachment in the dedicated `national events` category.
+- **FR-037**: When no geographic reference version is active, the system MUST still classify the event by its stated country and MUST publish it with an `unavailable` geographic status and an actionable diagnostic.
 - **FR-025**: The system MUST publish an event with its location and geographic links atomically so that readers cannot observe a partially enriched event.
 - **FR-026**: The system MUST support a versioned local French commune reference dataset populated from selected `data.gouv.fr` datasets.
 - **FR-027**: The system MUST provide an explicit operator-triggered action to start a geographic dataset refresh and MUST not require an automatic refresh schedule for the first release.
@@ -265,7 +269,7 @@ The same event, at the source and after enrichment:
 
 ## Out of Scope (this version)
 
-- Regions, EPCIs, legislative constituencies and municipal arrondissements are not modelled or populated; they are deferred to a later version.
+- Regions, EPCIs, legislative constituencies and municipal arrondissements are not modelled or populated; they are deferred to a later version, so an arrondissement name such as `Paris 1er` is diagnosed as unknown while `Paris` resolves.
 - Coordinates are not used for any enrichment decision, and no point-in-polygon or spatial resolution is performed; existing coordinate storage is retained unchanged and must not be deleted by this feature.
 - The constituency GeoJSON dataset is not part of this version's geographic reference.
 - Fuzzy, phonetic or approximate name matching is excluded; only exact normalized matches are accepted.
@@ -275,14 +279,14 @@ The same event, at the source and after enrichment:
 ### Measurable Outcomes
 
 - **SC-001**: 100% of events stating France, a commune name resolvable to exactly one reference commune, and a valid department code are linked to that commune, its department and the country.
-- **SC-002**: 100% of events rejected for an unknown event type produce a diagnostic naming the field and cause.
+- **SC-002**: 100% of events rejected for a malformed event type produce a diagnostic naming the field and cause, while 100% of well-formed labels published by the source are accepted.
 - **SC-003**: 100% of combined two-criterion geographic searches return only events satisfying both criteria in the reference test dataset.
 - **SC-004**: At least 95% of usual geographic searches return a result within one second for the project's reference volume.
 - **SC-005**: 100% of events remain retrievable by stable source identifier after a reference dataset update or geographic metadata change.
 - **SC-006**: 100% of failed dataset refreshes leave the previously active reference version serving published results.
 - **SC-007**: Operators can identify the proportion of events that are not enriched and distinguish absence, invalidity, non-applicability and unavailable-reference causes.
 - **SC-008**: 100% of events whose stated country is outside France are classified by that country and are assigned no French administrative entity.
-- **SC-009**: 100% of commune attachments derived from `location.commune.name` use an exact match after normalization, and ambiguous or unknown names remain visibly unresolved.
+- **SC-009**: 100% of commune attachments use an exact match after normalization on `location.commune.name` or `location.city`, and ambiguous or unknown names remain visibly unresolved.
 - **SC-010**: 100% of events with a usable department code but no resolvable commune keep the department link and expose the missing-commune diagnostic.
 - **SC-011**: 100% of events without a stated country, department code or commune name are classified in `national events`.
 - **SC-012**: 100% of department/commune disagreements expose a diagnostic retaining both raw values.
@@ -300,7 +304,7 @@ The same event, at the source and after enrichment:
 - Administrative relationships are evaluated for a specific reference version and do not reconstruct historical boundary changes unless a future feature explicitly requires that.
 - `location.country` is an ISO 3166-1 alpha-2 code as stated by the platform; an unknown or non-standard value is diagnosed and never guessed.
 - `location.departement` is a department code, not a name, and is preserved verbatim.
-- An INSEE code is not required as incoming event data; commune resolution relies on the stated commune name, or on the postal code plus city pair as a fallback.
+- An INSEE code is not required as incoming event data; commune resolution relies on the stated commune name, or on the city name as a fallback.
 - Event data and geographic data remain subject to their respective licenses; distribution must be checked for every selected source.
 - Raw source location fields are retained alongside enriched references so events can be reprocessed without another event-source fetch.
 - The project persists events and processing state in PostgreSQL through Prisma; the geographic reference lives in the same store so that activation and publication share one transactional boundary. The requirements themselves stay independent of that choice.
@@ -312,7 +316,7 @@ The same event, at the source and after enrichment:
 
 - **Geographic source**: The Action Populaire event contract already carries the country, department code, commune name, city and postal code, so attachment uses those stated fields. Coordinate matching, geocoding and spatial resolution are not needed and are excluded from this version.
 - **Levels**: Only commune, department and country are represented and populated. Region, EPCI, constituency and arrondissement are deferred, and the constituency GeoJSON is not part of the reference for this version.
-- **Commune precedence**: `location.commune.name` is authoritative when present and matches one reference commune after normalization; `location.zip` + `location.city` is a fallback used only in the absence of a commune name and must match exactly one commune.
+- **Commune precedence**: `location.commune.name` is authoritative when present; `location.city` is the fallback name source and must match exactly one commune after normalization. The reference CSV holds a single generic postal code for multi-postal communes (`69000`, `75000`, `13000`), so the postal code is never an equality criterion: it only disambiguates homonyms through its department prefix, which keeps `75005 Paris` attached to Paris.
 - **Department handling**: The stated department code is used as the event's department link once validated against the active reference. An unknown code falls back to the resolved commune's reference department with a diagnostic, and a disagreement between the two values is preserved and diagnosed rather than silently resolved.
 - **Country handling**: Only the stated country is used. A missing or blank country deduces nothing, so the event keeps any French commune or department attachment it could establish and otherwise falls back to `national events`.
 - **Business boundaries**: Country classification, commune resolution, department validation, filtering and persistence are separate modules, each independently testable and within the project's 100–150-line maintainability target where practical.

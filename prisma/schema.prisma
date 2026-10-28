@@ -68,11 +68,26 @@ model EventRecord {
   locationId    String?         @map("location_id")
   lastSeenPeriod String?        @map("last_seen_period")
   updatedAt     DateTime        @updatedAt @map("updated_at")
+  referenceVersion       String? @map("reference_version")
+  geographicStatus       String? @map("geographic_status")
+  countryCode            String? @map("country_code")
+  departmentCode         String? @map("department_code")
+  departmentSource       String? @map("department_source")
+  rawDepartmentCode      String? @map("raw_department_code")
+  rawCommuneName         String? @map("raw_commune_name")
+  communeId              String? @map("commune_id")
+  geographicDiagnostics  Json?   @map("geographic_diagnostics")
+  eventType              String? @map("event_type")
   location      LocationRecord? @relation(fields: [locationId], references: [locationId])
   period        ProcessingPeriod? @relation(fields: [lastSeenPeriod], references: [periodToken])
   groupLinks    EventGroupLink[]
   subscriptions Subscription[]
 
+  @@index([countryCode])
+  @@index([departmentCode])
+  @@index([communeId])
+  @@index([referenceVersion])
+  @@index([eventType])
   @@map("event_record")
 }
 
@@ -138,4 +153,60 @@ model CalendarSnapshot {
 
   @@index([scopeId, status, revision])
   @@map("calendar_snapshot")
+}
+
+model EventTypeReference {
+  value       String   @id
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  source      String
+
+  @@map("event_type_reference")
+}
+
+model GeographicReferenceVersion {
+  version          String   @id
+  status           String   @default("staged")
+  source           String
+  publicationDate  String   @map("publication_date")
+  ingestedAt       DateTime @map("ingested_at")
+  license          String
+  communeCount     Int      @default(0) @map("commune_count")
+  departmentCount  Int      @default(0) @map("department_count")
+  checksum         String
+  validationErrors Json?    @map("validation_errors")
+  departments      DepartmentReference[]
+  communes         CommuneReference[]
+
+  @@map("geographic_reference_version")
+}
+
+model DepartmentReference {
+  versionId    String                    @map("version_id")
+  code         String
+  name         String
+  communeCount Int                       @default(0) @map("commune_count")
+  version      GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  communes     CommuneReference[]
+
+  @@id([versionId, code])
+  @@map("department_reference")
+}
+
+model CommuneReference {
+  versionId                 String                    @map("version_id")
+  inseeCode                 String                    @map("insee_code")
+  name                      String
+  normalizedName            String                    @map("normalized_name")
+  pronounFreeNormalizedName String                    @map("pronoun_free_normalized_name")
+  postalCodes               String[]                  @map("postal_codes")
+  departmentCode            String                    @map("department_code")
+  version                   GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  department                DepartmentReference       @relation(fields: [versionId, departmentCode], references: [versionId, code], onDelete: Cascade)
+
+  @@id([versionId, inseeCode])
+  @@index([versionId, normalizedName])
+  @@index([versionId, pronounFreeNormalizedName])
+  @@index([versionId, departmentCode])
+  @@index([postalCodes], type: Gin)
+  @@map("commune_reference")
 }

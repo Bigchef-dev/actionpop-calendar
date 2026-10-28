@@ -32,6 +32,16 @@ pnpm prisma:generate
 pnpm prisma:migrate
 ```
 
+Operator commands:
+
+```bash
+pnpm geo:refresh                                            # parse, validate, stage, activate (date = today)
+GEOGRAPHIC_PUBLICATION_DATE=2026-01-01 pnpm geo:refresh      # explicit publication date
+EVENT_TYPES="tractage,boitage,diffusion-tracts" pnpm geo:event-types
+pnpm dev:worker                                              # watch mode
+pnpm start:worker                                            # built output
+```
+
 Expected: the new `geographic_reference_version`, `department_reference` and
 `commune_reference` tables exist, `event_record` exposes the geographic columns, and the
 partial unique index `geographic_reference_version_one_active` is present:
@@ -85,12 +95,15 @@ Expected outcomes:
 
 - `location.commune.name = "Lyon"` with `location.departement = "69"` and `location.country = "FR"` resolves the commune `69123`, department `69`, and country `FR`.
 - A commune name shared by several communes resolves only through a valid stated department code; without one it stays unresolved with an ambiguity diagnostic.
-- Without a commune name, an exact unique `zip` + `city` pair resolves the commune; a non-unique pair does not.
+- Without a commune name, an exact `location.city` match resolves the commune, even when the postal code is an arrondissement value absent from the reference (`75005 Paris`, `69003 Lyon`, `13008 Marseille`).
 - An unknown department code with a resolved commune links the commune's reference department and emits `department_code_unknown`.
 - A stated department that disagrees with the resolved commune emits `department_commune_mismatch` and keeps both raw values.
 - A stated country outside France produces an international classification and no French commune or department.
 - An event with no country, department, or commune is published in `national events`.
 - A department code such as `"01"` stays `"01"` from CSV parsing through publication and query output, and an empty `location.departement` produces no department link and no error diagnostic.
+- `Paris 1er` stays unresolved with `commune_unknown` until municipal arrondissements are modelled, while `Paris` resolves to `75056`.
+- A well-formed event-type label published by the source is accepted and registered on first sight, so `meeting-presidentielle-2027` or `porte-a-porte` never break ingestion; only a malformed label fails the job as a non-retryable `event_type_invalid` naming `subtype.label`.
+- With no active reference version, an event is still published with its stated `country_code` and `geographic_status = unavailable`, and `pnpm geo:refresh` restores full enrichment.
 - Raw values (`raw_department_code`, `raw_commune_name`) match the payload exactly while derived keys are used only for lookup.
 - A failed refresh leaves the previous active reference and event snapshot readable.
 - A successful refresh changes `reference_version` and geographic links without changing `source_event_id`, raw location, dates, or event type.

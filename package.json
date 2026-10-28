@@ -28,7 +28,11 @@
     "quality": "node scripts/quality.mjs",
     "prisma:migrate:dev": "node scripts/prisma.mjs migrate dev",
     "prisma:migrate:status": "node scripts/prisma.mjs migrate status",
-    "db:setup": "pnpm dev:infra || echo 'WARN: dependencies not started; start Redis and Postgres manually.'; pnpm prisma:generate && pnpm prisma:migrate"
+    "db:setup": "pnpm dev:infra || echo 'WARN: dependencies not started; start Redis and Postgres manually.'; pnpm prisma:generate && pnpm prisma:migrate",
+    "geo:refresh": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node scripts/geographic-refresh.mjs",
+    "geo:event-types": "pnpm --filter @actionpop/core build && node scripts/event-types-sync.mjs",
+    "dev:worker": "pnpm dev:infra || echo 'WARN: could not start Docker dependencies; start Redis and Postgres manually.'; pnpm db:setup && pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker dev",
+    "start:worker": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node apps/worker/dist/main.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

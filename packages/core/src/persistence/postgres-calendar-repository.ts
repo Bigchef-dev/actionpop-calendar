@@ -1,5 +1,10 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { CalendarDataset } from './calendar-dataset-repository.js';
+import type {
+  Diagnostic,
+  GeographicAttachment,
+  GeographicStatus,
+} from '../geography/reference-types.js';
 import type { PublishedEvent } from '../models/event.interface.js';
 
 export class PostgresCalendarDatasetRepository {
@@ -89,6 +94,16 @@ export class PostgresCalendarDatasetRepository {
     sequence: number;
     timezone: string;
     location: { address1: string | null; city: string | null; zip: string | null } | null;
+    referenceVersion: string | null;
+    geographicStatus: string | null;
+    countryCode: string | null;
+    departmentCode: string | null;
+    departmentSource: string | null;
+    rawDepartmentCode: string | null;
+    rawCommuneName: string | null;
+    communeId: string | null;
+    geographicDiagnostics: Prisma.JsonValue | null;
+    eventType: string | null;
   }): PublishedEvent {
     return {
       id: event.sourceEventId,
@@ -97,14 +112,45 @@ export class PostgresCalendarDatasetRepository {
       description: event.description ?? undefined,
       startTime: event.startTime.toISOString(),
       endTime: event.endTime.toISOString(),
-      location: event.location === null ? null : {
-        address1: event.location.address1 ?? '',
-        city: event.location.city ?? '',
-        zip: event.location.zip ?? '',
-        coordinates: null,
-      },
+      location:
+        event.location === null
+          ? null
+          : {
+              address1: event.location.address1 ?? '',
+              city: event.location.city ?? '',
+              zip: event.location.zip ?? '',
+              coordinates: null,
+            },
       contentHash: event.contentHash ?? '',
       sequence: event.sequence,
+      ...(event.eventType === null ? {} : { eventType: event.eventType }),
+      ...(event.geographicStatus === null ? {} : { geography: this.toGeography(event) }),
+    };
+  }
+
+  private toGeography(event: {
+    referenceVersion: string | null;
+    geographicStatus: string | null;
+    countryCode: string | null;
+    departmentCode: string | null;
+    departmentSource: string | null;
+    rawDepartmentCode: string | null;
+    rawCommuneName: string | null;
+    communeId: string | null;
+    geographicDiagnostics: Prisma.JsonValue | null;
+  }): GeographicAttachment {
+    return {
+      geographicStatus: (event.geographicStatus ?? 'national') as GeographicStatus,
+      diagnostics: readDiagnostics(event.geographicDiagnostics),
+      ...(event.referenceVersion === null ? {} : { referenceVersion: event.referenceVersion }),
+      ...(event.countryCode === null ? {} : { countryCode: event.countryCode }),
+      ...(event.communeId === null ? {} : { communeId: event.communeId }),
+      ...(event.departmentCode === null ? {} : { departmentCode: event.departmentCode }),
+      ...(event.departmentSource === null
+        ? {}
+        : { departmentSource: event.departmentSource === 'reference' ? 'reference' : 'stated' }),
+      ...(event.rawDepartmentCode === null ? {} : { rawDepartmentCode: event.rawDepartmentCode }),
+      ...(event.rawCommuneName === null ? {} : { rawCommuneName: event.rawCommuneName }),
     };
   }
 
@@ -119,6 +165,7 @@ export class PostgresCalendarDatasetRepository {
       sequence: event.sequence,
       timezone: 'Europe/Paris',
       lastSeenPeriod: null,
+      ...this.toGeographyColumns(event),
       groupLinks: { create: { scopeId } },
     };
   }
@@ -131,6 +178,49 @@ export class PostgresCalendarDatasetRepository {
       endTime: new Date(event.endTime),
       contentHash: event.contentHash,
       sequence: event.sequence,
+      ...this.toGeographyColumns(event),
     };
   }
+
+  private toGeographyColumns(event: PublishedEvent) {
+    const geography = event.geography;
+    if (geography === undefined) return {};
+
+    return {
+      referenceVersion: geography.referenceVersion ?? null,
+      geographicStatus: geography.geographicStatus,
+      countryCode: geography.countryCode ?? null,
+      departmentCode: geography.departmentCode ?? null,
+      departmentSource: geography.departmentSource ?? null,
+      rawDepartmentCode: geography.rawDepartmentCode ?? null,
+      rawCommuneName: geography.rawCommuneName ?? null,
+      communeId: geography.communeId ?? null,
+      geographicDiagnostics: toJsonValue(geography.diagnostics),
+      ...(event.eventType === undefined ? {} : { eventType: event.eventType }),
+    };
+  }
+}
+
+// Prisma's JSON input types require an index signature that domain records do not have;
+// the assertion is a narrow persistence-boundary conversion of already-validated data.
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function readDiagnostics(value: Prisma.JsonValue | null): Diagnostic[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return [];
+    const candidate = entry as Record<string, unknown>;
+    const { code, field, message, severity } = candidate;
+    if (
+      typeof code !== 'string' ||
+      typeof field !== 'string' ||
+      typeof message !== 'string' ||
+      (severity !== 'warning' && severity !== 'error')
+    ) {
+      return [];
+    }
+    return [{ code, field, message, severity }];
+  });
 }

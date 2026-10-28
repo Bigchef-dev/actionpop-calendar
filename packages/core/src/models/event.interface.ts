@@ -1,9 +1,21 @@
-import { ActionPopulaireEventPayload, ActionPopulaireLocation } from "../adapters/action-populaire-schemas.js";
+import {
+  ActionPopulaireEventPayload,
+  ActionPopulaireLocation,
+} from '../adapters/action-populaire-schemas.js';
+import type { GeographicAttachment } from '../geography/reference-types.js';
 
-export interface LocationEvent extends Pick<ActionPopulaireLocation, 'address1' | 'city' | 'zip' | 'coordinates'> {}
+export type LocationEvent = Pick<
+  ActionPopulaireLocation,
+  'address1' | 'city' | 'zip' | 'coordinates'
+>;
 
-export interface IncomingEvent extends Pick<ActionPopulaireEventPayload, 'id' | 'name' | 'startTime' | 'endTime' | 'description'> {
-    location: LocationEvent | null;
+export interface IncomingEvent extends Pick<
+  ActionPopulaireEventPayload,
+  'id' | 'name' | 'startTime' | 'endTime' | 'description'
+> {
+  location: LocationEvent | null;
+  eventType?: string;
+  geography?: GeographicAttachment;
 }
 
 export interface PublishedEvent extends IncomingEvent {

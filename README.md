@@ -50,6 +50,33 @@ machine, start the dependencies once with `sudo pnpm dev:infra` (or add your use
 the `docker` group) before running `pnpm dev`. Startup aborts with a single message
 naming the unreachable dependency instead of retrying forever.
 
+### Geographic reference
+
+Events are attached to a country, a department and a commune from the raw Action
+Populaire fields (`location.country`, `location.departement`, `location.commune.name`
+or `location.city`). Map coordinates are stored but never used for that decision, and
+region, EPCI, constituency and arrondissement levels are out of scope for now.
+
+The reference lives in Postgres (`geographic_reference_version`,
+`department_reference`, `commune_reference`) and is refreshed by an operator:
+
+```bash
+pnpm geo:refresh                                    # publication date defaults to today
+GEOGRAPHIC_PUBLICATION_DATE=2026-01-01 pnpm geo:refresh
+EVENT_TYPES="tractage,boitage,diffusion-tracts" pnpm geo:event-types
+```
+
+Run the worker with `pnpm dev:worker` (watch mode) or `pnpm start:worker` (built output).
+
+`pnpm geo:refresh` parses `data/communes-france-2026.csv`, validates it, stages a
+version and activates it in one transaction; a failed refresh leaves the previous
+version active. Event-type labels are registered automatically on first sight, so a new
+platform value never breaks ingestion; `pnpm geo:event-types` pre-seeds that registry
+from a known list, useful before a first run or for backfilling. Without an active
+reference version, events are still published with their stated country and a
+`geographic_status` of `unavailable`. PostgreSQL integration tests read `TEST_DATABASE_URL` (falling
+back to `DATABASE_URL`) and isolate each test file in its own schema.
+
 Prisma Studio provides a local visual interface for the persisted Postgres data and
 `pnpm dev:tools` additionally starts RedisInsight and Bull Board:
 

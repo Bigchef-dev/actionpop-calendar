@@ -16,7 +16,7 @@ Each stage keeps an explicit representation (raw source payload, validated recor
 
 **Primary Dependencies**: Existing Zod, Prisma, `@prisma/client`, BullMQ (Redis for the job queue only), Fastify, and Vitest; Node.js `fs`/`readline` for local CSV ingestion; no new CSV, geometry, geocoding or caching dependency
 
-**Storage**: PostgreSQL as the single source of truth, accessed through Prisma. New tables hold versioned commune and department references plus a reference-version table; `event_record` gains denormalized geographic columns. Redis remains the BullMQ transport and stores no event or geographic data
+**Storage**: PostgreSQL as the single source of truth, accessed through Prisma. New tables hold versioned commune and department references plus a reference-version table and the observed event-type registry; `event_record` gains denormalized geographic columns and an `event_type` column. Redis remains the BullMQ transport and stores no event or geographic data
 
 **Testing**: Vitest unit tests for pure parsing, normalization, resolution and classification; contract tests for the Prisma repository and the query contract; PostgreSQL integration tests through a new harness reading `TEST_DATABASE_URL` (the existing `tests/integration` harness covers Redis only) that applies `prisma migrate deploy` to a disposable database; strict TypeScript typecheck; ESLint; the documented quickstart validation flow
 
@@ -24,9 +24,9 @@ Each stage keeps an explicit representation (raw source payload, validated recor
 
 **Project Type**: TypeScript monorepo with core library, API service, and BullMQ worker
 
-**Performance Goals**: At least 95% of usual geographic searches complete within one second at the reference volume; commune name and postal lookups rely on B-tree indexes rather than table scans; filtering is a single indexed SQL predicate set on `event_record`
+**Performance Goals**: At least 95% of usual geographic searches complete within one second at the reference volume; commune name lookups rely on B-tree indexes rather than table scans; filtering is a single indexed SQL predicate set on `event_record`
 
-**Constraints**: The existing `LocationRecord.geoPoint` / `geo_point` coordinate storage stays unchanged and is never read for enrichment; exact normalized commune-name matching first; postal-code plus city only as a fallback and only when unique; no fuzzy, phonetic, or coordinate-based matching; stated department code validated against the reference with discrepancy diagnostics; no region, EPCI, constituency, or arrondissement assignment; refresh is operator-triggered; activation and enriched publication are atomic PostgreSQL transactions; business modules target 100–150 lines as the constitution requires; raw source location and stable event identifiers must survive re-enrichment; department, INSEE and postal codes remain strings at every stage
+**Constraints**: The existing `LocationRecord.geoPoint` / `geo_point` coordinate storage stays unchanged and is never read for enrichment; exact normalized matching on `location.commune.name` first, then on `location.city`; the postal code never selects a commune and only supplies a department prefix for disambiguation; no fuzzy, phonetic, or coordinate-based matching; stated department code validated against the reference with discrepancy diagnostics; no region, EPCI, constituency, or arrondissement assignment; refresh is operator-triggered; activation and enriched publication are atomic PostgreSQL transactions; business modules target 100–150 lines as the constitution requires; raw source location and stable event identifiers must survive re-enrichment; department, INSEE and postal codes remain strings at every stage
 
 **Scale/Scope**: The supplied reference contains one header plus 34,868 commune rows (UTF-8, quoted `codes_postaux`). The first release covers events, not group geographic enrichment, and covers only commune, department, and country levels.
 
@@ -60,7 +60,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 - **Independent Features**: PASS. Geography parsing, commune resolution, department validation, country classification, filtering, and persistence are separate contracts with pure-core tests and Prisma-integration tests.
 - **TypeScript and Verified Types**: PASS. Every stage boundary has an explicit type (raw payload, validated record, reference row, comparison key, attachment, published document, diagnostic); untrusted CSV and event values are validated before use, and Prisma-generated row types are mapped explicitly to domain records.
 - **Test-First Quality**: PASS. Each parser, normalization rule, resolution rule, reference activation path, transaction publication path, and filter contract has a named test surface before implementation tasks are generated.
-- **Small and Maintainable Business Logic**: PASS. Commune name resolution, postal fallback, department validation, and country classification are separate modules within the constitution's 100–150-line limit; Prisma access is confined to the repository, never mixed with business rules.
+- **Small and Maintainable Business Logic**: PASS. Commune name resolution, postal-to-department derivation, department validation, country classification and event-type validation are separate modules within the constitution's 100–150-line limit; Prisma access is confined to repositories, never mixed with business rules.
 - **Deployable by Default**: PASS. The feature reuses the existing PostgreSQL service, `DATABASE_URL` configuration and Prisma migration workflow; no new container or host-specific path is required.
 
 ## Project Structure
@@ -86,7 +86,8 @@ prisma/
 ├── schema.prisma                      # + GeographicReferenceVersion, CommuneReference, DepartmentReference,
 │                                      #   geographic columns on EventRecord
 └── migrations/
-    └── 0002_geographic_reference/     # tables, indexes, partial unique index on the active version
+    ├── 0002_geographic_reference/     # tables, indexes, partial unique index on the active version
+    └── 0003_event_type/               # event_type column, index and observed type registry
 
 packages/core/src/
 ├── domain/
@@ -96,15 +97,22 @@ packages/core/src/
 │   ├── commune-csv-parser.ts
 │   ├── commune-name-index.ts
 │   ├── commune-resolver.ts
+│   ├── postal-department.ts           # postal prefix to department (arrondissement-safe)
 │   ├── department-validator.ts
 │   ├── country-classifier.ts
-│   ├── geographic-formats.ts          # raw field extraction and stage output shapes
+│   ├── event-types.ts                 # observed type registry validation
+│   ├── diagnostics.ts                 # diagnostic codes and severities
+│   ├── geographic-filter.ts           # query criteria validation
+│   ├── reference-validation.ts        # dataset activation gate
 │   └── geographic-enricher.ts
 ├── adapters/
 │   └── action-populaire-schemas.ts    # must retain departement, commune and presentation fields
 ├── persistence/
 │   ├── postgres-calendar-repository.ts
-│   └── geographic-reference-repository.ts
+│   ├── postgres-event-query.ts
+│   ├── postgres-event-type-repository.ts
+│   ├── geographic-reference-repository.ts
+│   └── geographic-reference-writer.ts
 └── infrastructure/
     └── postgres.ts
 
