@@ -25,4 +25,17 @@ describe('event revision', () => {
     const previous = { ...content, contentHash: hashCalendarContent(content), sequence: 3 };
     expect(nextEventRevision({ ...content, summary: 'Updated' }, previous).sequence).toBe(4);
   });
+
+  it('increments sequence when the calendar-visible address changes', () => {
+    const withAddress = { ...content, location: '12 rue de la République, 69003 Lyon' };
+    const previous = { ...withAddress, contentHash: hashCalendarContent(withAddress), sequence: 1 };
+
+    expect(
+      nextEventRevision(
+        { ...withAddress, location: '14 rue de la République, 69003 Lyon' },
+        previous,
+      ).sequence,
+    ).toBe(2);
+    expect(nextEventRevision({ ...withAddress }, previous).sequence).toBe(1);
+  });
 });

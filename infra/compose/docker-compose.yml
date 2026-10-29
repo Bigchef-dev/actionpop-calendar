@@ -43,6 +43,11 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
       PORT: "3000"
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+    volumes:
+      # The whole document directory is mounted read-only, so the image still
+      # starts from the shipped example when config/actionpop.yaml is absent.
+      - ../../config:/app/config:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -70,6 +75,9 @@ services:
       UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:-}
       UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
       WORKER_HEALTH_PORT: "8081"
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+    volumes:
+      - ../../config:/app/config:ro
     depends_on:
       redis:
         condition: service_healthy

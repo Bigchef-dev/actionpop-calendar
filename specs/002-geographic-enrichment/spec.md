@@ -32,6 +32,7 @@
 - Q: Comment les formats de données sont-ils définis d'une étape à l'autre ? → A: Une section « Data Formats by Stage » fixe la représentation attendue à chaque étape (source, validation, référentiel, normalisation, enrichissement, publication, requête, diagnostic) et les conventions de valeur partagées.
 - Q: Que faire d'un type d'événement que le registre local ne connaît pas encore ? → A: Le libellé bien formé est accepté et enregistré à sa première observation ; seul un libellé mal formé est rejeté, afin qu'une nouveauté côté plateforme ne casse jamais l'ingestion.
 - Q: Que publier lorsqu'aucune version du référentiel géographique n'est active ? → A: L'événement est publié avec `geographic_status = unavailable` et conserve le pays déclaré, qui ne dépend d'aucune donnée de référence.
+- Q: Comment un intégrateur découvre-t-il les critères géographiques ? → A: Une référence d'API générée depuis le code (Scalar, servie sur `/reference`, adossée au document OpenAPI) expose les critères `country`, `department`, `commune` et `event_type`, leurs codes en chaîne et la sémantique `AND`, et ne peut pas dériver du contrat sans qu'un test échoue.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -250,6 +251,7 @@ The same event, at the source and after enrichment:
 - **FR-033**: The system MUST record a processing ledger for each ingestion identity, including scheduled, running, publishing, succeeded, retrying, and failed outcomes.
 - **FR-034**: The system MUST document the distribution and operating conditions of the selected search and storage solution before production use.
 - **FR-035**: The system MUST isolate country classification, commune resolution, department validation, filtering and persistence boundaries so that each rule can be tested independently.
+- **FR-038**: The system MUST publish an interactive API reference generated from the running service, documenting the geographic filter parameters (`country`, `department`, `commune`, `event_type`), their string-typed codes and their `AND` semantics, and a test MUST fail when the document no longer matches that contract.
 - **FR-036**: The system MUST keep the representation of geographic data explicit and stable at each stage, from the source payload through validation, reference data, normalization keys, enrichment result, published document and query criteria, and MUST NOT coerce codes to numbers or overwrite raw source values.
 
 ### Key Entities
@@ -293,6 +295,7 @@ The same event, at the source and after enrichment:
 - **SC-013**: 100% of published geographic links trace back to a stated source field; no link depends on coordinates.
 - **SC-014**: 100% of department, INSEE and postal codes remain strings with leading zeroes and alphanumeric codes preserved from ingestion to query.
 - **SC-015**: 100% of published geographic values match the documented format of their stage; no raw source value is rewritten by enrichment.
+- **SC-016**: The interactive API reference is reachable and lists every geographic filter parameter with string-typed codes; the reference test fails when a parameter or its type is removed.
 
 ## Assumptions
 
@@ -306,6 +309,7 @@ The same event, at the source and after enrichment:
 - `location.departement` is a department code, not a name, and is preserved verbatim.
 - An INSEE code is not required as incoming event data; commune resolution relies on the stated commune name, or on the city name as a fallback.
 - Event data and geographic data remain subject to their respective licenses; distribution must be checked for every selected source.
+- The API reference is generated from the service itself, so it never duplicates the contract by hand; exposing it in a production deployment remains an operator choice.
 - Raw source location fields are retained alongside enriched references so events can be reprocessed without another event-source fetch.
 - The project persists events and processing state in PostgreSQL through Prisma; the geographic reference lives in the same store so that activation and publication share one transactional boundary. The requirements themselves stay independent of that choice.
 - Redis remains the job-queue transport only and holds no event or geographic data.
@@ -320,5 +324,6 @@ The same event, at the source and after enrichment:
 - **Department handling**: The stated department code is used as the event's department link once validated against the active reference. An unknown code falls back to the resolved commune's reference department with a diagnostic, and a disagreement between the two values is preserved and diagnosed rather than silently resolved.
 - **Country handling**: Only the stated country is used. A missing or blank country deduces nothing, so the event keeps any French commune or department attachment it could establish and otherwise falls back to `national events`.
 - **Business boundaries**: Country classification, commune resolution, department validation, filtering and persistence are separate modules, each independently testable and within the project's 100–150-line maintainability target where practical.
+- **API reference**: The filter contract is explored through a Scalar page served on `/reference`, generated from the OpenAPI document of the running service so the documented parameters cannot drift from the implemented validation.
 - **Reference dataset**: The first version's reference is the local commune dataset (`data/communes-france-2026.csv`), validated, versioned and activated atomically with provenance and license metadata.
 - **Persistence**: PostgreSQL through Prisma is the single store for reference versions and enriched events; a version is activated inside one database transaction guarded by a partial unique index, and Redis carries only queue state.

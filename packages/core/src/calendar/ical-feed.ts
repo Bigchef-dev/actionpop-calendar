@@ -1,4 +1,5 @@
-import { PublishedEvent, PublishedGroupSnapshot } from "../models/event.interface.js";
+import { PublishedEvent, PublishedGroupSnapshot } from '../models/event.interface.js';
+import { escapeText, formatUtcInstant, joinLines } from './ical-writer.js';
 
 export type CalendarFeedInput = Exclude<PublishedGroupSnapshot, 'eventIds'> & {
   events: PublishedEvent[];
@@ -7,22 +8,6 @@ export type CalendarFeedInput = Exclude<PublishedGroupSnapshot, 'eventIds'> & {
 export interface CalendarFeed {
   revision: string;
   body: string;
-}
-
-function escapeText(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/([,;])/g, '\\$1')
-    .replace(/\r?\n/g, '\\n');
-}
-
-function toUtc(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new Error('calendar date is invalid');
-  return date
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\.\d{3}/, '');
 }
 
 export function buildIcalFeed(input: CalendarFeedInput): CalendarFeed {
@@ -38,18 +23,17 @@ export function buildIcalFeed(input: CalendarFeedInput): CalendarFeed {
     lines.push(
       'BEGIN:VEVENT',
       `UID:${escapeText(event.sourceEventId)}@actionpop-calendar`,
-      `DTSTAMP:${toUtc(input.generatedAt)}`,
-      `LAST-MODIFIED:${toUtc(input.generatedAt)}`,
-      `DTSTART:${toUtc(event.startTime)}`,
-      `DTEND:${toUtc(event.endTime)}`,
+      `DTSTAMP:${formatUtcInstant(input.generatedAt)}`,
+      `LAST-MODIFIED:${formatUtcInstant(input.generatedAt)}`,
+      `DTSTART:${formatUtcInstant(event.startTime)}`,
+      `DTEND:${formatUtcInstant(event.endTime)}`,
       `SUMMARY:${escapeText(event.name)}`,
       `SEQUENCE:${event.sequence}`,
     );
     if (event.description !== undefined) lines.push(`DESCRIPTION:${escapeText(event.description)}`);
-    // if (event.location !== undefined) lines.push(`LOCATION:${escapeText(event.location)}`);
     lines.push('END:VEVENT');
   }
 
   lines.push('END:VCALENDAR');
-  return { revision, body: `${lines.join('\r\n')}\r\n` };
+  return { revision, body: joinLines(lines) };
 }

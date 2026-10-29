@@ -81,6 +81,27 @@ Repository tests must verify staged inserts are invisible to readers, activation
 transaction, the unique-violation behaviour on concurrent activation, previous-version
 retention, and enriched publication committed together with the snapshot.
 
+## API reference checks
+
+The service serves its own OpenAPI document and an interactive Scalar page, so the filter
+contract is explored rather than retyped:
+
+```bash
+pnpm --filter @actionpop/api build && pnpm --filter @actionpop/api start
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/openapi.json   # expect 200
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/reference      # expect 200
+```
+
+Expected (verified 2026-10-28):
+
+- `/reference` renders the document with the title `ActionPop Calendar API`.
+- `/openapi.json` lists `GET /events` with `country` (`FR`), `department` (`01`), `commune`
+  (`01001`) and `event_type` (`tractage`) typed as `string`, and states the `AND` semantics.
+- `GET /events?country=FR` returns resolved events; `GET /events?region=84` returns `400`
+  with `filter_parameter_unsupported` and `GET /events?country=France` returns `400` with
+  `filter_value_invalid`.
+- Set `API_REFERENCE=false` to stop serving `/reference` when a deployment must not expose it.
+
 ## End-to-end checks
 
 ```bash

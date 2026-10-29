@@ -153,7 +153,56 @@ cp infra/compose/.env.example infra/compose/.env
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
-The public surface is the read-only `GET /feed/{scopeId}` route. Redis, BullMQ,
+The public surface is the read-only `GET /feed/{scopeId}` route, the read-only
+`GET /events` route, and the read-only `GET /calendar.ics` route. `/events` filters events
+by `country`, `department`, `commune` and `event_type` with `AND` semantics. Geographic
+identifiers are strings, so `01`, `2A` and `01001` keep their leading zeroes.
+
+`GET /calendar.ics` returns the matching events as an iCalendar (RFC 5545) document that a
+calendar client can subscribe to:
+
+```text
+GET /calendar.ics?department=69&insee_commune=69123,69124&event_type=tractage
+GET /calendar.ics?commune_name=Lyon,Villeurbanne&event_type=tractage
+```
+
+It accepts `country`, `department`, `commune_name`, `insee_commune` and `event_type`. Values
+inside one parameter combine with OR, distinct parameters combine with AND, and
+`commune_name`/`insee_commune` form one commune dimension whose values union. A commune name
+that stays ambiguous without a `department` is rejected with a diagnostic instead of being
+chosen arbitrarily. The calendar covers a configurable window and includes an event when it
+overlaps it.
+
+Each entry carries the standard `LOCATION`, `URL`, `CATEGORIES` and `GEO` properties when the
+event states them, plus `X-ACTIONPOP-*` experimental properties whose set depends on the
+configured metadata level: `off`, `identity`, `standard` (default) or `full`. `standard`
+emits the event identifier, the last update and processing period, the event type, the source
+page and the contributing groups; `full` adds the geographic attachment, its diagnostics and
+the raw source values.
+
+### Shared configuration file
+
+The whole application configuration lives in one YAML document, `config/actionpop.yaml`,
+created from the commented reference `config/actionpop.example.yaml`. The API and the worker
+read the same document, every value has a documented default, and an environment variable
+overrides the matching key without editing the file. Secrets and credential-bearing endpoints
+(`DATABASE_URL`, `REDIS_URL`, `UPSTREAM_BASE_URL`, `UPSTREAM_TOKEN`) stay environment-only.
+
+```bash
+cp config/actionpop.example.yaml config/actionpop.yaml
+CALENDAR_LOOKBACK_DAYS=7 CALENDAR_LOOKAHEAD_DAYS=60 pnpm dev
+```
+
+Invalid values abort startup with a message naming the setting and whether it came from the
+file or the environment. The calendar settings are `enabled`, `lookbackDays`,
+`lookaheadDays`, `maxEntries`, `maxGroupsPerEvent`, `revalidationSeconds`, `metadataLevel` and
+`disabledFamilies`; see `specs/003-icalendar-filtered-feed/contracts/configuration-file.md`
+for the complete table.
+
+The API also serves its own OpenAPI document and an interactive Scalar reference, generated
+from the running service: `GET /openapi.json` and the `/reference` page
+(`http://127.0.0.1:3000/reference` in development). Set `API_REFERENCE=false` to stop
+serving the page. Redis, BullMQ,
 worker responsibilities, and internal health routes stay on the private network.
 Production traffic must terminate HTTPS at the deployment edge.
 

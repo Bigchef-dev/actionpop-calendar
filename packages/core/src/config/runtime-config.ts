@@ -1,5 +1,16 @@
 import { ConfigurationError } from '../operations/errors.js';
-import { AppScopeConfig, LogLevel, QueueScopeConfig, RedisScopeConfig, RootConfig, UpstreamScopeConfig } from './config.interface.js';
+import { readConfiguration } from './config-file.js';
+import {
+  AppScopeConfig,
+  CalendarConfig,
+  LogLevel,
+  QueueScopeConfig,
+  RedisScopeConfig,
+  RootConfig,
+  UpstreamScopeConfig,
+} from './config.interface.js';
+import { DEFAULT_DISPATCHER_INTERVAL_MS } from './defaults.config.js';
+import { findWorkspaceRoot } from './load-env.js';
 
 function parsePositiveInt(val: string | undefined, name: string, fallback: number): number {
   if (!val || val.trim() === '') return fallback;
@@ -10,21 +21,38 @@ function parsePositiveInt(val: string | undefined, name: string, fallback: numbe
   return num;
 }
 
-export function parseAppConfig(env: Record<string, string | undefined>, service: string): AppScopeConfig {
-  if (!service) throw new ConfigurationError('Service name is required');
-
-  const timezone = env.TIMEZONE ?? 'Europe/Paris';
+function parseTimezone(value: string | undefined): string {
+  const timezone = value ?? 'Europe/Paris';
   try {
     Intl.DateTimeFormat(undefined, { timeZone: timezone });
   } catch {
     throw new ConfigurationError(`Invalid timezone: ${timezone}`);
   }
+  return timezone;
+}
+
+export function parseAppConfig(
+  env: Record<string, string | undefined>,
+  service: string,
+  document: {
+    environment?: string | undefined;
+    logLevel?: string | undefined;
+    timezone?: string | undefined;
+  } = {},
+): AppScopeConfig {
+  if (!service) throw new ConfigurationError('Service name is required');
 
   return {
     service,
-    environment: (env.NODE_ENV as AppScopeConfig['environment']) ?? 'development',
-    logLevel: (env.LOG_LEVEL?.toLowerCase() as LogLevel) ?? LogLevel.INFO,
-    timezone,
+    environment:
+      (document.environment as AppScopeConfig['environment']) ??
+      (env.NODE_ENV as AppScopeConfig['environment']) ??
+      'development',
+    logLevel:
+      (document.logLevel?.toLowerCase() as LogLevel) ??
+      (env.LOG_LEVEL?.toLowerCase() as LogLevel) ??
+      LogLevel.INFO,
+    timezone: parseTimezone(document.timezone ?? env.TIMEZONE),
   };
 }
 
@@ -40,15 +68,31 @@ export function parseRedisConfig(env: Record<string, string | undefined>): Redis
   return { url: parsed.toString() };
 }
 
-export function parseQueueConfig(env: Record<string, string | undefined>): QueueScopeConfig {
+export function parseQueueConfig(
+  env: Record<string, string | undefined>,
+  document: {
+    attempts?: number | undefined;
+    backoffMs?: number | undefined;
+    dispatcherIntervalMs?: number | undefined;
+  } = {},
+): QueueScopeConfig {
   return {
-    attempts: parsePositiveInt(env.QUEUE_ATTEMPTS, 'QUEUE_ATTEMPTS', 3),
-    backoffMs: parsePositiveInt(env.QUEUE_BACKOFF_MS, 'QUEUE_BACKOFF_MS', 1000),
-    dispatcherIntervalMs: parsePositiveInt(env.DISPATCHER_INTERVAL_MS, 'DISPATCHER_INTERVAL_MS', 15 * 60 * 1000),
+    attempts: document.attempts ?? parsePositiveInt(env.QUEUE_ATTEMPTS, 'QUEUE_ATTEMPTS', 3),
+    backoffMs:
+      document.backoffMs ?? parsePositiveInt(env.QUEUE_BACKOFF_MS, 'QUEUE_BACKOFF_MS', 1000),
+    dispatcherIntervalMs:
+      document.dispatcherIntervalMs ??
+      parsePositiveInt(
+        env.DISPATCHER_INTERVAL_MS,
+        'DISPATCHER_INTERVAL_MS',
+        DEFAULT_DISPATCHER_INTERVAL_MS,
+      ),
   };
 }
 
-export function parseUpstreamConfig(env: Record<string, string | undefined>): UpstreamScopeConfig | undefined {
+export function parseUpstreamConfig(
+  env: Record<string, string | undefined>,
+): UpstreamScopeConfig | undefined {
   const baseUrl = env.UPSTREAM_BASE_URL?.trim();
   if (!baseUrl) return undefined;
 
@@ -59,14 +103,39 @@ export function parseUpstreamConfig(env: Record<string, string | undefined>): Up
   };
 }
 
+/**
+ * Reads the shared YAML document, overlays environment variables and validates
+ * the merged result. Environment values always win over file values, and the
+ * file is never rewritten.
+ */
+export interface ConfigurationLoadResult {
+  readonly config: RootConfig;
+  readonly warning: string | undefined;
+  readonly path: string | undefined;
+}
+
+export function loadConfiguration(
+  env: Record<string, string | undefined>,
+  service: string,
+  rootDirectory: string = findWorkspaceRoot(process.cwd()) ?? process.cwd(),
+): ConfigurationLoadResult {
+  const { path, warning, parsed } = readConfiguration(env, rootDirectory);
+
+  const config: RootConfig = {
+    app: parseAppConfig(env, service, parsed.app),
+    calendar: parsed.calendar as CalendarConfig,
+    redis: parseRedisConfig(env),
+    queue: parseQueueConfig(env, parsed.queue),
+    upstream: parseUpstreamConfig(env),
+  };
+
+  return { config, warning, path };
+}
+
 export function parseRuntimeConfig(
   env: Record<string, string | undefined>,
   service: string,
+  rootDirectory: string = findWorkspaceRoot(process.cwd()) ?? process.cwd(),
 ): RootConfig {
-  return {
-    app: parseAppConfig(env, service),
-    redis: parseRedisConfig(env),
-    queue: parseQueueConfig(env),
-    upstream: parseUpstreamConfig(env),
-  };
+  return loadConfiguration(env, service, rootDirectory).config;
 }

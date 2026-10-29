@@ -34,7 +34,7 @@ import type { Redis } from 'ioredis';
 
 import { ActionPopulaireClient } from './adapters/action-populaire-client.js';
 import { PostgresGroupCatalogueRepository } from './catalogue/group-catalogue.js';
-import { loadWorkerConfig } from './config.js';
+import { loadWorkerConfiguration } from './config.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
 import { RedisLock } from './dispatcher/lock.js';
 import { collectEventPages } from './ingestion/event-pages.js';
@@ -61,7 +61,7 @@ function toRawLocationFields(event: ActionPopulaireEventPayload): RawLocationFie
   };
 }
 
-function toIncomingEvent(
+export function toIncomingEvent(
   event: ActionPopulaireEventPayload,
   geography: GeographicAttachment,
 ): IncomingEvent {
@@ -69,10 +69,23 @@ function toIncomingEvent(
     event.location === null
       ? null
       : {
-          address1: event.location.address1,
-          city: event.location.city,
-          zip: event.location.zip,
-          coordinates: event.location.coordinates,
+          ...(event.location.name === undefined ? {} : { name: event.location.name }),
+          ...(event.location.address === undefined ? {} : { address: event.location.address }),
+          ...(event.location.address1 === undefined ? {} : { address1: event.location.address1 }),
+          ...(event.location.address2 === null || event.location.address2 === undefined
+            ? {}
+            : { address2: event.location.address2 }),
+          ...(event.location.zip === undefined ? {} : { zip: event.location.zip }),
+          ...(event.location.city === undefined ? {} : { city: event.location.city }),
+          ...(event.location.shortAddress === undefined
+            ? {}
+            : { shortAddress: event.location.shortAddress }),
+          ...(event.location.shortLocation === undefined
+            ? {}
+            : { shortLocation: event.location.shortLocation }),
+          ...(event.location.coordinates === null || event.location.coordinates === undefined
+            ? {}
+            : { coordinates: event.location.coordinates }),
         };
 
   return {
@@ -123,7 +136,7 @@ export interface RefreshGeographicReferenceResultSummary {
 export function createWorkerRuntime(
   env: Record<string, string | undefined> = process.env,
 ): WorkerRuntime {
-  const config = loadWorkerConfig(env);
+  const { config, warning, configurationPath } = loadWorkerConfiguration(env);
   const redis: Redis = createRedisConnection(config.redis.url);
   const databaseUrl = env.DATABASE_URL;
   const postgres = createPostgresClient(databaseUrl ?? 'postgresql://localhost:5432/actionpop');
@@ -143,6 +156,10 @@ export function createWorkerRuntime(
   const publisher = new PostgresSnapshotPublisher(new PostgresCalendarDatasetRepository(postgres));
   const revisions = new SnapshotPublisher();
   const observability = createWorkerObservability(config.app.environment);
+  if (warning !== undefined) observability.logger.warn(warning);
+  observability.logger.info('Configuration resolved', {
+    configurationFile: configurationPath ?? 'defaults',
+  });
   const worker = new Worker(
     QUEUE_NAME,
     async (job: Job<IngestionJobData>) => {

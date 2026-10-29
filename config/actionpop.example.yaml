@@ -1,0 +1,54 @@
+# ActionPop Calendar — shared configuration reference.
+#
+# Copy this file to `config/actionpop.yaml` (git-ignored) or point
+# `APP_CONFIG_FILE` at any copy of it. The API and the worker read the same
+# document, and every value below can be overridden by an environment variable
+# for the matching key (see the comments). Environment values always win and the
+# file is never rewritten.
+#
+# Credentials are deliberately absent: DATABASE_URL, REDIS_URL, UPSTREAM_TOKEN
+# and UPSTREAM_BASE_URL stay environment-only so this document can be reviewed
+# and versioned safely.
+
+app:
+  # NODE_ENV — development | production | test
+  environment: production
+  # LOG_LEVEL — debug | info | warn | error
+  logLevel: info
+  # TIMEZONE — canonical timezone used for window arithmetic
+  timezone: Europe/Paris
+  # PORT — API listening port
+  port: 3000
+
+calendar:
+  # CALENDAR_ENABLED — exposes GET /calendar.ics; false answers 404 on that route only
+  enabled: true
+  # CALENDAR_LOOKBACK_DAYS — window start, whole days before the request instant (>= 0)
+  lookbackDays: 30
+  # CALENDAR_LOOKAHEAD_DAYS — window end, whole days after the request instant (>= 1)
+  lookaheadDays: 90
+  # CALENDAR_MAX_ENTRIES — hard ceiling of VEVENT entries per calendar (>= 1)
+  maxEntries: 1000
+  # CALENDAR_MAX_GROUPS_PER_EVENT — ceiling of X-ACTIONPOP-GROUP per entry (>= 1)
+  maxGroupsPerEvent: 5
+  # CALENDAR_REVALIDATION_SECONDS — Cache-Control max-age (>= 0)
+  revalidationSeconds: 900
+  # CALENDAR_METADATA_LEVEL — off | identity | standard | full
+  #   off       no experimental property
+  #   identity  X-ACTIONPOP-EVENT-ID, UPDATED-AT, PERIOD
+  #   standard  adds EVENT-TYPE, SOURCE-URL, GROUP
+  #   full      adds GEO-STATUS, COUNTRY, DEPARTMENT, INSEE-COMMUNE,
+  #             GEO-REFERENCE, GEO-DIAGNOSTIC-COUNT, GEO-DIAGNOSTIC,
+  #             RAW-DEPARTMENT, RAW-COMMUNE
+  metadataLevel: standard
+  # CALENDAR_DISABLED_FAMILIES — comma-separated families to silence at any level
+  #   identity | classification | provenance | geography | diagnostics | raw_source
+  disabledFamilies: []
+
+queue:
+  # QUEUE_ATTEMPTS — retry limit of an ingestion job (>= 1)
+  attempts: 3
+  # QUEUE_BACKOFF_MS — delay before a retry, in milliseconds (>= 1)
+  backoffMs: 1000
+  # DISPATCHER_INTERVAL_MS — dispatcher period, in milliseconds (>= 1)
+  dispatcherIntervalMs: 900000

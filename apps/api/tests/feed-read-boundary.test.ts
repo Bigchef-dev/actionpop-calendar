@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildServer } from '../src/server.js';
+import { buildApp } from '../src/server.js';
 
 describe('feed read boundary', () => {
   it('only calls the prepared dataset repository', async () => {
@@ -11,7 +11,7 @@ describe('feed read boundary', () => {
       events: [],
     });
     const upstream = vi.fn();
-    const server = await buildServer({ datasetRepository: { getCurrent }, upstream });
+    const server = await buildApp({ datasetRepository: { getCurrent }, upstream });
 
     await server.inject({ method: 'GET', url: '/feed/group-1' });
     expect(getCurrent).toHaveBeenCalledWith('group-1');

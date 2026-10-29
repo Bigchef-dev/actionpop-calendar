@@ -6,7 +6,15 @@ import type { GeographicAttachment } from '../geography/reference-types.js';
 
 export type LocationEvent = Pick<
   ActionPopulaireLocation,
-  'address1' | 'city' | 'zip' | 'coordinates'
+  | 'name'
+  | 'address'
+  | 'address1'
+  | 'address2'
+  | 'zip'
+  | 'city'
+  | 'shortAddress'
+  | 'shortLocation'
+  | 'coordinates'
 >;
 
 export interface IncomingEvent extends Pick<

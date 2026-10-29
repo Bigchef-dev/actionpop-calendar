@@ -12,3 +12,6 @@ Thumbs.db
 .vscode/*
 !.vscode/launch.json
 .idea/
+
+# Runtime configuration copy; the commented example stays tracked.
+config/actionpop.yaml

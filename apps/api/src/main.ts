@@ -4,15 +4,19 @@ import {
   createPostgresClient,
   createRedisConnection,
   describeDependencyFailures,
+  CommuneNameResolver,
+  FilteredCalendarService,
   loadEnvFile,
   PostgresCalendarDatasetRepository,
+  PostgresCalendarEventQuery,
+  PostgresGeographicReferenceRepository,
+  PostgresEventQuery,
   probeRedis,
   runPreflight,
 } from '@actionpop/core';
 import { buildApp } from './server.js';
-import { loadApiConfig } from './config.js';
+import { loadApiConfiguration } from './config.js';
 import { logger } from './logger.js';
-import { apiReference } from '@scalar/nestjs-api-reference';
 
 process.on('uncaughtException', (error: Error) => {
   logger.error({ err: error }, 'Uncaught exception');
@@ -27,12 +31,17 @@ process.on('unhandledRejection', (reason: unknown) => {
 export async function startApi(): Promise<void> {
   loadEnvFile();
   logger.info('Starting API');
-  const config = loadApiConfig();
+  const { config, warning, path } = loadApiConfiguration();
+  if (warning !== undefined) logger.warn(warning);
+  logger.info({ configurationFile: path ?? 'defaults' }, 'Configuration resolved');
   const postgres = createPostgresClient();
-  logger.info({
-    environment: config.app.environment,
-    timezone: config.app.timezone,
-  }, 'API configuration loaded');
+  logger.info(
+    {
+      environment: config.app.environment,
+      timezone: config.app.timezone,
+    },
+    'API configuration loaded',
+  );
 
   const failures = await runPreflight([
     { name: 'redis', probe: () => probeRedis(config.redis.url) },
@@ -60,6 +69,32 @@ export async function startApi(): Promise<void> {
   logger.info('Building API application');
   const app = await buildApp({
     datasetRepository: new PostgresCalendarDatasetRepository(postgres),
+    eventQuery: new PostgresEventQuery(postgres),
+    calendarService: new FilteredCalendarService(
+      new PostgresCalendarEventQuery(postgres),
+      {
+        lookbackDays: config.calendar.lookbackDays,
+        lookaheadDays: config.calendar.lookaheadDays,
+        maxEntries: config.calendar.maxEntries,
+        metadata: {
+          level: config.calendar.metadataLevel,
+          disabledFamilies: config.calendar.disabledFamilies,
+          maxGroupsPerEvent: config.calendar.maxGroupsPerEvent,
+        },
+      },
+      new CommuneNameResolver(new PostgresGeographicReferenceRepository(postgres)),
+    ),
+    calendarSettings: {
+      enabled: config.calendar.enabled,
+      lookbackDays: config.calendar.lookbackDays,
+      lookaheadDays: config.calendar.lookaheadDays,
+      maxEntries: config.calendar.maxEntries,
+      revalidationSeconds: config.calendar.revalidationSeconds,
+      metadataLevel: config.calendar.metadataLevel,
+      disabledFamilies: config.calendar.disabledFamilies,
+      maxGroupsPerEvent: config.calendar.maxGroupsPerEvent,
+    },
+    apiReference: process.env.API_REFERENCE !== 'false',
     health: {
       redis: async () => {
         await redis.ping();
@@ -79,14 +114,6 @@ export async function startApi(): Promise<void> {
   process.once('SIGINT', shutdown);
 
   const port = Number(process.env.PORT ?? 3000);
-
-  app.use(
-    '/reference',
-    apiReference({
-      url: '/openapi.json',
-      withFastify: true,
-    }),
-  )
 
   logger.info({ port }, 'Starting HTTP server');
   await app.listen(port, '0.0.0.0');

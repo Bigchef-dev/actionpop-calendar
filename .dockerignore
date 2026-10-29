@@ -8,3 +8,6 @@ coverage/
 dist/
 build/
 *.tsbuildinfo
+
+# The commented configuration reference must reach the images.
+!config/actionpop.example.yaml

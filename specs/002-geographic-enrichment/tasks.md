@@ -121,7 +121,7 @@ and testable.
 - [x] T027 [US2] Implement the query in `packages/core/src/persistence/postgres-event-query.ts` as `AND` equality predicates on `country_code`, `department_code`, `commune_id` and `event_type`, requiring no reference join and no duplicate suppression
 - [x] T028 [US2] Verify the documented response shape from `contracts/geographic-filter.md` is produced, including `geographicStatus` and `referenceVersion`
 
-**Checkpoint**: User Stories 1 and 2 work independently.
+**Checkpoint**: User Stories 1 and 2 work independently (the HTTP surface of US2 is delivered by Phase 8).
 
 ---
 
@@ -184,6 +184,36 @@ and testable.
 
 ---
 
+## Phase 8: API reference (Scalar) and OpenAPI documentation
+
+**Goal**: Publish the geographic filtering contract as an explorable, always-current API
+reference so an integrator can try the combined criteria (`country`, `department`, `commune`,
+`event_type`) without reading the source.
+
+**Delivered 2026-10-28**: `GET /events` is documented and validated, the Scalar page and the
+OpenAPI document are mounted by `buildApp` (`apps/api/src/server.ts`) behind the
+`apiReference` option (`API_REFERENCE=false` disables the page), and
+`apps/api/tests/api-reference.test.ts` fails when a parameter, its string type or its example
+disappears.
+
+**Independent Test**: Open `/reference`, run a combined query built from the documented
+parameters, and verify that the identifiers are typed as strings (`"01001"`, `"2A"`) and that
+the description states `AND` semantics.
+
+- [x] T051 [US2] Fix the stale import in `apps/api/tests/feed-read-boundary.test.ts` and `apps/api/tests/observability.test.ts` (`buildServer` no longer exists; `apps/api/src/server.ts` exports `buildApp`), which blocks any API-level test
+- [x] T052 [US2] Expose the read-only query route described by `contracts/geographic-filter.md` (`GET /events?country=&department=&commune=&event_type=`) in `apps/api/src/controllers/events.controller.ts`, backed by `PostgresEventQuery`
+- [x] T053 [US2] Validate the incoming query with `parseGeographicFilter` in `apps/api/src/controllers/events.controller.ts` and return `400` with the diagnostics for an unsupported, unknown or malformed parameter
+- [x] T054 [P] [US2] Annotate the route with `@nestjs/swagger` decorators so the document types `country`, `department`, `commune` and `event_type` as `string` with examples `FR`, `"01"`, `"2A"`, `"01001"` and `tractage`, and states the `AND` semantics in the operation description
+- [x] T055 [P] [US2] Document the geographic response schema (see `contracts/geographic-filter.md`: `sourceEventId`, `eventType`, `countryCode`, `departmentCode`, `communeId`, `geographicStatus`, `referenceVersion`) in `apps/api/src/controllers/events.controller.ts`
+- [x] T056 [US2] Register the Scalar reference in `apps/api/src/server.ts` next to the existing `/openapi.json` route, so a server built by `buildApp` exposes both (today `/reference` is only mounted by `apps/api/src/main.ts`), and gate the page behind configuration when a deployment must not expose it
+- [x] T057 [P] [US2] Add contract tests in `apps/api/tests/api-reference.test.ts`: `GET /openapi.json` returns `200` with the geographic parameters typed as strings, and `GET /reference` returns `200`
+- [x] T058 [P] [US2] Complete the reference documentation in `README.md` and `specs/002-geographic-enrichment/quickstart.md` with the delivered parameter list, and confirm the `@scalar/nestjs-api-reference` version stays pinned in `apps/api/package.json`
+
+**Checkpoint**: The geographic contract is explorable in `/reference` and cannot drift from
+the code without failing T057.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -199,6 +229,8 @@ and testable.
 - **US2 (P1)**: depends on Phase 2; independently testable with seeded rows, and only benefits from US1 in production
 - **US3 (P1)**: depends on Phase 2; independent of US1 and US2 (reference writes do not need enrichment)
 - **US4 (P2)**: depends on Phase 2 and refines the ingestion path introduced by T022 in US1
+- **Phase 8 (API reference)**: depends on US2 (T026–T028); T051 blocks T052–T057 because the
+  API test suite currently cannot run
 
 ### Within Each Story
 
@@ -214,6 +246,7 @@ and testable.
 - US2: T024 and T025 in parallel, then T026 → T027 → T028
 - US3: T029–T032 in parallel, then T033, T034, T035, T036, T037, T038 in order, with T039–T041 after activation exists
 - US4: T042 and T043 in parallel, then T044 → T045 → T046
+- Phase 8: T051 → T052 → T053, then T054, T055, T057 and T058 in parallel, with T056 after T054
 
 ---
 
@@ -254,8 +287,10 @@ T020 geographic-enricher.ts → T021 postgres-calendar-repository.ts → T022 ap
 ### Notes
 
 - The migration must not drop or modify `location_record` or `geo_point`
+- Phase 8 is intentionally pending: the Scalar/OpenAPI wiring already runs in `apps/api`, but
+  the geographic contract and its tests are not part of the delivered surface yet
 - Every stage boundary from `plan.md` must have at least one test that asserts the format it emits
-- Total tasks: 50
+- Total tasks: 58 (all delivered)
 
 ---
 
@@ -304,7 +339,10 @@ Decisions taken during implementation, with the artifacts updated accordingly:
 - `npx eslint .`: pass
 - `pnpm --filter @actionpop/core test`: 123 tests pass
 - `pnpm --filter @actionpop/worker test`: 22 tests pass
-- `pnpm test:integration`: 35 pass, 3 skipped
+- `pnpm test:integration`: 38 pass, 3 skipped
+- `pnpm --filter @actionpop/api test`: 10 tests pass (including the 5 API-reference contract tests)
 - `GEOGRAPHIC_PUBLICATION_DATE=2026-10-28 node scripts/geographic-refresh.mjs`: 34 868 communes,
   101 departments, version active
 - `node apps/worker/dist/main.js`: starts and reports `worker started` (health server ready)
+- `GET /openapi.json` and `GET /reference`: `200`; `GET /events?country=FR` returns resolved
+  events; `GET /events?region=84` returns `400` with `filter_parameter_unsupported`

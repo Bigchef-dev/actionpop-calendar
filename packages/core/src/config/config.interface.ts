@@ -1,3 +1,5 @@
+import type { MetadataFamily, MetadataLevel } from '../calendar/metadata-levels.js';
+
 export enum LogLevel {
   INFO = 'info',
   DEBUG = 'debug',
@@ -10,6 +12,17 @@ export interface AppScopeConfig {
   readonly environment: 'development' | 'production' | 'test';
   readonly logLevel: LogLevel;
   readonly timezone: string;
+}
+
+export interface CalendarConfig {
+  readonly enabled: boolean;
+  readonly lookbackDays: number;
+  readonly lookaheadDays: number;
+  readonly maxEntries: number;
+  readonly maxGroupsPerEvent: number;
+  readonly revalidationSeconds: number;
+  readonly metadataLevel: MetadataLevel;
+  readonly disabledFamilies: readonly MetadataFamily[];
 }
 
 export interface RedisScopeConfig {
@@ -29,6 +42,7 @@ export interface UpstreamScopeConfig {
 
 export interface RootConfig {
   readonly app: AppScopeConfig;
+  readonly calendar: CalendarConfig;
   readonly redis: RedisScopeConfig;
   readonly queue: QueueScopeConfig;
   readonly upstream: UpstreamScopeConfig | undefined;

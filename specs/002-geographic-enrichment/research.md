@@ -96,6 +96,14 @@
 
 **Alternatives considered**: Blocking activation until every event is re-enriched increases operational risk and makes rollback harder. Re-fetching source events is rejected because raw location data is retained specifically to support replay.
 
+## Decision: Publish the filter contract through a Scalar page built from the service
+
+**Decision**: Keep `@nestjs/swagger` as the document source (`/openapi.json`, created from the Nest modules in `apps/api/src/server.ts`) and render it with `@scalar/nestjs-api-reference` on `/reference`. The geographic parameters are described with `@nestjs/swagger` decorators on the controller, so the document is generated from the code rather than written by hand, and a contract test asserts that each parameter is still a string with its example.
+
+**Rationale**: The API is already NestJS on Fastify, and both packages are already installed and mounted. Generating the document from the decorated route keeps a single source of truth, and rendering it with Scalar gives an interactive client that can be used to try combined criteria — including identifiers with leading zeroes such as `"01001"` — without writing a query by hand. String typing matters here because a numeric coercion would silently drop leading zeroes, which the specification forbids at every stage.
+
+**Alternatives considered**: Hand-written Markdown would drift from the code and cannot execute a request. Serving only the raw OpenAPI JSON forces the reader to import it elsewhere. `@scalar/fastify-api-reference` would bypass Nest's decorator metadata and require documenting the controllers twice.
+
 ## Decision: Keep the stated country when the reference is unavailable
 
 **Decision**: Classify the country before resolving the reference. When no version is active, publish the event with `geographic_status = unavailable`, keep `countryCode`, `rawDepartmentCode` and `rawCommuneName`, leave commune and department links empty, and emit a `reference_unavailable` error diagnostic.

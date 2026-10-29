@@ -1,6 +1,7 @@
 export * from './commune-csv-parser.js';
 export * from './commune-name-index.js';
 export * from './commune-resolver.js';
+export * from './commune-name-resolver.js';
 export * from './country-classifier.js';
 export * from './department-validator.js';
 export * from './diagnostics.js';

@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 let loaded = false;
 
-function findWorkspaceRoot(start: string): string | undefined {
+export function findWorkspaceRoot(start: string): string | undefined {
   let current = start;
   for (;;) {
     if (existsSync(resolve(current, 'pnpm-workspace.yaml'))) return current;

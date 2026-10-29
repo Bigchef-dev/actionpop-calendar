@@ -1,4 +1,4 @@
-import { hashCalendarContent, nextEventRevision } from '@actionpop/core';
+import { formatCalendarLocation, hashCalendarContent, nextEventRevision } from '@actionpop/core';
 import { PostgresCalendarDatasetRepository } from '@actionpop/core';
 import {
   buildRedisKey,
@@ -9,7 +9,6 @@ import {
   type PublishedEvent,
 } from '@actionpop/core';
 
-
 interface PublishedGroupSnapshotEventIds extends PublishedGroupSnapshot {
   eventIds: string[];
 }
@@ -18,7 +17,11 @@ export class SnapshotPublisher {
   private readonly snapshots = new Map<string, PublishedGroupSnapshotEventIds>();
   private readonly eventsById = new Map<string, PublishedEvent>();
 
-  public async publish(scopeId: string, incoming: IncomingEvent[], complete = true): Promise<{
+  public async publish(
+    scopeId: string,
+    incoming: IncomingEvent[],
+    complete = true,
+  ): Promise<{
     snapshot: PublishedGroupSnapshotEventIds;
     events: PublishedEvent[];
   }> {
@@ -32,12 +35,14 @@ export class SnapshotPublisher {
       const eventId = String(rawEvent.id);
       eventIds.push(eventId);
 
+      const calendarLocation = formatCalendarLocation(rawEvent.location);
       const content = {
         sourceEventId: eventId,
         summary: rawEvent.name,
         startTime: rawEvent.startTime,
         endTime: rawEvent.endTime,
         ...(rawEvent.description !== undefined && { description: rawEvent.description }),
+        ...(calendarLocation !== undefined && { location: calendarLocation }),
       };
 
       const previousEvent = this.eventsById.get(eventId);
@@ -103,9 +108,15 @@ export class RedisSnapshotPublisher {
     for (const event of events) {
       const eventKey = buildRedisKey(this.namespace, 'event', String(event.id));
       const eventCommuneKey = buildRedisKey(this.namespace, 'event', String(event.id), 'commune');
-      const communeKey = event.location?.city === undefined
-        ? ''
-        : buildRedisKey(this.namespace, 'idx', 'commune', normalizeCommuneKey(event.location.city));
+      const communeKey =
+        event.location?.city === undefined
+          ? ''
+          : buildRedisKey(
+              this.namespace,
+              'idx',
+              'commune',
+              normalizeCommuneKey(event.location.city),
+            );
       eventArgs.push(eventKey, JSON.stringify(event), communeKey, eventCommuneKey);
     }
 

@@ -14,7 +14,7 @@ Each stage keeps an explicit representation (raw source payload, validated recor
 
 **Language/Version**: TypeScript on Node.js >=20, strict compiler settings
 
-**Primary Dependencies**: Existing Zod, Prisma, `@prisma/client`, BullMQ (Redis for the job queue only), Fastify, and Vitest; Node.js `fs`/`readline` for local CSV ingestion; no new CSV, geometry, geocoding or caching dependency
+**Primary Dependencies**: Existing Zod, Prisma, `@prisma/client`, BullMQ (Redis for the job queue only), Fastify, `@nestjs/swagger` and `@scalar/nestjs-api-reference` for the generated API reference, and Vitest; Node.js `fs`/`readline` for local CSV ingestion; no new CSV, geometry, geocoding or caching dependency
 
 **Storage**: PostgreSQL as the single source of truth, accessed through Prisma. New tables hold versioned commune and department references plus a reference-version table and the observed event-type registry; `event_record` gains denormalized geographic columns and an `event_type` column. Redis remains the BullMQ transport and stores no event or geographic data
 
@@ -116,6 +116,12 @@ packages/core/src/
 └── infrastructure/
     └── postgres.ts
 
+apps/api/src/
+├── controllers/
+│   ├── calendar.controller.ts
+│   └── events.controller.ts         # pending: documented geographic query route
+└── server.ts                        # OpenAPI document, `/openapi.json`, Scalar `/reference`
+
 apps/worker/src/
 ├── adapters/
 │   └── action-populaire-client.ts
@@ -155,6 +161,9 @@ See [research.md](research.md). All technical-context unknowns are resolved ther
 - [contracts/geographic-filter.md](contracts/geographic-filter.md) defines intersection filtering and duplicate suppression.
 - [contracts/geographic-refresh.md](contracts/geographic-refresh.md) defines operator refresh input, validation diagnostics, staging, and transactional activation.
 - [quickstart.md](quickstart.md) defines runnable unit, integration, and dataset validation scenarios.
+- Phase 8 of [tasks.md](tasks.md) covers the API reference: the Scalar page and the OpenAPI
+  document are already served, but the geographic contract, its string-typed codes and its
+  tests are still pending.
 
 ## Post-Design Constitution Check
 

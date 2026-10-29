@@ -6,6 +6,8 @@ export interface NormalizedCalendarContent {
   startTime: string;
   endTime: string;
   locationId?: string;
+  /** Calendar-visible address, so an address change updates subscribers. */
+  location?: string;
   sourceUrl?: string;
   description?: string;
 }
@@ -24,6 +26,7 @@ function normalizeCalendarContent(content: NormalizedCalendarContent): Normalize
   };
 
   if (content.locationId !== undefined) normalizedContent.locationId = content.locationId;
+  if (content.location !== undefined) normalizedContent.location = content.location;
   if (content.sourceUrl !== undefined) normalizedContent.sourceUrl = content.sourceUrl;
   if (content.description !== undefined) normalizedContent.description = content.description;
 
