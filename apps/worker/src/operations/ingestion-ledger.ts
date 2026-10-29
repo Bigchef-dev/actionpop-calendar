@@ -1,5 +1,5 @@
 import type { IngestionLedgerStatus } from '@actionpop/core';
-import { buildRedisKey, parsePeriodToken } from '@actionpop/core';
+import { buildRedisKey, parsePeriodToken, PostgresGroupRegistry } from '@actionpop/core';
 import type { PrismaClient } from '@prisma/client';
 
 interface LedgerPatch {
@@ -11,6 +11,10 @@ interface LedgerPatch {
 }
 
 type StoredLedger = LedgerPatch & { attempts: number; error?: string };
+
+// Two concurrent transitions can wait on the same scope row under load; the default
+// five-second interactive timeout is too tight for that wait.
+const LEDGER_TRANSACTION_TIMEOUT_MS = 15_000;
 
 export class IngestionLedgerStore {
   private readonly values = new Map<string, StoredLedger>();
@@ -91,10 +95,9 @@ export class PostgresIngestionLedgerStore {
     // idempotently with `createMany({ skipDuplicates })`; an upsert would race and fail
     // on the primary key instead of updating.
     await this.prisma.$transaction(async (transaction) => {
-      await transaction.groupScope.createMany({
-        data: [{ scopeId, active: true }],
-        skipDuplicates: true,
-      });
+      // A job runs for a scope the dispatcher selected, so a missing row is a data
+      // loss rather than a discovery: bootstrap it pending, never active.
+      await new PostgresGroupRegistry(transaction).bootstrapScope(scopeId);
       await transaction.processingPeriod.createMany({
         data: [
           {
@@ -129,7 +132,7 @@ export class PostgresIngestionLedgerStore {
           lastError: error ?? null,
         },
       });
-    });
+    }, { timeout: LEDGER_TRANSACTION_TIMEOUT_MS });
   }
 
   public async get(jobId: string): Promise<StoredLedger | undefined> {

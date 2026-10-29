@@ -1,8 +1,28 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+
 import type { CalendarDataset } from './calendar-dataset-repository.js';
 import type { GeographicAttachment, GeographicStatus } from '../geography/reference-types.js';
 import type { LocationEvent, PublishedEvent } from '../models/event.interface.js';
 import { readDiagnostics } from './diagnostic-json.js';
+import { parsePeriodToken } from '../domain/job-identity.js';
+import { CYCLE_METRICS, cycleMetricSamples } from '../groups/cycle-metrics.js';
+import { normalizeScopeIdentity, toObservedGroups } from '../groups/observed-groups.js';
+import { writeEventAttribution } from './attribution-writer.js';
+import { upsertEventRecord } from './event-record-writer.js';
+import { PostgresCycleMetrics } from './postgres-cycle-metrics.js';
+import { PostgresGroupRegistry } from './postgres-group-registry.js';
+
+const PUBLICATION_TIMEOUT_MS = 60_000;
+
+export interface PublicationSummary {
+  readonly events: number;
+  readonly eventsWithoutGroup: number;
+  readonly attributionsAdded: number;
+  readonly attributionsRemoved: number;
+  readonly discoveredUnlisted: number;
+  readonly reEnabled: number;
+  readonly blankIdentifiers: number;
+}
 
 export class PostgresCalendarDatasetRepository {
   public constructor(private readonly prisma: PrismaClient) {}
@@ -35,44 +55,93 @@ export class PostgresCalendarDatasetRepository {
     };
   }
 
-  public async saveCurrent(dataset: CalendarDataset): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.groupScope.upsert({
-        where: { scopeId: dataset.scopeId },
-        create: { scopeId: dataset.scopeId, active: true },
-        update: {},
-      });
+  /**
+   * Publishes one complete listing: the events, their attribution as the source
+   * states it, the evidence of the observation, and the snapshot, in one
+   * transaction so a reader cannot observe a partially attributed event.
+   */
+  public async saveCurrent(dataset: CalendarDataset): Promise<PublicationSummary> {
+    const periodToken = dataset.periodToken ?? parsePeriodToken(dataset.generatedAt).toISOString();
+    const blankIdentifiers = dataset.events.reduce(
+      (total, event) => total + (event.blankGroupIdentifiers ?? 0),
+      0,
+    );
+    const statedGroups = toObservedGroups(
+      dataset.events.flatMap((event) => [...(event.groups ?? [])]),
+    ).groups;
 
-      for (const event of dataset.events) {
-        const locationId = await this.upsertEventLocation(transaction, event);
-        await transaction.eventRecord.upsert({
-          where: { sourceEventId: event.sourceEventId },
-          create: this.toEventCreate(event, dataset.scopeId, locationId),
-          update: this.toEventUpdate(event, locationId),
-        });
-        await transaction.eventGroupLink.upsert({
-          where: {
-            eventId_scopeId: {
-              eventId: event.sourceEventId,
-              scopeId: dataset.scopeId,
-            },
+    return this.prisma.$transaction(
+      async (transaction): Promise<PublicationSummary> => {
+        const registry = new PostgresGroupRegistry(transaction);
+        // A scope row is never activated here: eligibility belongs to the directory
+        // and to the discovery ceiling, not to publication.
+        await registry.bootstrapScope(dataset.scopeId);
+        const registration = await registry.registerObservedGroups(
+          statedGroups,
+          new Date(dataset.generatedAt),
+        );
+        // Every write below references `group_scope.scope_id`, which keeps the
+        // first-seen spelling; a payload or job may name the same group differently.
+        const scopeIds = await registry.resolveScopeIds([
+          normalizeScopeIdentity(dataset.scopeId),
+          ...statedGroups.map((group) => normalizeScopeIdentity(group.id)),
+        ]);
+        const observingScopeId =
+          scopeIds.get(normalizeScopeIdentity(dataset.scopeId)) ?? dataset.scopeId;
+
+        let added = 0;
+        let removed = 0;
+        let withoutGroup = 0;
+
+        for (const event of dataset.events) {
+          await upsertEventRecord(transaction, event);
+          const attribution = await writeEventAttribution(
+            transaction,
+            event,
+            observingScopeId,
+            periodToken,
+            scopeIds,
+          );
+          added += attribution.added;
+          removed += attribution.removed;
+          withoutGroup += attribution.eventsWithoutGroup;
+        }
+
+        await new PostgresCycleMetrics(transaction).increment(
+          periodToken,
+          cycleMetricSamples({
+            [CYCLE_METRICS.discoveredUnlisted]: registration.discovered.length,
+            [CYCLE_METRICS.reEnabled]: registration.reEnabled.length,
+            [CYCLE_METRICS.blankIdentifier]: blankIdentifiers,
+            [CYCLE_METRICS.eventsWithoutGroup]: withoutGroup,
+            [CYCLE_METRICS.attributionsAdded]: added,
+            [CYCLE_METRICS.attributionsRemoved]: removed,
+          }),
+        );
+
+        await transaction.calendarSnapshot.create({
+          data: {
+            snapshotId: `${observingScopeId}:${dataset.revision}:${Date.now()}`,
+            scopeId: observingScopeId,
+            revision: dataset.revision,
+            generatedAt: new Date(dataset.generatedAt),
+            status: 'complete',
+            eventIds: dataset.events.map((event) => event.sourceEventId),
           },
-          create: { eventId: event.sourceEventId, scopeId: dataset.scopeId },
-          update: {},
         });
-      }
 
-      await transaction.calendarSnapshot.create({
-        data: {
-          snapshotId: `${dataset.scopeId}:${dataset.revision}:${Date.now()}`,
-          scopeId: dataset.scopeId,
-          revision: dataset.revision,
-          generatedAt: new Date(dataset.generatedAt),
-          status: 'complete',
-          eventIds: dataset.events.map((event) => event.sourceEventId),
-        },
-      });
-    });
+        return {
+          events: dataset.events.length,
+          eventsWithoutGroup: withoutGroup,
+          attributionsAdded: added,
+          attributionsRemoved: removed,
+          discoveredUnlisted: registration.discovered.length,
+          reEnabled: registration.reEnabled.length,
+          blankIdentifiers,
+        };
+      },
+      { timeout: PUBLICATION_TIMEOUT_MS },
+    );
   }
 
   private readEventIds(value: unknown): string[] {
@@ -152,106 +221,6 @@ export class PostgresCalendarDatasetRepository {
       ...(event.rawCommuneName === null ? {} : { rawCommuneName: event.rawCommuneName }),
     };
   }
-
-  private toEventCreate(event: PublishedEvent, scopeId: string, locationId: string | null) {
-    return {
-      sourceEventId: event.sourceEventId,
-      locationId,
-      summary: event.name,
-      description: event.description ?? null,
-      startTime: new Date(event.startTime),
-      endTime: new Date(event.endTime),
-      contentHash: event.contentHash,
-      sequence: event.sequence,
-      timezone: 'Europe/Paris',
-      lastSeenPeriod: null,
-      ...this.toGeographyColumns(event),
-      groupLinks: { create: { scopeId } },
-    };
-  }
-
-  private toEventUpdate(event: PublishedEvent, locationId: string | null) {
-    return {
-      locationId,
-      summary: event.name,
-      description: event.description ?? null,
-      startTime: new Date(event.startTime),
-      endTime: new Date(event.endTime),
-      contentHash: event.contentHash,
-      sequence: event.sequence,
-      ...this.toGeographyColumns(event),
-    };
-  }
-
-  /**
-   * Stores the event address under a stable, event-scoped key and returns it, or
-   * null when the source states no location. The address is not part of the event
-   * identity, so re-ingesting the same event updates the same row.
-   */
-  private async upsertEventLocation(
-    transaction: Prisma.TransactionClient,
-    event: PublishedEvent,
-  ): Promise<string | null> {
-    const locationId = `event:${event.sourceEventId}`;
-    const location = event.location;
-    if (location === null) {
-      // The source stopped stating an address: drop the row instead of leaving
-      // an orphan that no event references.
-      await transaction.geoPoint.deleteMany({ where: { locationId } });
-      await transaction.locationRecord.deleteMany({ where: { locationId } });
-      return null;
-    }
-
-    const data = {
-      ownerType: 'EVENT',
-      name: location.name ?? null,
-      address1: location.address1 ?? null,
-      address2: location.address2 ?? null,
-      zip: location.zip ?? null,
-      city: location.city ?? null,
-      fullAddress: location.address ?? null,
-      shortAddress: location.shortAddress ?? location.shortLocation ?? null,
-    };
-
-    await transaction.locationRecord.upsert({
-      where: { locationId },
-      create: { locationId, ...data },
-      update: data,
-    });
-
-    const coordinates = location.coordinates;
-    if (coordinates === undefined || coordinates === null) {
-      await transaction.geoPoint.deleteMany({ where: { locationId } });
-      return locationId;
-    }
-
-    const [longitude, latitude] = coordinates.coordinates;
-    await transaction.geoPoint.upsert({
-      where: { locationId },
-      create: { locationId, type: 'Point', longitude, latitude },
-      update: { type: 'Point', longitude, latitude },
-    });
-
-    return locationId;
-  }
-
-  private toGeographyColumns(event: PublishedEvent) {
-    const geography = event.geography;
-    if (geography === undefined) return {};
-
-    return {
-      referenceVersion: geography.referenceVersion ?? null,
-      geographicStatus: geography.geographicStatus,
-      countryCode: geography.countryCode ?? null,
-      departmentCode: geography.departmentCode ?? null,
-      departmentSource: geography.departmentSource ?? null,
-      rawDepartmentCode: geography.rawDepartmentCode ?? null,
-      rawCommuneName: geography.rawCommuneName ?? null,
-      communeId: geography.communeId ?? null,
-      geographicDiagnostics: toJsonValue(geography.diagnostics),
-      ...(event.eventType === undefined ? {} : { eventType: event.eventType }),
-    };
-  }
 }
 
 function toLocationEvent(location: {
@@ -285,10 +254,4 @@ function toLocationEvent(location: {
           },
         }),
   };
-}
-
-// Prisma's JSON input types require an index signature that domain records do not have;
-// the assertion is a narrow persistence-boundary conversion of already-validated data.
-function toJsonValue(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }

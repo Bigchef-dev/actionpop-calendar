@@ -69,7 +69,8 @@ describe('diagnostics never leak payload content beyond the stated value', () =>
   });
 
   it('reports a malformed type as an error naming the field', async () => {
-    const result = await validateEventType('Type Invalide', {
+    // Labels are slugified, so only a label with no usable character is malformed.
+    const result = await validateEventType('!!!', {
       findEventType: async () => null,
       recordObservedEventTypes: async () => undefined,
     });

@@ -8,6 +8,8 @@ import {
 } from '../calendar/metadata-levels.js';
 import { ConfigurationError } from '../operations/errors.js';
 import {
+  DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
+  DEFAULT_INGESTION_WORKER_CONCURRENCY,
   DEFAULT_CALENDAR_ENABLED,
   DEFAULT_CALENDAR_LOOKAHEAD_DAYS,
   DEFAULT_CALENDAR_LOOKBACK_DAYS,
@@ -50,6 +52,21 @@ const appSchema = z
   })
   .strict();
 
+const ingestionSchema = z
+  .object({
+    maxNewGroupsPerCycle: z
+      .number()
+      .int()
+      .min(1)
+      .default(DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE),
+    workerConcurrency: z
+      .number()
+      .int()
+      .min(1)
+      .default(DEFAULT_INGESTION_WORKER_CONCURRENCY),
+  })
+  .strict();
+
 const queueSchema = z
   .object({
     attempts: z.number().int().min(1).optional(),
@@ -63,6 +80,7 @@ const documentSchema = z
     app: appSchema.optional(),
     calendar: calendarSchema.optional(),
     queue: queueSchema.optional(),
+    ingestion: ingestionSchema.optional(),
   })
   .strict();
 
@@ -88,6 +106,10 @@ export interface ParsedConfigurationDocument {
     readonly backoffMs?: number | undefined;
     readonly dispatcherIntervalMs?: number | undefined;
   };
+  readonly ingestion: {
+    readonly maxNewGroupsPerCycle: number;
+    readonly workerConcurrency: number;
+  };
 }
 
 export function parseConfigurationDocument(
@@ -103,6 +125,7 @@ export function parseConfigurationDocument(
     app: result.data.app ?? {},
     calendar: result.data.calendar ?? calendarSchema.parse({}),
     queue: result.data.queue ?? {},
+    ingestion: result.data.ingestion ?? ingestionSchema.parse({}),
   };
 }
 

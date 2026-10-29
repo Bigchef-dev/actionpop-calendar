@@ -1,9 +1,10 @@
 import { formatCalendarLocation, hashCalendarContent, nextEventRevision } from '@actionpop/core';
-import { PostgresCalendarDatasetRepository } from '@actionpop/core';
+import { PostgresCalendarDatasetRepository, type PublicationSummary } from '@actionpop/core';
 import {
   buildRedisKey,
   normalizeCommuneKey,
   normalizeScopeToken,
+  toObservedGroups,
   type PublishedGroupSnapshot,
   type IncomingEvent,
   type PublishedEvent,
@@ -21,6 +22,7 @@ export class SnapshotPublisher {
     scopeId: string,
     incoming: IncomingEvent[],
     complete = true,
+    periodToken?: string,
   ): Promise<{
     snapshot: PublishedGroupSnapshotEventIds;
     events: PublishedEvent[];
@@ -36,6 +38,7 @@ export class SnapshotPublisher {
       eventIds.push(eventId);
 
       const calendarLocation = formatCalendarLocation(rawEvent.location);
+      const groupIds = toObservedGroups(rawEvent.groups ?? []).groups.map((group) => group.id);
       const content = {
         sourceEventId: eventId,
         summary: rawEvent.name,
@@ -43,6 +46,7 @@ export class SnapshotPublisher {
         endTime: rawEvent.endTime,
         ...(rawEvent.description !== undefined && { description: rawEvent.description }),
         ...(calendarLocation !== undefined && { location: calendarLocation }),
+        ...(groupIds.length > 0 && { groupIds }),
       };
 
       const previousEvent = this.eventsById.get(eventId);
@@ -64,6 +68,7 @@ export class SnapshotPublisher {
       scopeId,
       revision: (previous?.revision ?? 0) + 1,
       generatedAt: new Date().toISOString(),
+      ...(periodToken === undefined ? {} : { periodToken }),
       eventIds,
     };
 
@@ -216,12 +221,13 @@ export class PostgresSnapshotPublisher {
     snapshot: PublishedGroupSnapshotEventIds,
     events: PublishedEvent[],
     complete = true,
-  ): Promise<void> {
+  ): Promise<PublicationSummary> {
     if (!complete) throw new Error('only complete snapshots can be published');
-    await this.repository.saveCurrent({
+    return this.repository.saveCurrent({
       scopeId,
       revision: snapshot.revision,
       generatedAt: snapshot.generatedAt,
+      ...(snapshot.periodToken === undefined ? {} : { periodToken: snapshot.periodToken }),
       events,
       status: 'complete',
     });

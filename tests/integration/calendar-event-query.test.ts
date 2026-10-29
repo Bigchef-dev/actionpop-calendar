@@ -30,6 +30,7 @@ function event(
     departmentCode?: string;
     communeId?: string;
     eventType?: string;
+    groups?: string[];
   } = {},
 ) {
   return {
@@ -42,6 +43,7 @@ function event(
     contentHash: `hash-${sourceEventId}`,
     sequence: 0,
     eventType: options.eventType ?? 'tractage',
+    groups: (options.groups ?? []).map((id) => ({ id })),
     geography: {
       geographicStatus: 'resolved' as const,
       diagnostics: [],
@@ -54,13 +56,14 @@ function event(
 }
 
 describe('PostgresCalendarEventQuery', () => {
-  it('returns one row per event even when several group links match', async () => {
+  it('returns one row per event even when the same event is observed by several listings', async () => {
+    const shared = event('event-shared', { groups: ['group-a', 'group-b', 'group-c'] });
     for (const scopeId of ['group-a', 'group-b', 'group-c']) {
       await repository.saveCurrent({
         scopeId,
         revision: 1,
         generatedAt: '2026-10-15T12:00:00.000Z',
-        events: [event('event-shared')],
+        events: [shared],
         status: 'complete',
       });
     }
@@ -70,6 +73,27 @@ describe('PostgresCalendarEventQuery', () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]?.groupIds).toEqual(['group-a', 'group-b', 'group-c']);
     expect(result.truncated).toBe(false);
+  });
+
+  it('exposes a group once when two listings state the same organizer', async () => {
+    const shared = event('event-shared', { groups: ['group-shared'] });
+    for (const scopeId of ['listing-1', 'listing-2']) {
+      await repository.saveCurrent({
+        scopeId,
+        revision: 1,
+        generatedAt: '2026-10-15T12:00:00.000Z',
+        events: [shared],
+        status: 'complete',
+      });
+    }
+
+    const links = await harness.prisma.eventGroupLink.findMany({
+      where: { eventId: 'event-shared' },
+    });
+    expect(links).toHaveLength(2);
+
+    const result = await query.listCalendarEvents({}, window, 100);
+    expect(result.events[0]?.groupIds).toEqual(['group-shared']);
   });
 
   it('applies the overlap window and keeps identifiers as strings', async () => {

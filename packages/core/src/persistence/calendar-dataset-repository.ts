@@ -16,6 +16,8 @@ export interface CalendarDataset {
   scopeId: string;
   revision: number;
   generatedAt: string;
+  /** Period the observation belongs to; attributed counters are recorded against it. */
+  periodToken?: string;
   events: PublishedEvent[];
   status?: 'complete';
 }

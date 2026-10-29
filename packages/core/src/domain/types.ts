@@ -69,7 +69,8 @@ export type IngestionLedgerStatus =
   | 'publishing'
   | 'succeeded'
   | 'retrying'
-  | 'failed';
+  | 'failed'
+  | 'stopped';
 
 export interface IngestionJob {
   jobId: string;

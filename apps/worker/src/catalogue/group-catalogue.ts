@@ -1,20 +1,13 @@
-import { validateGroupCatalogue, type GroupCatalogueEntry } from '@actionpop/core';
-import { Prisma, type PrismaClient } from '@prisma/client';
+import {
+  normalizeScopeIdentity,
+  PostgresGroupRegistry,
+  synchronizeGroupDirectory,
+  validateGroupCatalogue,
+  type GroupCatalogueEntry,
+} from '@actionpop/core';
+import type { PrismaClient } from '@prisma/client';
 
-const CATALOGUE_UPSERT_CHUNK_SIZE = 500;
-
-function catalogueValues(entries: GroupCatalogueEntry[]): Prisma.Sql {
-  return Prisma.join(entries.map(entry => Prisma.sql`(
-    ${entry.id},
-    ${entry.name},
-    ${entry.is_active},
-    ${entry.type ?? null},
-    ${typeof entry.subtype === 'number' ? entry.subtype : null},
-    ${entry.is_certified ?? null},
-    ${entry.link ?? null},
-    ${entry.filter ?? null}
-  )`));
-}
+const CATALOGUE_SYNC_TIMEOUT_MS = 60_000;
 
 interface RedisValueStore {
   get(key: string): Promise<string | null>;
@@ -48,7 +41,10 @@ export class GroupCatalogueRepository {
 }
 
 export class RedisGroupCatalogueRepository {
-  public constructor(private readonly redis: RedisValueStore, private readonly key = 'actionpop:catalogue:groups') {}
+  public constructor(
+    private readonly redis: RedisValueStore,
+    private readonly key = 'actionpop:catalogue:groups',
+  ) {}
 
   public async synchronize(value: unknown): Promise<void> {
     const entries = validateGroupCatalogue(value);
@@ -81,30 +77,33 @@ export class RedisGroupCatalogueRepository {
 export class PostgresGroupCatalogueRepository {
   public constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * The directory is the source of truth for what the map advertises. A group
+   * listed as active always becomes retrievable, which is also the recovery path
+   * after a systemic unknown-group outage; an inactive one stops being retrieved
+   * while keeping its history.
+   */
   public async synchronize(value: unknown): Promise<void> {
-    const entries = [...new Map(validateGroupCatalogue(value).map(entry => [entry.id, entry])).values()];
-    if (entries.length === 0) return;
+    const entries = [
+      ...new Map(
+        validateGroupCatalogue(value).map((entry) => [normalizeScopeIdentity(entry.id), entry]),
+      ).values(),
+    ];
 
-    await this.prisma.$transaction(async (transaction) => {
-      for (let offset = 0; offset < entries.length; offset += CATALOGUE_UPSERT_CHUNK_SIZE) {
-        const chunk = entries.slice(offset, offset + CATALOGUE_UPSERT_CHUNK_SIZE);
-        await transaction.$executeRaw(Prisma.sql`
-          INSERT INTO "group_scope" (
-            "scope_id", "display_name", "active", "scope_type",
-            "source_subtype", "certified", "source_link", "source_filter"
-          )
-          VALUES ${catalogueValues(chunk)}
-          ON CONFLICT ("scope_id") DO UPDATE SET
-            "display_name" = EXCLUDED."display_name",
-            "active" = EXCLUDED."active",
-            "scope_type" = COALESCE(EXCLUDED."scope_type", "group_scope"."scope_type"),
-            "source_subtype" = EXCLUDED."source_subtype",
-            "certified" = COALESCE(EXCLUDED."certified", "group_scope"."certified"),
-            "source_link" = COALESCE(EXCLUDED."source_link", "group_scope"."source_link"),
-            "source_filter" = COALESCE(EXCLUDED."source_filter", "group_scope"."source_filter")
-        `);
-      }
-    }, { timeout: 60_000 });
+    const stoppedAt = new Date();
+    await this.prisma.$transaction(
+      (transaction) =>
+        synchronizeGroupDirectory(
+          transaction,
+          entries.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            isActive: entry.is_active,
+          })),
+          stoppedAt,
+        ),
+      { timeout: CATALOGUE_SYNC_TIMEOUT_MS },
+    );
   }
 
   public async synchronizePartial(value: unknown): Promise<void> {
@@ -113,29 +112,14 @@ export class PostgresGroupCatalogueRepository {
   }
 
   public async allIds(): Promise<string[]> {
-    const entries = await this.prisma.groupScope.findMany({
-      where: { active: true },
-      select: { scopeId: true },
-    });
-    return entries.map((entry) => entry.scopeId);
+    return this.activeScopes();
   }
 
   public async get(id: string): Promise<GroupCatalogueEntry | undefined> {
-    const entry = await this.prisma.groupScope.findUnique({ where: { scopeId: id } });
-    if (entry === null) return undefined;
-    return {
-      id: entry.scopeId,
-      name: entry.displayName ?? entry.scopeId,
-      is_active: entry.active,
-      ...(entry.scopeType === null ? {} : { type: entry.scopeType }),
-      ...(entry.sourceSubtype === null ? {} : { subtype: entry.sourceSubtype }),
-      ...(entry.certified === null ? {} : { is_certified: entry.certified }),
-      ...(entry.sourceLink === null ? {} : { link: entry.sourceLink }),
-      ...(entry.sourceFilter === null ? {} : { filter: entry.sourceFilter }),
-    };
+    return new PostgresGroupRegistry(this.prisma).findGroup(id);
   }
 
   public async activeScopes(): Promise<string[]> {
-    return this.allIds();
+    return [...(await new PostgresGroupRegistry(this.prisma).activeScopeIds())];
   }
 }

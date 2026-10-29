@@ -4,11 +4,17 @@ classDiagram
     namespace Domain {
         class Scope {
             +UUID scopeId
+            +string scopeKey
             +string displayName
-            +bool active
-            +string scopeType
-            +activate()
-            +deactivate()
+            +MapStatus mapStatus
+            +RetrievalStatus retrievalStatus
+            +Instant firstObservedAt
+            +Instant lastObservedAt
+            +discovered()
+            +listed()
+            +deactivated()
+            +stopped(reason)
+            +promoted()
         }
 
         class ProcessingPeriod {
@@ -26,6 +32,7 @@ classDiagram
             +Instant startTime
             +Instant endTime
             +string summary
+            +GroupAttribution groupAttribution
             +applyRevision(string contentHash)
             +cancel()
         }
@@ -68,6 +75,22 @@ classDiagram
             +int pageSize
             +int retryLimit
             +string publicBaseUrl
+        }
+    }
+
+    namespace Attribution {
+        class Attribution {
+            +UUID scopeId
+            +UUID observedViaScopeId
+            +stated()
+            +reconcile(stated groups)
+        }
+
+        class Observation {
+            +UUID viaScopeId
+            +int statedGroupCount
+            +Instant firstSeenPeriod
+            +Instant lastSeenPeriod
         }
     }
 

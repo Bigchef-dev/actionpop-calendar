@@ -3,117 +3,58 @@ import { fileURLToPath } from 'node:url';
 import {
   buildIngestionJobId,
   checkPostgresHealth,
-  classifyRetry,
   closePostgres,
   closeRedis,
   createPostgresClient,
   createRedisConnection,
   describeDependencyFailures,
-  enrichEventGeography,
-  IncomingEvent,
-  LocationEvent,
   loadEnvFile,
-  probeRedis,
-  runPreflight,
-  type ActionPopulaireEventPayload,
-  type GeographicAttachment,
-  type RawLocationFields,
   PostgresCalendarDatasetRepository,
+  PostgresCycleMetrics,
+  PostgresEventTypeRepository,
   PostgresGeographicReferenceRepository,
   PostgresGeographicReferenceWriter,
-  PostgresEventTypeRepository,
-  validateEventType,
+  PostgresGroupRegistry,
+  probeRedis,
+  runPreflight,
 } from '@actionpop/core';
-import {
-  refreshGeographicReference,
-  type RefreshGeographicReferenceInput,
-} from './geography/reference-refresh.js';
-import { reEnrichEvents } from './geography/re-enrichment.js';
 import { Job, Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 import { ActionPopulaireClient } from './adapters/action-populaire-client.js';
 import { PostgresGroupCatalogueRepository } from './catalogue/group-catalogue.js';
+import { synchronizeDirectory } from './catalogue/directory-sync.js';
 import { loadWorkerConfiguration } from './config.js';
+import {
+  refreshGeographicReference,
+  type RefreshGeographicReferenceInput,
+} from './geography/reference-refresh.js';
+import { reEnrichEvents } from './geography/re-enrichment.js';
+import { reportDispatcherCycle } from './dispatcher/cycle-report.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
+import { queueJobState } from './dispatcher/job-state.js';
 import { RedisLock } from './dispatcher/lock.js';
-import { collectEventPages } from './ingestion/event-pages.js';
+import {
+  processCalendarIngestion,
+  type CalendarIngestionDependencies,
+} from './ingestion/calendar-ingestion-processor.js';
 import { PostgresIngestionLedgerStore } from './operations/ingestion-ledger.js';
+import { reconcileIngestionLedger } from './operations/ledger-reconciliation.js';
 import { createWorkerObservability } from './operations/observability.js';
 import { PostgresSnapshotPublisher, SnapshotPublisher } from './persistence/snapshot-publisher.js';
 import { buildQueueOptions } from './queue/queue.js';
 
+export { toIncomingEvent } from './ingestion/event-mapper.js';
+export { EventTypeValidationError } from './ingestion/calendar-ingestion-processor.js';
+
 const QUEUE_NAME = 'calendar-ingestion';
+
+// Four cycles: nothing legitimate stays in a live status this long.
+const LEDGER_GRACE_MS = 60 * 60 * 1000;
 
 interface IngestionJobData {
   scopeId: string;
   periodStartUtc: string;
-}
-
-function toRawLocationFields(event: ActionPopulaireEventPayload): RawLocationFields {
-  const location = event.location;
-  return {
-    ...(location.country === undefined ? {} : { country: location.country }),
-    ...(location.departement === undefined ? {} : { departement: location.departement }),
-    ...(location.commune?.name === undefined ? {} : { communeName: location.commune.name }),
-    ...(location.city === undefined ? {} : { city: location.city }),
-    ...(location.zip === undefined ? {} : { zip: location.zip }),
-  };
-}
-
-export function toIncomingEvent(
-  event: ActionPopulaireEventPayload,
-  geography: GeographicAttachment,
-): IncomingEvent {
-  const location: LocationEvent | null =
-    event.location === null
-      ? null
-      : {
-          ...(event.location.name === undefined ? {} : { name: event.location.name }),
-          ...(event.location.address === undefined ? {} : { address: event.location.address }),
-          ...(event.location.address1 === undefined ? {} : { address1: event.location.address1 }),
-          ...(event.location.address2 === null || event.location.address2 === undefined
-            ? {}
-            : { address2: event.location.address2 }),
-          ...(event.location.zip === undefined ? {} : { zip: event.location.zip }),
-          ...(event.location.city === undefined ? {} : { city: event.location.city }),
-          ...(event.location.shortAddress === undefined
-            ? {}
-            : { shortAddress: event.location.shortAddress }),
-          ...(event.location.shortLocation === undefined
-            ? {}
-            : { shortLocation: event.location.shortLocation }),
-          ...(event.location.coordinates === null || event.location.coordinates === undefined
-            ? {}
-            : { coordinates: event.location.coordinates }),
-        };
-
-  return {
-    id: event.id,
-    name: event.name,
-    startTime: event.startTime,
-    endTime: event.endTime,
-    ...(event.description === undefined ? {} : { description: event.description }),
-    location,
-    geography,
-    ...(event.subtype?.label === undefined ? {} : { eventType: event.subtype.label }),
-  };
-}
-
-export class EventTypeValidationError extends Error {
-  public constructor(message: string) {
-    super(`event type validation failed: ${message}`);
-    this.name = 'EventTypeValidationError';
-  }
-}
-
-function summarizeGeography(events: IncomingEvent[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const event of events) {
-    const status = event.geography?.geographicStatus ?? 'unavailable';
-    counts[status] = (counts[status] ?? 0) + 1;
-  }
-  return counts;
 }
 
 export interface WorkerRuntime {
@@ -148,6 +89,8 @@ export function createWorkerRuntime(
     ...buildQueueOptions({ attempts: config.queue.attempts, backoffMs: config.queue.backoffMs }),
   });
   const catalogue = new PostgresGroupCatalogueRepository(postgres);
+  const registry = new PostgresGroupRegistry(postgres);
+  const cycleMetrics = new PostgresCycleMetrics(postgres);
   const ledger = new PostgresIngestionLedgerStore(postgres);
   const client = new ActionPopulaireClient({
     baseUrl: config.upstream!.baseUrl,
@@ -160,117 +103,63 @@ export function createWorkerRuntime(
   observability.logger.info('Configuration resolved', {
     configurationFile: configurationPath ?? 'defaults',
   });
+
+  const ingestionDependencies: CalendarIngestionDependencies = {
+    client,
+    ledger,
+    eventTypes,
+    geographicReference,
+    revisions,
+    publisher,
+    groups: registry,
+    metrics: observability.metrics,
+    logger: observability.logger,
+    cycleMetrics,
+  };
+
   const worker = new Worker(
     QUEUE_NAME,
     async (job: Job<IngestionJobData>) => {
-      const startedAt = Date.now();
       const jobId = String(
         job.id ?? buildIngestionJobId(job.data.scopeId, new Date(job.data.periodStartUtc)),
       );
-      await ledger.transition(jobId, {
-        scopeId: job.data.scopeId,
-        periodToken: job.data.periodStartUtc,
-        status: 'running',
-        attempts: job.attemptsMade + 1,
-      });
-      try {
-        const events = await collectEventPages((page, pageSize) =>
-          client.fetchEventPage(job.data.scopeId, page, pageSize),
-        );
-        const enrichedEvents: IncomingEvent[] = [];
-        for (const event of events) {
-          const typeValidation = await validateEventType(event.subtype?.label, eventTypes);
-          const blocking = typeValidation.diagnostics.filter(
-            (diagnostic) => diagnostic.severity === 'error',
-          );
-          if (blocking.length > 0) {
-            throw new EventTypeValidationError(
-              blocking.map((diagnostic) => `${diagnostic.field}: ${diagnostic.message}`).join('; '),
-            );
-          }
-
-          const geography = await enrichEventGeography(
-            toRawLocationFields(event),
-            geographicReference,
-          );
-          enrichedEvents.push(toIncomingEvent(event, geography));
-        }
-        await ledger.transition(jobId, { status: 'publishing', attempts: job.attemptsMade + 1 });
-        const publication = await revisions.publish(job.data.scopeId, enrichedEvents);
-        await publisher.publish(job.data.scopeId, publication.snapshot, publication.events);
-        await ledger.transition(jobId, { status: 'succeeded', attempts: job.attemptsMade + 1 });
-        observability.metrics.increment('actionpop_jobs_completed_total', { outcome: 'success' });
-        observability.metrics.increment(
-          'actionpop_job_duration_seconds',
-          { outcome: 'success' },
-          (Date.now() - startedAt) / 1000,
-        );
-        observability.metrics.setGauge(
-          'actionpop_ingestion_last_success_timestamp',
-          {},
-          Math.floor(Date.now() / 1000),
-        );
-        observability.logger.info('ingestion completed', {
+      await processCalendarIngestion(
+        {
           jobId,
           scopeId: job.data.scopeId,
-          operation: 'ingestion',
-          outcome: 'success',
-          durationMs: Date.now() - startedAt,
-          geography: summarizeGeography(enrichedEvents),
-        });
-      } catch (error) {
-        const retryDecision = classifyRetry(error);
-        const retryable =
-          retryDecision.retryable &&
-          job.attemptsMade + 1 < (job.opts.attempts ?? config.queue.attempts);
-        await ledger.transition(jobId, {
-          status: retryable ? 'retrying' : 'failed',
-          attempts: job.attemptsMade + 1,
-          error: error instanceof Error ? error.message : 'ingestion failed',
-        });
-        observability.metrics.increment('actionpop_jobs_failed_total', {
-          outcome: 'failure',
-          reason: retryDecision.reason,
-        });
-        observability.metrics.increment(
-          'actionpop_job_duration_seconds',
-          { outcome: 'failure' },
-          (Date.now() - startedAt) / 1000,
-        );
-        if (retryDecision.retryable) {
-          observability.metrics.increment('actionpop_upstream_failures_total', {
-            reason: retryDecision.reason,
-          });
-        }
-        if (!retryable) {
-          observability.metrics.increment('actionpop_jobs_exhausted_total', {
-            reason: retryDecision.reason,
-          });
-        } else {
-          observability.metrics.increment('actionpop_jobs_retried_total', {
-            reason: retryDecision.reason,
-          });
-        }
-        observability.logger.error('ingestion failed', {
-          jobId,
-          scopeId: job.data.scopeId,
-          operation: 'ingestion',
-          outcome: 'failure',
-          durationMs: Date.now() - startedAt,
-          failure: error instanceof Error ? error.message : 'ingestion failed',
-        });
-        throw error;
-      }
+          periodToken: job.data.periodStartUtc,
+          attemptsMade: job.attemptsMade,
+          maxAttempts: job.opts.attempts ?? config.queue.attempts,
+        },
+        ingestionDependencies,
+      );
     },
-    { connection: redis, concurrency: 4 },
+    { connection: redis, concurrency: config.ingestion.workerConcurrency },
   );
+
   const lock = new RedisLock(redis, 'actionpop:lock:dispatcher');
   const dispatcher = createDispatcher({
     catalogue,
     queue,
     lock,
     intervalMs: config.queue.dispatcherIntervalMs,
-    isScheduled: (jobId) => ledger.isScheduled(jobId),
+    promotion: registry,
+    maxNewGroupsPerCycle: config.ingestion.maxNewGroupsPerCycle,
+    scheduledThisPeriod: async (periodToken) =>
+      (await cycleMetrics.read(periodToken))?.metrics['groups.scheduled'] ?? 0,
+    isHandled: async (jobId) => {
+      const stored = await ledger.get(jobId);
+      if (stored === undefined) return false;
+      if (
+        stored.status === 'succeeded' ||
+        stored.status === 'failed' ||
+        stored.status === 'stopped'
+      ) {
+        return true;
+      }
+      // A live ledger status only counts while the queue still owns the job.
+      return (await queueJobState(queue, jobId)).kind !== 'missing';
+    },
     onScheduled: (jobId, scopeId, periodToken) =>
       ledger.transition(jobId, {
         scopeId,
@@ -278,7 +167,15 @@ export function createWorkerRuntime(
         status: 'scheduled',
         attempts: 0,
       }),
+    onCycle: (cycle) =>
+      reportDispatcherCycle(cycle, {
+        registry,
+        cycleMetrics,
+        metrics: observability.metrics,
+        logger: observability.logger,
+      }),
   });
+
   let timer: NodeJS.Timeout | undefined;
   let healthServer: Server | undefined;
   const readiness = async (): Promise<boolean> =>
@@ -392,14 +289,37 @@ export function createWorkerRuntime(
         outcome: 'redis_ready',
       });
 
-      const catalogueData = await client.fetchGroupCatalogue();
-
-      await catalogue.synchronize(catalogueData);
-      await dispatcher.runOnce();
-      timer = setInterval(async () => {
-        await catalogue.synchronize(await client.fetchGroupCatalogue());
+      const runCycle = async () => {
+        // An unavailable map directory must not stop the cycle: the listings that can
+        // still be retrieved are dispatched even when the directory cannot be read.
+        const directory = await synchronizeDirectory(
+          () => client.fetchGroupCatalogue(),
+          (value) => catalogue.synchronize(value),
+        );
+        if (!directory.synced) {
+          observability.logger.warn('map directory unavailable', {
+            operation: 'catalogue-sync',
+            outcome: 'skipped',
+            ...(directory.failure === undefined ? {} : { failure: directory.failure }),
+          });
+        }
+        const reconciled = await reconcileIngestionLedger(
+          postgres,
+          queue,
+          new Date(Date.now() - LEDGER_GRACE_MS),
+        );
+        if (reconciled.succeeded + reconciled.failed > 0) {
+          observability.logger.warn('ingestion ledger reconciled', {
+            operation: 'ingestion-ledger',
+            outcome: 'reconciled',
+            ...reconciled,
+          });
+        }
         await dispatcher.runOnce();
-      }, dispatcher.intervalMs);
+      };
+
+      await runCycle();
+      timer = setInterval(runCycle, dispatcher.intervalMs);
       observability.logger.info('worker started', {
         operation: 'startup',
         outcome: 'ready',

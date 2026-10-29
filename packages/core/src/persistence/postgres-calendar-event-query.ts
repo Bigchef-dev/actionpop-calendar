@@ -129,6 +129,8 @@ function toCalendarEvent(row: EventRow): CalendarEvent {
       geoPoint === null
         ? null
         : { latitude: geoPoint.latitude.toString(), longitude: geoPoint.longitude.toString() },
-    groupIds: row.groupLinks.map((link) => link.scopeId).sort(),
+    // The link key includes the observing listing, so one event can reference the
+    // same organizer through several observations; the calendar exposes it once.
+    groupIds: [...new Set(row.groupLinks.map((link) => link.scopeId))].sort(),
   };
 }

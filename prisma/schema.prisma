@@ -8,35 +8,47 @@ datasource db {
 }
 
 model GroupScope {
-  scopeId       String          @id @map("scope_id")
-  displayName   String?         @map("display_name")
-  active        Boolean         @default(true)
-  scopeType     String?         @map("scope_type")
-  sourceSubtype Int?            @map("source_subtype")
-  certified     Boolean?
-  sourceLink    String?         @map("source_link")
-  sourceFilter  String?         @map("source_filter")
-  locationId    String?         @map("location_id")
-  location      LocationRecord? @relation(fields: [locationId], references: [locationId])
-  eventLinks    EventGroupLink[]
-  subscriptions Subscription[]
-  snapshots     CalendarSnapshot[]
-  ledgers        IngestionLedger[]
+  scopeId         String             @id @map("scope_id")
+  scopeKey        String             @unique @map("scope_key")
+  displayName     String?            @map("display_name")
+  discoverySource String             @default("directory") @map("discovery_source")
+  mapStatus       String             @default("unlisted") @map("map_status")
+  retrievalStatus String             @default("pending") @map("retrieval_status")
+  firstObservedAt DateTime?          @map("first_observed_at")
+  lastObservedAt  DateTime?          @map("last_observed_at")
+  stoppedAt       DateTime?          @map("stopped_at")
+  stoppedReason   String?            @map("stopped_reason")
+  scopeType       String?            @map("scope_type")
+  sourceSubtype   Int?               @map("source_subtype")
+  certified       Boolean?
+  sourceLink      String?            @map("source_link")
+  sourceFilter    String?            @map("source_filter")
+  locationId      String?            @map("location_id")
+  location        LocationRecord?    @relation(fields: [locationId], references: [locationId])
+  attributions    EventGroupLink[]   @relation("GroupAttribution")
+  observedVia     EventGroupLink[]   @relation("GroupAttributionSource")
+  observations    EventObservation[] @relation("ObservationSource")
+  subscriptions   Subscription[]
+  snapshots       CalendarSnapshot[]
+  ledgers         IngestionLedger[]
 
+  @@index([retrievalStatus])
+  @@index([mapStatus])
+  @@index([firstObservedAt])
   @@map("group_scope")
 }
 
 model LocationRecord {
-  locationId   String       @id @map("location_id")
-  ownerType    String?      @map("owner_type")
+  locationId   String        @id @map("location_id")
+  ownerType    String?       @map("owner_type")
   name         String?
   address1     String?
   address2     String?
   zip          String?
   city         String?
-  fullAddress  String?      @map("full_address")
-  shortAddress String?      @map("short_address")
-  staticMapUrl String?      @map("static_map_url")
+  fullAddress  String?       @map("full_address")
+  shortAddress String?       @map("short_address")
+  staticMapUrl String?       @map("static_map_url")
   geoPoint     GeoPoint?
   groups       GroupScope[]
   events       EventRecord[]
@@ -55,35 +67,38 @@ model GeoPoint {
 }
 
 model EventRecord {
-  sourceEventId String          @id @map("source_event_id")
-  contentHash   String?         @map("content_hash")
-  sequence      Int             @default(0)
-  status        String          @default("ACTIVE")
-  startTime     DateTime        @map("start_time")
-  endTime       DateTime        @map("end_time")
-  summary       String
-  description   String?
-  timezone      String          @default("Europe/Paris")
-  sourceUrl     String?         @map("source_url")
-  locationId    String?         @map("location_id")
-  lastSeenPeriod String?        @map("last_seen_period")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  referenceVersion       String? @map("reference_version")
-  geographicStatus       String? @map("geographic_status")
-  countryCode            String? @map("country_code")
-  departmentCode         String? @map("department_code")
-  departmentSource       String? @map("department_source")
-  rawDepartmentCode      String? @map("raw_department_code")
-  rawCommuneName         String? @map("raw_commune_name")
-  communeId              String? @map("commune_id")
-  geographicDiagnostics  Json?   @map("geographic_diagnostics")
-  eventType              String? @map("event_type")
-  location      LocationRecord? @relation(fields: [locationId], references: [locationId])
-  period        ProcessingPeriod? @relation(fields: [lastSeenPeriod], references: [periodToken])
-  groupLinks    EventGroupLink[]
-  subscriptions Subscription[]
+  sourceEventId         String             @id @map("source_event_id")
+  contentHash           String?            @map("content_hash")
+  sequence              Int                @default(0)
+  status                String             @default("ACTIVE")
+  startTime             DateTime           @map("start_time")
+  endTime               DateTime           @map("end_time")
+  summary               String
+  description           String?
+  timezone              String             @default("Europe/Paris")
+  sourceUrl             String?            @map("source_url")
+  locationId            String?            @map("location_id")
+  lastSeenPeriod        String?            @map("last_seen_period")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  referenceVersion      String?            @map("reference_version")
+  geographicStatus      String?            @map("geographic_status")
+  countryCode           String?            @map("country_code")
+  departmentCode        String?            @map("department_code")
+  departmentSource      String?            @map("department_source")
+  rawDepartmentCode     String?            @map("raw_department_code")
+  rawCommuneName        String?            @map("raw_commune_name")
+  communeId             String?            @map("commune_id")
+  geographicDiagnostics Json?              @map("geographic_diagnostics")
+  eventType             String?            @map("event_type")
+  groupAttribution      String             @default("unknown") @map("group_attribution")
+  location              LocationRecord?    @relation(fields: [locationId], references: [locationId])
+  period                ProcessingPeriod?  @relation(fields: [lastSeenPeriod], references: [periodToken])
+  groupLinks            EventGroupLink[]
+  observations          EventObservation[]
+  subscriptions         Subscription[]
 
   @@index([countryCode])
+  @@index([groupAttribution])
   @@index([departmentCode])
   @@index([communeId])
   @@index([referenceVersion])
@@ -92,22 +107,39 @@ model EventRecord {
 }
 
 model EventGroupLink {
-  eventId String      @map("event_id")
-  scopeId String      @map("scope_id")
-  event   EventRecord @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
-  group   GroupScope  @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  eventId            String      @map("event_id")
+  scopeId            String      @map("scope_id")
+  observedViaScopeId String      @map("observed_via_scope_id")
+  event              EventRecord @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
+  group              GroupScope  @relation("GroupAttribution", fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  observedVia        GroupScope  @relation("GroupAttributionSource", fields: [observedViaScopeId], references: [scopeId], onDelete: Cascade)
 
-  @@id([eventId, scopeId])
+  @@id([eventId, scopeId, observedViaScopeId])
+  @@index([scopeId])
   @@map("event_group_link")
 }
 
+model EventObservation {
+  eventId          String      @map("event_id")
+  viaScopeId       String      @map("via_scope_id")
+  statedGroupCount Int         @map("stated_group_count")
+  firstSeenPeriod  String      @map("first_seen_period")
+  lastSeenPeriod   String      @map("last_seen_period")
+  event            EventRecord @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
+  viaScope         GroupScope  @relation("ObservationSource", fields: [viaScopeId], references: [scopeId], onDelete: Cascade)
+
+  @@id([eventId, viaScopeId])
+  @@index([lastSeenPeriod])
+  @@map("event_observation")
+}
+
 model Subscription {
-  id        String      @id
-  scopeId   String      @map("scope_id")
-  eventId   String?     @map("event_id")
-  userId    String?     @map("user_id")
-  createdAt DateTime    @default(now()) @map("created_at")
-  group     GroupScope  @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  id        String       @id
+  scopeId   String       @map("scope_id")
+  eventId   String?      @map("event_id")
+  userId    String?      @map("user_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  group     GroupScope   @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
   event     EventRecord? @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
 
   @@index([scopeId])
@@ -116,27 +148,38 @@ model Subscription {
 }
 
 model ProcessingPeriod {
-  periodToken    String        @id @map("period_token")
-  periodStartUtc DateTime      @map("period_start_utc")
-  periodEndUtc   DateTime      @map("period_end_utc")
+  periodToken    String                 @id @map("period_token")
+  periodStartUtc DateTime               @map("period_start_utc")
+  periodEndUtc   DateTime               @map("period_end_utc")
   events         EventRecord[]
   ledgers        IngestionLedger[]
+  metrics        IngestionCycleMetric[]
 
   @@map("processing_period")
 }
 
+model IngestionCycleMetric {
+  periodToken String           @map("period_token")
+  metric      String
+  value       Int              @default(0)
+  period      ProcessingPeriod @relation(fields: [periodToken], references: [periodToken], onDelete: Cascade)
+
+  @@id([periodToken, metric])
+  @@map("ingestion_cycle_metric")
+}
+
 model IngestionLedger {
-  jobId          String          @id @map("job_id")
-  scopeId        String          @map("scope_id")
-  periodToken    String          @map("period_token")
-  status         String
-  attempts       Int             @default(0)
-  lastError      String?         @map("last_error")
-  workerId       String?         @map("worker_id")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  group          GroupScope      @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
-  period         ProcessingPeriod @relation(fields: [periodToken], references: [periodToken], onDelete: Cascade)
+  jobId       String           @id @map("job_id")
+  scopeId     String           @map("scope_id")
+  periodToken String           @map("period_token")
+  status      String
+  attempts    Int              @default(0)
+  lastError   String?          @map("last_error")
+  workerId    String?          @map("worker_id")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  group       GroupScope       @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  period      ProcessingPeriod @relation(fields: [periodToken], references: [periodToken], onDelete: Cascade)
 
   @@unique([scopeId, periodToken])
   @@map("ingestion_ledger")
@@ -164,16 +207,16 @@ model EventTypeReference {
 }
 
 model GeographicReferenceVersion {
-  version          String   @id
-  status           String   @default("staged")
+  version          String                @id
+  status           String                @default("staged")
   source           String
-  publicationDate  String   @map("publication_date")
-  ingestedAt       DateTime @map("ingested_at")
+  publicationDate  String                @map("publication_date")
+  ingestedAt       DateTime              @map("ingested_at")
   license          String
-  communeCount     Int      @default(0) @map("commune_count")
-  departmentCount  Int      @default(0) @map("department_count")
+  communeCount     Int                   @default(0) @map("commune_count")
+  departmentCount  Int                   @default(0) @map("department_count")
   checksum         String
-  validationErrors Json?    @map("validation_errors")
+  validationErrors Json?                 @map("validation_errors")
   departments      DepartmentReference[]
   communes         CommuneReference[]
 
@@ -181,10 +224,10 @@ model GeographicReferenceVersion {
 }
 
 model DepartmentReference {
-  versionId    String                    @map("version_id")
+  versionId    String                     @map("version_id")
   code         String
   name         String
-  communeCount Int                       @default(0) @map("commune_count")
+  communeCount Int                        @default(0) @map("commune_count")
   version      GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
   communes     CommuneReference[]
 
@@ -193,15 +236,15 @@ model DepartmentReference {
 }
 
 model CommuneReference {
-  versionId                 String                    @map("version_id")
-  inseeCode                 String                    @map("insee_code")
+  versionId                 String                     @map("version_id")
+  inseeCode                 String                     @map("insee_code")
   name                      String
-  normalizedName            String                    @map("normalized_name")
-  pronounFreeNormalizedName String                    @map("pronoun_free_normalized_name")
-  postalCodes               String[]                  @map("postal_codes")
-  departmentCode            String                    @map("department_code")
+  normalizedName            String                     @map("normalized_name")
+  pronounFreeNormalizedName String                     @map("pronoun_free_normalized_name")
+  postalCodes               String[]                   @map("postal_codes")
+  departmentCode            String                     @map("department_code")
   version                   GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
-  department                DepartmentReference       @relation(fields: [versionId, departmentCode], references: [versionId, code], onDelete: Cascade)
+  department                DepartmentReference        @relation(fields: [versionId, departmentCode], references: [versionId, code], onDelete: Cascade)
 
   @@id([versionId, inseeCode])
   @@index([versionId, normalizedName])

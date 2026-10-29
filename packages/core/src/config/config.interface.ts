@@ -35,6 +35,12 @@ export interface QueueScopeConfig {
   readonly dispatcherIntervalMs: number;
 }
 
+export interface IngestionScopeConfig {
+  readonly maxNewGroupsPerCycle: number;
+  /** Concurrent group retrievals per worker process. */
+  readonly workerConcurrency: number;
+}
+
 export interface UpstreamScopeConfig {
   readonly baseUrl: string;
   readonly token?: string | undefined;
@@ -45,5 +51,6 @@ export interface RootConfig {
   readonly calendar: CalendarConfig;
   readonly redis: RedisScopeConfig;
   readonly queue: QueueScopeConfig;
+  readonly ingestion: IngestionScopeConfig;
   readonly upstream: UpstreamScopeConfig | undefined;
 }

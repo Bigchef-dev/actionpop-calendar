@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PostgresIngestionLedgerStore } from '../../apps/worker/src/operations/ingestion-ledger.js';
+import { reconcileIngestionLedger } from '../../apps/worker/src/operations/ledger-reconciliation.js';
 import { startIntegrationPostgres } from './postgres-setup.js';
 
 const harness = await startIntegrationPostgres({ schema: 'test_ingestion_ledger' });
@@ -114,5 +115,85 @@ describe('PostgresIngestionLedgerStore concurrency', () => {
     expect(row?.status).toBe('succeeded');
     expect(row?.attempts).toBe(1);
     expect(await harness.prisma.processingPeriod.count()).toBe(1);
+  });
+});
+
+
+describe('ingestion ledger reconciliation', () => {
+  const cutoff = new Date('2026-10-29T10:00:00.000Z');
+
+  async function seed(jobId: string, status: string, updatedAt: string) {
+    await ledger.transition(jobId, {
+      scopeId: `scope-${jobId}`,
+      periodToken: '20261029T091500Z',
+      status: status as never,
+    });
+    await harness.prisma.ingestionLedger.update({
+      where: { jobId },
+      data: { updatedAt: new Date(updatedAt) },
+    });
+  }
+
+  function queueWith(states: Record<string, string | undefined>) {
+    return {
+      getJob: async (jobId: string) => {
+        const state = states[jobId];
+        return state === undefined ? undefined : { getState: async () => state };
+      },
+    };
+  }
+
+  it('aligns every stale row with what the queue actually recorded', async () => {
+    await seed('job-completed', 'scheduled', '2026-10-29T08:00:00.000Z');
+    await seed('job-lost', 'running', '2026-10-29T08:05:00.000Z');
+    await seed('job-still-live', 'scheduled', '2026-10-29T08:10:00.000Z');
+    await seed('job-recent', 'scheduled', '2026-10-29T10:05:00.000Z');
+    await seed('job-done', 'succeeded', '2026-10-29T08:00:00.000Z');
+
+    const reconciled = await reconcileIngestionLedger(
+      harness.prisma,
+      queueWith({ 'job-completed': 'completed', 'job-still-live': 'active' }),
+      cutoff,
+    );
+
+    expect(reconciled).toEqual({ succeeded: 1, failed: 1 });
+
+    const rows = await harness.prisma.ingestionLedger.findMany({ orderBy: { jobId: 'asc' } });
+    expect(rows.map((row) => [row.jobId, row.status])).toEqual([
+      ['job-completed', 'succeeded'],
+      ['job-done', 'succeeded'],
+      ['job-lost', 'failed'],
+      ['job-recent', 'scheduled'],
+      ['job-still-live', 'scheduled'],
+    ]);
+    expect(rows.find((row) => row.jobId === 'job-lost')?.lastError).toContain('abandoned');
+  });
+
+  it('records the reason the queue reported for a failed job', async () => {
+    await seed('job-throttled', 'retrying', '2026-10-29T08:00:00.000Z');
+
+    await reconcileIngestionLedger(
+      harness.prisma,
+      { getJob: async () => ({ getState: async () => 'failed', failedReason: 'Upstream HTTP 429' }) },
+      cutoff,
+    );
+
+    const row = await harness.prisma.ingestionLedger.findUnique({ where: { jobId: 'job-throttled' } });
+    expect(row?.status).toBe('failed');
+    expect(row?.lastError).toBe('Upstream HTTP 429');
+  });
+
+  it('is idempotent', async () => {
+    await seed('job-lost', 'scheduled', '2026-10-29T08:00:00.000Z');
+    const queue = queueWith({});
+
+    expect(await reconcileIngestionLedger(harness.prisma, queue, cutoff)).toEqual({
+      succeeded: 0,
+      failed: 1,
+    });
+    expect(await reconcileIngestionLedger(harness.prisma, queue, cutoff)).toEqual({
+      succeeded: 0,
+      failed: 0,
+    });
   });
 });

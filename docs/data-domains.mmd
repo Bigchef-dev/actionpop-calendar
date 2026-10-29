@@ -3,6 +3,7 @@ flowchart TB
         PROCESSING_PERIOD["PROCESSING_PERIOD"]
         INGESTION_JOB["INGESTION_JOB"]
         INGESTION_LEDGER["INGESTION_LEDGER"]
+        INGESTION_CYCLE_METRIC["INGESTION_CYCLE_METRIC"]
     end
 
     subgraph Validated ["2. Données récupérées, validées et actives"]
@@ -10,6 +11,8 @@ flowchart TB
         EVENT_RECORD["EVENT_RECORD"]
         LOCATION_RECORD["LOCATION_RECORD"]
         GEO_POINT["GEO_POINT"]
+        EVENT_GROUP_LINK["EVENT_GROUP_LINK<br/>attribution + observed-via"]
+        EVENT_OBSERVATION["EVENT_OBSERVATION<br/>evidence of one listing"]
     end
 
     subgraph Business ["3. Surmétier - hors périmètre actuel"]

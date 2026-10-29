@@ -183,6 +183,32 @@ describe('configuration file', () => {
     ).toThrow(ConfigurationError);
   });
 
+  it('lets the environment override the ingestion ceiling declared in the file', () => {
+    const directory = workspace({ 'app.yaml': 'ingestion:\n  maxNewGroupsPerCycle: 50\n' });
+
+    const fromFile = loadConfiguration({ ...BASE_ENV, APP_CONFIG_FILE: 'app.yaml' }, 'worker', directory);
+    expect(fromFile.config.ingestion.maxNewGroupsPerCycle).toBe(50);
+
+    const overridden = loadConfiguration(
+      { ...BASE_ENV, APP_CONFIG_FILE: 'app.yaml', INGESTION_MAX_NEW_GROUPS_PER_CYCLE: '75' },
+      'worker',
+      directory,
+    );
+    expect(overridden.config.ingestion.maxNewGroupsPerCycle).toBe(75);
+  });
+
+  it('reports an invalid ingestion ceiling with the variable that produced it', () => {
+    const directory = workspace({ 'app.yaml': 'ingestion:\n  maxNewGroupsPerCycle: 10\n' });
+
+    expect(() =>
+      loadConfiguration(
+        { ...BASE_ENV, APP_CONFIG_FILE: 'app.yaml', INGESTION_MAX_NEW_GROUPS_PER_CYCLE: '0' },
+        'worker',
+        directory,
+      ),
+    ).toThrow(/INGESTION_MAX_NEW_GROUPS_PER_CYCLE/);
+  });
+
   it('gives the API and the worker the same calendar settings from one document', () => {
     const directory = workspace({
       'config/actionpop.yaml': 'calendar:\n  maxEntries: 42\n  metadataLevel: full\n',

@@ -22,7 +22,7 @@ describe('dispatcher', () => {
     const dispatcher = createDispatcher({
       catalogue: { activeScopes: () => ['group-1', 'group-2'] },
       queue: { add: async (_name, _data, options) => { jobs.push(options.jobId); } },
-      isScheduled: async (jobId) => jobs.includes(jobId),
+      isHandled: async (jobId: string) => jobs.includes(jobId),
       lock: new RedisLock(new Store(), 'dispatcher-lock'),
       now: () => new Date('2026-09-30T12:07:00Z'),
     });

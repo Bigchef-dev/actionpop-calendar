@@ -10,6 +10,8 @@ export interface NormalizedCalendarContent {
   location?: string;
   sourceUrl?: string;
   description?: string;
+  /** Stated organizer identifiers, so an organizer change bumps the revision. */
+  groupIds?: string[];
 }
 
 export interface EventRevision extends NormalizedCalendarContent {
@@ -29,6 +31,9 @@ function normalizeCalendarContent(content: NormalizedCalendarContent): Normalize
   if (content.location !== undefined) normalizedContent.location = content.location;
   if (content.sourceUrl !== undefined) normalizedContent.sourceUrl = content.sourceUrl;
   if (content.description !== undefined) normalizedContent.description = content.description;
+  if (content.groupIds !== undefined && content.groupIds.length > 0) {
+    normalizedContent.groupIds = [...content.groupIds].sort();
+  }
 
   return normalizedContent;
 }

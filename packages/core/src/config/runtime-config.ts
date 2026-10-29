@@ -3,13 +3,18 @@ import { readConfiguration } from './config-file.js';
 import {
   AppScopeConfig,
   CalendarConfig,
+  IngestionScopeConfig,
   LogLevel,
   QueueScopeConfig,
   RedisScopeConfig,
   RootConfig,
   UpstreamScopeConfig,
 } from './config.interface.js';
-import { DEFAULT_DISPATCHER_INTERVAL_MS } from './defaults.config.js';
+import {
+  DEFAULT_DISPATCHER_INTERVAL_MS,
+  DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
+  DEFAULT_INGESTION_WORKER_CONCURRENCY,
+} from './defaults.config.js';
 import { findWorkspaceRoot } from './load-env.js';
 
 function parsePositiveInt(val: string | undefined, name: string, fallback: number): number {
@@ -90,6 +95,31 @@ export function parseQueueConfig(
   };
 }
 
+export function parseIngestionConfig(
+  env: Record<string, string | undefined>,
+  document: {
+    maxNewGroupsPerCycle?: number | undefined;
+    workerConcurrency?: number | undefined;
+  } = {},
+): IngestionScopeConfig {
+  return {
+    maxNewGroupsPerCycle:
+      document.maxNewGroupsPerCycle ??
+      parsePositiveInt(
+        env.INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
+        'INGESTION_MAX_NEW_GROUPS_PER_CYCLE',
+        DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
+      ),
+    workerConcurrency:
+      document.workerConcurrency ??
+      parsePositiveInt(
+        env.INGESTION_WORKER_CONCURRENCY,
+        'INGESTION_WORKER_CONCURRENCY',
+        DEFAULT_INGESTION_WORKER_CONCURRENCY,
+      ),
+  };
+}
+
 export function parseUpstreamConfig(
   env: Record<string, string | undefined>,
 ): UpstreamScopeConfig | undefined {
@@ -126,6 +156,7 @@ export function loadConfiguration(
     calendar: parsed.calendar as CalendarConfig,
     redis: parseRedisConfig(env),
     queue: parseQueueConfig(env, parsed.queue),
+    ingestion: parseIngestionConfig(env, parsed.ingestion),
     upstream: parseUpstreamConfig(env),
   };
 

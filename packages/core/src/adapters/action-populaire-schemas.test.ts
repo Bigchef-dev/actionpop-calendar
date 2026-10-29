@@ -97,6 +97,24 @@ describe('Action Populaire schemas', () => {
     ).toBe('Europe/Berlin');
   });
 
+  it('tolerates group entries that state a blank identifier or no name', () => {
+    const parsed = validateActionPopulaireEvent({
+      id: 'event-groups',
+      name: 'Meeting',
+      startTime: '2026-09-24T10:00:00+02:00',
+      endTime: '2026-09-24T11:00:00+02:00',
+      timezone: 'Europe/Paris',
+      location,
+      groups: [{ id: '  ', name: 'Blank' }, { id: ' group-1 ' }, { id: 'group-2', name: '  ' }],
+    });
+
+    expect(parsed.groups).toEqual([
+      { id: '', name: 'Blank' },
+      { id: 'group-1' },
+      { id: 'group-2' },
+    ]);
+  });
+
   it('rejects out-of-range GeoJSON coordinates and malformed payloads', () => {
     expect(() =>
       validateActionPopulaireEvent({

@@ -69,9 +69,36 @@ describe('validateEventType', () => {
     }
   });
 
-  it('rejects a malformed label naming the field and cause', async () => {
+  it('normalizes the accented labels the source publishes', async () => {
     const reader = new FakeEventTypeReader();
-    const result = await validateEventType('Meeting Présidentielle', reader);
+
+    expect(await validateEventType('fête-locale', reader)).toEqual({
+      eventType: 'fete-locale',
+      diagnostics: [],
+    });
+    expect(await validateEventType('Événement ILB', reader)).toEqual({
+      eventType: 'evenement-ilb',
+      diagnostics: [],
+    });
+    expect(await validateEventType('Cœur de quartier', reader)).toEqual({
+      eventType: 'coeur-de-quartier',
+      diagnostics: [],
+    });
+    expect(reader.recorded).toEqual(['fete-locale', 'evenement-ilb', 'coeur-de-quartier']);
+  });
+
+  it('registers the normalized label, not the raw one', async () => {
+    const reader = new FakeEventTypeReader(['fete-locale']);
+    expect(await validateEventType('Fête-locale', reader)).toEqual({
+      eventType: 'fete-locale',
+      diagnostics: [],
+    });
+    expect(reader.recorded).toEqual([]);
+  });
+
+  it('rejects a label with no usable characters, naming the field and cause', async () => {
+    const reader = new FakeEventTypeReader();
+    const result = await validateEventType('!!!', reader);
 
     expect(result.eventType).toBeUndefined();
     expect(result.diagnostics).toEqual([
@@ -79,7 +106,7 @@ describe('validateEventType', () => {
         code: 'event_type_invalid',
         field: 'subtype.label',
         message:
-          '"Meeting Présidentielle" is not a valid event-type label (expected lowercase words separated by hyphens)',
+          '"!!!" cannot be normalized into an event-type label (expected letters, digits and hyphens)',
         severity: 'error',
       },
     ]);

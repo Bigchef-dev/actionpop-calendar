@@ -70,10 +70,19 @@ const locationSchema = z
   })
   .strip();
 
+// A group name is presentation only: an absent, blank or unreadable value falls back
+// to the identifier instead of failing the whole listing.
+const optionalGroupName = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined),
+  z.string().optional(),
+);
+
+// A blank identifier is a data-quality gap of the payload, not a reason to reject the
+// event: `toObservedGroups` drops and counts it before anything is persisted.
 const eventGroupSchema = z
   .object({
-    id: z.string().trim().min(1),
-    name: z.string().trim().min(1),
+    id: z.string().trim(),
+    name: optionalGroupName,
   })
   .strip();
 

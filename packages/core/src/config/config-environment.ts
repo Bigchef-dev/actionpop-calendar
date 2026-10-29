@@ -41,6 +41,16 @@ export const ENVIRONMENT_MAPPINGS: readonly EnvironmentMapping[] = [
   { key: 'queue.attempts', variable: 'QUEUE_ATTEMPTS', read: asInteger },
   { key: 'queue.backoffMs', variable: 'QUEUE_BACKOFF_MS', read: asInteger },
   { key: 'queue.dispatcherIntervalMs', variable: 'DISPATCHER_INTERVAL_MS', read: asInteger },
+  {
+    key: 'ingestion.maxNewGroupsPerCycle',
+    variable: 'INGESTION_MAX_NEW_GROUPS_PER_CYCLE',
+    read: asInteger,
+  },
+  {
+    key: 'ingestion.workerConcurrency',
+    variable: 'INGESTION_WORKER_CONCURRENCY',
+    read: asInteger,
+  },
 ];
 
 export function variableFor(key: string): string | undefined {
