@@ -12,7 +12,7 @@ const query = new PostgresCalendarEventQuery(harness.prisma);
 beforeEach(async () => {
   await harness.prisma.eventRecord.deleteMany();
   await harness.prisma.calendarSnapshot.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
 });
 
 afterAll(async () => {
@@ -160,6 +160,22 @@ describe('PostgresCalendarEventQuery', () => {
 
     expect(result.events).toHaveLength(2);
     expect(result.truncated).toBe(true);
+  });
+
+  it('never exposes an event ingestion as a group identifier', async () => {
+    await repository.saveCurrent({
+      scopeId: 'event-scope-1',
+      scopeKind: 'event',
+      revision: 1,
+      generatedAt: '2026-10-15T12:00:00.000Z',
+      status: 'complete',
+      events: [event('event-1')],
+    });
+
+    const result = await query.listCalendarEvents({}, window, 100);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.groupIds).toEqual([]);
   });
 
   it('returns an empty result when nothing matches', async () => {

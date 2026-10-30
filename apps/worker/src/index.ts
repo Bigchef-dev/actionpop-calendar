@@ -13,6 +13,7 @@ export * from './queue/queue.js';
 export * from './ingestion/processor.js';
 export * from './ingestion/calendar-ingestion-processor.js';
 export * from './ingestion/event-mapper.js';
+export * from './ingestion/publication.js';
 export * from './ingestion/ingestion-outcome.js';
 export * from './dispatcher/cycle-report.js';
 export * from './operations/ingestion-ledger.js';

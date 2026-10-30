@@ -32,6 +32,26 @@ services:
       timeout: 3s
       retries: 10
 
+  # Applies the migrations the running images expect, then exits. Both application
+  # services wait for it, so a deployment can never start against an older schema.
+  migrate:
+    image: ${WORKER_IMAGE:-actionpop-worker:latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    entrypoint: ['node_modules/.bin/prisma', 'migrate', 'deploy', '--schema=prisma/schema.prisma']
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
+      NODE_ENV: ${NODE_ENV:-production}
+      TIMEZONE: ${TIMEZONE:-Europe/Paris}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - private
+    restart: 'no'
+
   api:
     image: ${API_IMAGE:-actionpop-api:latest}
     build:
@@ -49,6 +69,8 @@ services:
       # starts from the shipped example when config/actionpop.yaml is absent.
       - ../../config:/app/config:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:
@@ -79,6 +101,8 @@ services:
     volumes:
       - ../../config:/app/config:ro
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:

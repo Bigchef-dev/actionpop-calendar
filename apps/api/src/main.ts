@@ -1,5 +1,6 @@
 import {
   checkPostgresHealth,
+  checkPostgresSchema,
   closePostgres,
   createPostgresClient,
   createRedisConnection,
@@ -46,6 +47,7 @@ export async function startApi(): Promise<void> {
   const failures = await runPreflight([
     { name: 'redis', probe: () => probeRedis(config.redis.url) },
     { name: 'postgres', probe: () => checkPostgresHealth(postgres) },
+    { name: 'postgres schema', probe: () => checkPostgresSchema(postgres) },
   ]);
 
   if (failures.length > 0) {

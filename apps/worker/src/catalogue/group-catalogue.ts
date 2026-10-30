@@ -1,4 +1,5 @@
 import {
+  activeGroupScopeIds,
   normalizeScopeIdentity,
   PostgresGroupRegistry,
   synchronizeGroupDirectory,
@@ -119,7 +120,8 @@ export class PostgresGroupCatalogueRepository {
     return new PostgresGroupRegistry(this.prisma).findGroup(id);
   }
 
+  /** Group identifiers only: the catalogue never exposes an event ingestion. */
   public async activeScopes(): Promise<string[]> {
-    return [...(await new PostgresGroupRegistry(this.prisma).activeScopeIds())];
+    return [...(await activeGroupScopeIds(this.prisma))];
   }
 }

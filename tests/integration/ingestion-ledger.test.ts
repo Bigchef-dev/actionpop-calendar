@@ -10,7 +10,7 @@ const ledger = new PostgresIngestionLedgerStore(harness.prisma);
 beforeEach(async () => {
   await harness.prisma.ingestionLedger.deleteMany();
   await harness.prisma.processingPeriod.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
 });
 
 afterAll(async () => {

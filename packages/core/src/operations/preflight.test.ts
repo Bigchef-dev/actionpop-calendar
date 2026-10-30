@@ -27,9 +27,21 @@ describe('runPreflight', () => {
     expect(failures[0]?.message).toMatch(/timed out after 25ms/);
   });
 
+  it('asks for migrations when the database is reachable but behind', () => {
+    const description = describeDependencyFailures([
+      { name: 'postgres schema', message: 'missing tables ingestion_scope' },
+    ]);
+
+    expect(description).toContain('pnpm prisma:migrate');
+    expect(description).not.toContain('pnpm dev:infra');
+  });
+
   it('describes failures with the startup command', () => {
     const description = describeDependencyFailures(
-      [{ name: 'redis', message: 'boom' }, { name: 'postgres', message: 'boom' }],
+      [
+        { name: 'redis', message: 'boom' },
+        { name: 'postgres', message: 'boom' },
+      ],
       'pnpm dev:infra',
     );
 

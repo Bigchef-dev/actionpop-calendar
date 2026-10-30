@@ -18,6 +18,11 @@ function logger(sink: Logged[]): Logger {
 }
 
 const counts = { active: 7, pending: 3, unlisted: 4, stopped: 2 };
+const eventCounts = { pending: 2, active: 5, retired: 3 };
+
+function eventScopes() {
+  return { countEventScopes: async () => eventCounts };
+}
 
 describe('dispatcher cycle report', () => {
   it('sets the registry gauges and logs the previous cycle counters', async () => {
@@ -26,9 +31,15 @@ describe('dispatcher cycle report', () => {
     const written: { periodToken: string; samples: { metric: string; value: number }[] }[] = [];
 
     await reportDispatcherCycle(
-      { periodToken: '2026-10-29T10:00:00.000Z', promoted: ['group-a', 'group-b'], scheduled: 10 },
+      {
+        periodToken: '2026-10-29T10:00:00.000Z',
+        promoted: ['group-a', 'group-b'],
+        scheduled: 10,
+        retired: 0,
+      },
       {
         registry: { counts: async () => counts },
+        eventScopes: eventScopes(),
         cycleMetrics: {
           latestBefore: async () => ({
             periodToken: '2026-10-29T09:45:00.000Z',
@@ -43,7 +54,9 @@ describe('dispatcher cycle report', () => {
       },
     );
 
-    const gauges = Object.fromEntries(metrics.snapshot().map((sample) => [sample.name, sample.value]));
+    const gauges = Object.fromEntries(
+      metrics.snapshot().map((sample) => [sample.name, sample.value]),
+    );
     expect(gauges).toMatchObject({
       actionpop_groups_active: 7,
       actionpop_groups_pending: 3,
@@ -52,7 +65,10 @@ describe('dispatcher cycle report', () => {
       actionpop_groups_scheduled_total: 2,
     });
     expect(written).toEqual([
-      { periodToken: '2026-10-29T10:00:00.000Z', samples: [{ metric: 'groups.scheduled', value: 2 }] },
+      {
+        periodToken: '2026-10-29T10:00:00.000Z',
+        samples: [{ metric: 'groups.scheduled', value: 2 }],
+      },
     ]);
     expect(logs[0]?.message).toBe('dispatcher cycle');
     expect(logs[0]?.context).toMatchObject({
@@ -71,9 +87,10 @@ describe('dispatcher cycle report', () => {
     const logs: Logged[] = [];
 
     await reportDispatcherCycle(
-      { periodToken: '2026-10-29T10:00:00.000Z', promoted: [], scheduled: 0 },
+      { periodToken: '2026-10-29T10:00:00.000Z', promoted: [], scheduled: 0, retired: 0 },
       {
         registry: { counts: async () => counts },
+        eventScopes: eventScopes(),
         cycleMetrics: { latestBefore: async () => undefined, increment: async () => undefined },
         metrics,
         logger: logger(logs),
@@ -84,5 +101,42 @@ describe('dispatcher cycle report', () => {
     expect(
       metrics.snapshot().some((sample) => sample.name === 'actionpop_groups_scheduled_total'),
     ).toBe(false);
+  });
+
+  it('reports event ingestions apart from the group gauges', async () => {
+    const metrics = new MetricsRegistry();
+    const logs: Logged[] = [];
+    const written: { samples: { metric: string; value: number }[] }[] = [];
+
+    await reportDispatcherCycle(
+      { periodToken: '2026-10-29T10:00:00.000Z', promoted: [], scheduled: 1, retired: 2 },
+      {
+        registry: { counts: async () => counts },
+        eventScopes: eventScopes(),
+        cycleMetrics: {
+          latestBefore: async () => undefined,
+          increment: async (_periodToken, samples) => {
+            written.push({ samples: [...samples] });
+          },
+        },
+        metrics,
+        logger: logger(logs),
+      },
+    );
+
+    const gauges = Object.fromEntries(
+      metrics.snapshot().map((sample) => [sample.name, sample.value]),
+    );
+    expect(gauges).toMatchObject({
+      actionpop_event_scopes_pending: 2,
+      actionpop_event_scopes_active: 5,
+      actionpop_event_scopes_retired: 3,
+      actionpop_groups_stopped: 2,
+    });
+    expect(gauges.actionpop_groups_stopped).toBe(counts.stopped);
+    expect(written).toEqual([{ samples: [{ metric: 'event_scopes.retired', value: 2 }] }]);
+    expect(logs[0]?.context).toMatchObject({
+      eventScopes: { active: 5, pending: 2, retired: 3, retiredNow: 2 },
+    });
   });
 });

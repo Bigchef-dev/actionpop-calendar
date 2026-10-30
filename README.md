@@ -125,6 +125,12 @@ resolved target (host and database only) so migrations, Studio, and the applicat
 are guaranteed to use the same database. `pnpm prisma:migrate:status` reports pending
 migrations when Studio shows an empty or missing table.
 
+After a schema change, the database and the generated client must both follow it:
+`relation "ingestion_scope" does not exist` means migrations were not applied, and
+`Cannot read properties of undefined (reading 'findMany')` means the client was not
+regenerated. The API and worker refuse to start in either case and name the fix;
+`pnpm prisma:generate` then `pnpm prisma:migrate` (or `pnpm db:setup`) resolves both.
+
 The API is then available at `http://127.0.0.1:3000`. The public surface remains
 the read-only `GET /feed/{scopeId}` route; Redis, worker responsibilities, and
 internal health routes are not exposed by the development command. The dev

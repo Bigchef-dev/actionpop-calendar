@@ -7,6 +7,8 @@ export interface AttributionWriteResult {
   readonly added: number;
   readonly removed: number;
   readonly eventsWithoutGroup: number;
+  /** Number of distinct groups this observation states for the event. */
+  readonly statedGroups: number;
 }
 
 /**
@@ -92,5 +94,6 @@ export async function writeEventAttribution(
     added,
     removed,
     eventsWithoutGroup: stated.length === 0 ? 1 : 0,
+    statedGroups: stated.length,
   };
 }

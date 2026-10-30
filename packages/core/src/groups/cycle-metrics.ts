@@ -7,6 +7,9 @@ export const CYCLE_METRICS = {
   eventsWithoutGroup: 'events.without_group',
   attributionsAdded: 'attributions.added',
   attributionsRemoved: 'attributions.removed',
+  eventScopesCreated: 'event_scopes.created',
+  eventScopesRetired: 'event_scopes.retired',
+  eventScopesReadingFailed: 'event_scopes.reading_failed',
 } as const;
 
 export type CycleMetricKey = (typeof CYCLE_METRICS)[keyof typeof CYCLE_METRICS];

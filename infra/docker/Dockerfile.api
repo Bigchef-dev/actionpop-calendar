@@ -1,26 +1,35 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable
+# Sources are copied before installing: the workspace packages are `file:` dependencies,
+# and pnpm must see them to link @actionpop/core.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
-COPY packages/core/package.json packages/core/package.json
-COPY apps/api/package.json apps/api/package.json
-COPY apps/worker/package.json apps/worker/package.json
-RUN pnpm install --frozen-lockfile
 COPY packages packages
 COPY apps apps
 COPY config config
+COPY prisma prisma
+RUN pnpm install --frozen-lockfile
 RUN rm -f packages/core/tsconfig.tsbuildinfo apps/api/tsconfig.tsbuildinfo apps/worker/tsconfig.tsbuildinfo
+# The client is generated before compiling: the type checker reads the models, so an
+# ungenerated client fails the build on missing `Prisma.sql` and `Prisma.JsonValue`.
+# No database is contacted; the URL below only satisfies the datasource declaration.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" \
+    pnpm exec prisma generate --schema=prisma/schema.prisma
 RUN pnpm --filter @actionpop/core build && pnpm --filter @actionpop/api build
-RUN pnpm --filter @actionpop/api deploy --prod /tmp/api
+# Tests and sources are not needed at runtime; the Prisma schema stays so a deployment
+# can apply migrations with the CLI that ships in the image.
+RUN rm -rf packages/core/src packages/core/tests apps/api/src apps/api/tests \
+           apps/worker/src apps/worker/tests apps/api/tsconfig.tsbuildinfo \
+           apps/worker/tsconfig.tsbuildinfo packages/core/tsconfig.tsbuildinfo
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# The commented reference ships with the image so a deployment can copy it and
-# override any value without rebuilding.
-COPY --from=build /app/config ./config
 RUN addgroup -S actionpop && adduser -S actionpop -G actionpop
-COPY --from=build /tmp/api/ ./
+# The whole workspace is shipped as built. `pnpm deploy` is not used here: in this
+# monorepo it installs a stub Prisma client and leaves @actionpop/core unresolved, which
+# only shows up as a runtime failure on the first database call.
+COPY --from=build --chown=actionpop:actionpop /app /app
 USER actionpop
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]

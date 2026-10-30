@@ -13,6 +13,9 @@ describe('cycle metrics', () => {
       'events.without_group',
       'attributions.added',
       'attributions.removed',
+      'event_scopes.created',
+      'event_scopes.retired',
+      'event_scopes.reading_failed',
     ]);
   });
 

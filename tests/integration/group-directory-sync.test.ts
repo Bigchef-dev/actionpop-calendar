@@ -1,6 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PostgresGroupCatalogueRepository } from '../../apps/worker/src/catalogue/group-catalogue.js';
+import {
+  requestEventScopes,
+  retireUnknownEventScope,
+} from '../../packages/core/src/persistence/postgres-event-scopes.js';
+import { countEventScopes } from '../../packages/core/src/persistence/postgres-scope-queries.js';
 import { PostgresGroupRegistry } from '../../packages/core/src/persistence/postgres-group-registry.js';
 import { startIntegrationPostgres } from './postgres-setup.js';
 
@@ -10,7 +15,7 @@ const registry = new PostgresGroupRegistry(harness.prisma);
 
 beforeEach(async () => {
   await harness.prisma.ingestionLedger.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
 });
 
 afterAll(async () => {
@@ -18,7 +23,7 @@ afterAll(async () => {
 });
 
 async function group(scopeId: string) {
-  return harness.prisma.groupScope.findUnique({ where: { scopeId } });
+  return harness.prisma.ingestionScope.findUnique({ where: { scopeId } });
 }
 
 describe('map directory synchronisation', () => {
@@ -62,7 +67,7 @@ describe('map directory synchronisation', () => {
 
     await catalogue.synchronize([{ id: 'group-discovered', name: 'Now listed', is_active: true }]);
 
-    const listed = await harness.prisma.groupScope.findMany({
+    const listed = await harness.prisma.ingestionScope.findMany({
       where: { scopeId: 'group-discovered' },
     });
     expect(listed).toHaveLength(1);
@@ -127,5 +132,67 @@ describe('promotion ceiling', () => {
 
     expect(await registry.promotePendingScopes(10)).toEqual(['group-2']);
     expect(await registry.promotePendingScopes(10)).toEqual([]);
+  });
+});
+
+describe('kind isolation', () => {
+  async function seedEventScope(eventId: string) {
+    await requestEventScopes(
+      harness.prisma,
+      [
+        {
+          eventId,
+          displayName: 'Event',
+          endTime: '2026-12-01T12:00:00.000Z',
+        },
+      ],
+      new Date('2026-10-29T10:00:00.000Z'),
+    );
+  }
+
+  it('leaves every event scope untouched during a complete directory synchronisation', async () => {
+    await seedEventScope('event-1');
+    const before = await harness.prisma.ingestionScope.findUnique({
+      where: { scopeId: 'event-1' },
+    });
+
+    await catalogue.synchronize([{ id: 'group-listed', name: 'Listed', is_active: true }]);
+    await catalogue.synchronize([{ id: 'group-other', name: 'Other', is_active: false }]);
+
+    const after = await harness.prisma.ingestionScope.findUnique({
+      where: { scopeId: 'event-1' },
+    });
+    expect(after).toMatchObject({
+      scopeKind: 'event',
+      mapStatus: 'not_applicable',
+      retrievalStatus: before?.retrievalStatus,
+      eventEndsAt: before?.eventEndsAt,
+    });
+  });
+
+  it('counts groups and event scopes apart', async () => {
+    await seedEventScope('event-1');
+    await retireUnknownEventScope(harness.prisma, 'event-1', new Date());
+    await catalogue.synchronize([{ id: 'group-listed', name: 'Listed', is_active: true }]);
+
+    expect(await registry.counts()).toEqual({
+      active: 1,
+      pending: 0,
+      unlisted: 0,
+      stopped: 0,
+    });
+    expect(await countEventScopes(harness.prisma)).toEqual({ pending: 0, active: 0, retired: 1 });
+  });
+
+  it('never exposes an event ingestion through the group catalogue', async () => {
+    await seedEventScope('event-1');
+    await harness.prisma.ingestionScope.update({
+      where: { scopeId: 'event-1' },
+      data: { retrievalStatus: 'active' },
+    });
+
+    expect(await catalogue.activeScopes()).toEqual([]);
+    expect(await catalogue.get('event-1')).toBeUndefined();
+    expect((await registry.activeScopes()).map((scope) => scope.scopeKind)).toEqual(['event']);
   });
 });

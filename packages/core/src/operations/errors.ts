@@ -50,7 +50,10 @@ export class HttpError extends Error {
 export class UnknownGroupError extends Error {
   readonly code = 'UNKNOWN_GROUP';
 
-  constructor(readonly scopeId: string, message = `unknown group ${scopeId}`) {
+  constructor(
+    readonly scopeId: string,
+    message = `unknown group ${scopeId}`,
+  ) {
     super(message);
     this.name = 'UnknownGroupError';
   }
@@ -62,4 +65,37 @@ export class TemporaryRedisError extends Error {
 
 export class PermanentAuthenticationError extends Error {
   readonly code = 'PERMANENT_AUTHENTICATION_ERROR';
+}
+
+/**
+ * The source answered that an event does not exist. Distinct from any other failure so
+ * only a definitive answer can retire an event ingestion.
+ */
+export class UnknownEventError extends Error {
+  readonly code = 'UNKNOWN_EVENT';
+
+  constructor(
+    readonly eventId: string,
+    message = `unknown event ${eventId}`,
+  ) {
+    super(message);
+    this.name = 'UnknownEventError';
+  }
+}
+
+/**
+ * The document returned does not describe the event that was requested. Transient
+ * rather than permanent: a proxy, a stale cache or a shuffled response must not stall
+ * an event's refresh for good.
+ */
+export class EventIdentityMismatchError extends Error {
+  readonly code = 'EVENT_IDENTITY_MISMATCH';
+
+  constructor(
+    readonly requestedEventId: string,
+    readonly receivedEventId: string,
+  ) {
+    super(`event ${requestedEventId} answered as ${receivedEventId}`);
+    this.name = 'EventIdentityMismatchError';
+  }
 }

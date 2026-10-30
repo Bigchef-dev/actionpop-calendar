@@ -1,6 +1,15 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { parseRuntimeConfig } from './runtime-config.js';
+
+/** A root without any configuration file, so built-in defaults are what is measured. */
+function emptyConfigRoot(): string {
+  return mkdtempSync(join(tmpdir(), 'actionpop-config-'));
+}
 
 describe('parseRuntimeConfig', () => {
   it('uses Europe/Paris and safe defaults', () => {
@@ -12,7 +21,11 @@ describe('parseRuntimeConfig', () => {
   });
 
   it('defaults the ingestion ceiling to 200 new groups per cycle', () => {
-    const config = parseRuntimeConfig({ REDIS_URL: 'redis://localhost:6379' }, 'worker');
+    const config = parseRuntimeConfig(
+      { REDIS_URL: 'redis://localhost:6379' },
+      'worker',
+      emptyConfigRoot(),
+    );
 
     expect(config.ingestion.maxNewGroupsPerCycle).toBe(200);
   });

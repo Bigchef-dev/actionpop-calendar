@@ -1,7 +1,5 @@
 import {
-  enrichEventGeography,
   UnknownGroupError,
-  validateEventType,
   type ActionPopulaireEventPayload,
   type EventTypeReader,
   type GeographicReferenceReader,
@@ -16,8 +14,9 @@ import {
 } from '@actionpop/core';
 
 import { collectEventPages } from './event-pages.js';
+import { prepareIncomingEvent } from './event-preparation.js';
+import { countPublication, publishObservation } from './publication.js';
 import { failIngestion, stopIngestionForUnknownGroup } from './ingestion-outcome.js';
-import { toIncomingEvent, toRawLocationFields } from './event-mapper.js';
 
 export interface IngestionJobContext {
   readonly jobId: string;
@@ -71,12 +70,7 @@ export interface CalendarIngestionDependencies {
   };
 }
 
-export class EventTypeValidationError extends Error {
-  public constructor(message: string) {
-    super(`event type validation failed: ${message}`);
-    this.name = 'EventTypeValidationError';
-  }
-}
+export { EventTypeValidationError } from './event-preparation.js';
 
 function summarizeGeography(events: IncomingEvent[]): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -85,25 +79,6 @@ function summarizeGeography(events: IncomingEvent[]): Record<string, number> {
     counts[status] = (counts[status] ?? 0) + 1;
   }
   return counts;
-}
-
-/**
- * Cumulative mirror of the per-cycle counters, so the `/metrics` endpoint answers
- * "how many unlisted groups, events without a group and attribution changes so far".
- * A zero change publishes nothing, which keeps the registry readable.
- */
-function countPublishedAttribution(metrics: MetricsRegistry, summary: PublicationSummary): void {
-  const counters: readonly (readonly [string, number])[] = [
-    ['actionpop_groups_discovered_total', summary.discoveredUnlisted],
-    ['actionpop_groups_re_enabled_total', summary.reEnabled],
-    ['actionpop_events_without_group_total', summary.eventsWithoutGroup],
-    ['actionpop_attributions_added_total', summary.attributionsAdded],
-    ['actionpop_attributions_removed_total', summary.attributionsRemoved],
-  ];
-
-  for (const [name, value] of counters) {
-    if (value > 0) metrics.increment(name, {}, value);
-  }
 }
 
 /**
@@ -131,33 +106,14 @@ export async function processCalendarIngestion(
 
     const enriched: IncomingEvent[] = [];
     for (const event of events) {
-      const typeValidation = await validateEventType(event.subtype?.label, deps.eventTypes);
-      const blocking = typeValidation.diagnostics.filter(
-        (diagnostic) => diagnostic.severity === 'error',
-      );
-      if (blocking.length > 0) {
-        throw new EventTypeValidationError(
-          blocking.map((diagnostic) => `${diagnostic.field}: ${diagnostic.message}`).join('; '),
-        );
-      }
-
-      const geography = await enrichEventGeography(
-        toRawLocationFields(event),
-        deps.geographicReference,
-      );
-      enriched.push(toIncomingEvent(event, geography, typeValidation.eventType));
+      enriched.push(await prepareIncomingEvent(event, deps));
     }
 
     await deps.ledger.transition(job.jobId, { status: 'publishing', attempts });
-    const publication = await deps.revisions.publish(job.scopeId, enriched, true, job.periodToken);
-    const summary = await deps.publisher.publish(
-      job.scopeId,
-      publication.snapshot,
-      publication.events,
-    );
+    const summary = await publishObservation(job.scopeId, 'group', enriched, job.periodToken, deps);
     await deps.ledger.transition(job.jobId, { status: 'succeeded', attempts });
 
-    countPublishedAttribution(deps.metrics, summary);
+    countPublication(deps.metrics, summary);
     deps.metrics.increment('actionpop_jobs_completed_total', { outcome: 'success' });
     deps.metrics.increment(
       'actionpop_job_duration_seconds',

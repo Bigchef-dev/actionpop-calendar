@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildIngestionJobId,
   checkPostgresHealth,
+  checkPostgresSchema,
   closePostgres,
   closeRedis,
   createPostgresClient,
@@ -14,8 +15,12 @@ import {
   PostgresEventTypeRepository,
   PostgresGeographicReferenceRepository,
   PostgresGeographicReferenceWriter,
+  countEventScopes,
   PostgresGroupRegistry,
   probeRedis,
+  retireEndedEventScopes,
+  retireUnknownEventScope,
+  type ScopeKind,
   runPreflight,
 } from '@actionpop/core';
 import { Job, Queue, Worker } from 'bullmq';
@@ -34,10 +39,7 @@ import { reportDispatcherCycle } from './dispatcher/cycle-report.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
 import { queueJobState } from './dispatcher/job-state.js';
 import { RedisLock } from './dispatcher/lock.js';
-import {
-  processCalendarIngestion,
-  type CalendarIngestionDependencies,
-} from './ingestion/calendar-ingestion-processor.js';
+import { processIngestionJob, type IngestionDependencies } from './ingestion/job-dispatch.js';
 import { PostgresIngestionLedgerStore } from './operations/ingestion-ledger.js';
 import { reconcileIngestionLedger } from './operations/ledger-reconciliation.js';
 import { createWorkerObservability } from './operations/observability.js';
@@ -54,6 +56,8 @@ const LEDGER_GRACE_MS = 60 * 60 * 1000;
 
 interface IngestionJobData {
   scopeId: string;
+  /** Absent for a job enqueued before this feature; such a job is a group listing. */
+  scopeKind?: ScopeKind;
   periodStartUtc: string;
 }
 
@@ -104,7 +108,7 @@ export function createWorkerRuntime(
     configurationFile: configurationPath ?? 'defaults',
   });
 
-  const ingestionDependencies: CalendarIngestionDependencies = {
+  const ingestionDependencies: IngestionDependencies = {
     client,
     ledger,
     eventTypes,
@@ -112,6 +116,9 @@ export function createWorkerRuntime(
     revisions,
     publisher,
     groups: registry,
+    scopes: {
+      retireUnknownEvent: (scopeId, at) => retireUnknownEventScope(postgres, scopeId, at),
+    },
     metrics: observability.metrics,
     logger: observability.logger,
     cycleMetrics,
@@ -123,10 +130,11 @@ export function createWorkerRuntime(
       const jobId = String(
         job.id ?? buildIngestionJobId(job.data.scopeId, new Date(job.data.periodStartUtc)),
       );
-      await processCalendarIngestion(
+      await processIngestionJob(
         {
           jobId,
           scopeId: job.data.scopeId,
+          scopeKind: job.data.scopeKind ?? 'group',
           periodToken: job.data.periodStartUtc,
           attemptsMade: job.attemptsMade,
           maxAttempts: job.opts.attempts ?? config.queue.attempts,
@@ -139,11 +147,14 @@ export function createWorkerRuntime(
 
   const lock = new RedisLock(redis, 'actionpop:lock:dispatcher');
   const dispatcher = createDispatcher({
-    catalogue,
+    catalogue: { activeScopes: () => registry.activeScopes() },
     queue,
     lock,
     intervalMs: config.queue.dispatcherIntervalMs,
     promotion: registry,
+    retirement: {
+      retireEndedScopes: (now) => retireEndedEventScopes(postgres, now),
+    },
     maxNewGroupsPerCycle: config.ingestion.maxNewGroupsPerCycle,
     scheduledThisPeriod: async (periodToken) =>
       (await cycleMetrics.read(periodToken))?.metrics['groups.scheduled'] ?? 0,
@@ -160,9 +171,10 @@ export function createWorkerRuntime(
       // A live ledger status only counts while the queue still owns the job.
       return (await queueJobState(queue, jobId)).kind !== 'missing';
     },
-    onScheduled: (jobId, scopeId, periodToken) =>
+    onScheduled: (jobId, scope, periodToken) =>
       ledger.transition(jobId, {
-        scopeId,
+        scopeId: scope.scopeId,
+        scopeKind: scope.scopeKind,
         periodToken,
         status: 'scheduled',
         attempts: 0,
@@ -170,6 +182,7 @@ export function createWorkerRuntime(
     onCycle: (cycle) =>
       reportDispatcherCycle(cycle, {
         registry,
+        eventScopes: { countEventScopes: () => countEventScopes(postgres) },
         cycleMetrics,
         metrics: observability.metrics,
         logger: observability.logger,
@@ -241,6 +254,7 @@ export function createWorkerRuntime(
       const failures = await runPreflight([
         { name: 'redis', probe: () => probeRedis(config.redis.url) },
         { name: 'postgres', probe: () => checkPostgresHealth(postgres) },
+        { name: 'postgres schema', probe: () => checkPostgresSchema(postgres) },
       ]);
       if (failures.length > 0) {
         observability.logger.error('worker startup aborted', {

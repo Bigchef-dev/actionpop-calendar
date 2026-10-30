@@ -7,12 +7,34 @@ import { readDiagnostics } from './diagnostic-json.js';
 import { parsePeriodToken } from '../domain/job-identity.js';
 import { CYCLE_METRICS, cycleMetricSamples } from '../groups/cycle-metrics.js';
 import { normalizeScopeIdentity, toObservedGroups } from '../groups/observed-groups.js';
+import { nextEventScopeStatus, requiresEventIngestion } from '../scopes/event-scope.js';
 import { writeEventAttribution } from './attribution-writer.js';
 import { upsertEventRecord } from './event-record-writer.js';
 import { PostgresCycleMetrics } from './postgres-cycle-metrics.js';
 import { PostgresGroupRegistry } from './postgres-group-registry.js';
+import {
+  recordEventScopeObservation,
+  requestEventScopes,
+  retireEventScopesForStatedGroups,
+  type EventScopeRequest,
+} from './postgres-event-scopes.js';
 
 const PUBLICATION_TIMEOUT_MS = 60_000;
+
+/** The pure rule answers "does this observation retire the event's own ingestion?". */
+function retiresForStatedGroup(statesGroup: boolean, endTime: string, observedAt: Date): boolean {
+  const endsAt = new Date(endTime);
+  const decision = nextEventScopeStatus(
+    {
+      retrievalStatus: 'active',
+      eventEndsAt: Number.isNaN(endsAt.getTime()) ? null : endsAt,
+      statesGroup,
+      unknownAnswer: false,
+    },
+    observedAt,
+  );
+  return decision.type === 'retire' && decision.reason === 'event_group_stated';
+}
 
 export interface PublicationSummary {
   readonly events: number;
@@ -22,6 +44,8 @@ export interface PublicationSummary {
   readonly discoveredUnlisted: number;
   readonly reEnabled: number;
   readonly blankIdentifiers: number;
+  readonly eventScopesCreated: number;
+  readonly eventScopesRetired: number;
 }
 
 export class PostgresCalendarDatasetRepository {
@@ -73,25 +97,41 @@ export class PostgresCalendarDatasetRepository {
     return this.prisma.$transaction(
       async (transaction): Promise<PublicationSummary> => {
         const registry = new PostgresGroupRegistry(transaction);
+        const observingKind = dataset.scopeKind ?? 'group';
         // A scope row is never activated here: eligibility belongs to the directory
         // and to the discovery ceiling, not to publication.
-        await registry.bootstrapScope(dataset.scopeId);
+        await registry.bootstrapScope(dataset.scopeId, observingKind);
         const registration = await registry.registerObservedGroups(
           statedGroups,
           new Date(dataset.generatedAt),
         );
-        // Every write below references `group_scope.scope_id`, which keeps the
-        // first-seen spelling; a payload or job may name the same group differently.
-        const scopeIds = await registry.resolveScopeIds([
-          normalizeScopeIdentity(dataset.scopeId),
-          ...statedGroups.map((group) => normalizeScopeIdentity(group.id)),
-        ]);
+        // Attribution always points at groups; the observing scope may be a group or an
+        // event, and every write references the registered spelling of its identifier.
+        const scopeIds = await registry.resolveScopeIds(
+          statedGroups.map((group) => normalizeScopeIdentity(group.id)),
+          'group',
+        );
         const observingScopeId =
-          scopeIds.get(normalizeScopeIdentity(dataset.scopeId)) ?? dataset.scopeId;
+          (
+            await registry.resolveScopeIds([normalizeScopeIdentity(dataset.scopeId)], observingKind)
+          ).get(normalizeScopeIdentity(dataset.scopeId)) ?? dataset.scopeId;
+
+        const observedAt = new Date(dataset.generatedAt);
+        const requests: EventScopeRequest[] = dataset.events
+          .filter((event) =>
+            requiresEventIngestion({ groups: event.groups, endTime: event.endTime }, observedAt),
+          )
+          .map((event) => ({
+            eventId: event.sourceEventId,
+            displayName: event.name,
+            endTime: event.endTime,
+          }));
+        const requestedScopes = await requestEventScopes(transaction, requests, observedAt);
 
         let added = 0;
         let removed = 0;
         let withoutGroup = 0;
+        const groupStatingEventIds: string[] = [];
 
         for (const event of dataset.events) {
           await upsertEventRecord(transaction, event);
@@ -105,7 +145,36 @@ export class PostgresCalendarDatasetRepository {
           added += attribution.added;
           removed += attribution.removed;
           withoutGroup += attribution.eventsWithoutGroup;
+          // Only what this observation states may retire a scope: a reading that states
+          // no group must leave the event's own ingestion scheduled.
+          if (retiresForStatedGroup(attribution.statedGroups > 0, event.endTime, observedAt)) {
+            groupStatingEventIds.push(event.sourceEventId);
+          }
         }
+
+        // An event that now states a group is observed by group listings from the next
+        // cycle on; its own ingestion retires instead of becoming a parallel refresh path.
+        const retiredScopes = await retireEventScopesForStatedGroups(
+          transaction,
+          groupStatingEventIds,
+          observedAt,
+        );
+        // A detail reading is the only place that learns a moved end time, including the
+        // case where the event already ended, so the scope's own observation is recorded
+        // whatever the outcome above.
+        const endedScopes =
+          observingKind === 'event'
+            ? await Promise.all(
+                dataset.events.map((event) =>
+                  recordEventScopeObservation(
+                    transaction,
+                    event.sourceEventId,
+                    event.endTime,
+                    observedAt,
+                  ),
+                ),
+              ).then((counts) => counts.reduce((total, count) => total + count, 0))
+            : 0;
 
         await new PostgresCycleMetrics(transaction).increment(
           periodToken,
@@ -116,6 +185,8 @@ export class PostgresCalendarDatasetRepository {
             [CYCLE_METRICS.eventsWithoutGroup]: withoutGroup,
             [CYCLE_METRICS.attributionsAdded]: added,
             [CYCLE_METRICS.attributionsRemoved]: removed,
+            [CYCLE_METRICS.eventScopesCreated]: requestedScopes.created.length,
+            [CYCLE_METRICS.eventScopesRetired]: retiredScopes + endedScopes,
           }),
         );
 
@@ -138,6 +209,8 @@ export class PostgresCalendarDatasetRepository {
           discoveredUnlisted: registration.discovered.length,
           reEnabled: registration.reEnabled.length,
           blankIdentifiers,
+          eventScopesCreated: requestedScopes.created.length,
+          eventScopesRetired: retiredScopes + endedScopes,
         };
       },
       { timeout: PUBLICATION_TIMEOUT_MS },

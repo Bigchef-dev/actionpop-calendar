@@ -1,9 +1,11 @@
-import type { IngestionLedgerStatus } from '@actionpop/core';
+import type { IngestionLedgerStatus, ScopeKind } from '@actionpop/core';
 import { buildRedisKey, parsePeriodToken, PostgresGroupRegistry } from '@actionpop/core';
 import type { PrismaClient } from '@prisma/client';
 
 interface LedgerPatch {
   scopeId?: string;
+  /** Ingestion kind of the scope this row belongs to; absent means a group. */
+  scopeKind?: ScopeKind;
   periodToken?: string;
   status: IngestionLedgerStatus;
   attempts?: number;
@@ -82,6 +84,7 @@ export class PostgresIngestionLedgerStore {
     const previous = await this.get(jobId);
     const error = patch.error?.replace(/upstream token=.* failed/i, 'upstream failed');
     const scopeId = patch.scopeId ?? previous?.scopeId;
+    const kind: ScopeKind = patch.scopeKind ?? previous?.scopeKind ?? 'group';
     const periodToken = patch.periodToken ?? previous?.periodToken;
     if (scopeId === undefined || periodToken === undefined) {
       throw new Error(`ledger ${jobId} requires scopeId and periodToken`);
@@ -94,45 +97,49 @@ export class PostgresIngestionLedgerStore {
     // Concurrent jobs share the same scope and period rows, so every parent is inserted
     // idempotently with `createMany({ skipDuplicates })`; an upsert would race and fail
     // on the primary key instead of updating.
-    await this.prisma.$transaction(async (transaction) => {
-      // A job runs for a scope the dispatcher selected, so a missing row is a data
-      // loss rather than a discovery: bootstrap it pending, never active.
-      await new PostgresGroupRegistry(transaction).bootstrapScope(scopeId);
-      await transaction.processingPeriod.createMany({
-        data: [
-          {
-            periodToken: canonicalToken,
-            periodStartUtc: start,
-            periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
-          },
-        ],
-        skipDuplicates: true,
-      });
-      await transaction.ingestionLedger.createMany({
-        data: [
-          {
-            jobId,
-            scopeId,
-            periodToken: canonicalToken,
+    await this.prisma.$transaction(
+      async (transaction) => {
+        // A job runs for a scope the dispatcher selected, so a missing row is a data
+        // loss rather than a discovery: bootstrap it pending, never active, and never
+        // under the wrong kind — an event identifier must not become a group row.
+        await new PostgresGroupRegistry(transaction).bootstrapScope(scopeId, kind);
+        await transaction.processingPeriod.createMany({
+          data: [
+            {
+              periodToken: canonicalToken,
+              periodStartUtc: start,
+              periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
+            },
+          ],
+          skipDuplicates: true,
+        });
+        await transaction.ingestionLedger.createMany({
+          data: [
+            {
+              jobId,
+              scopeId,
+              periodToken: canonicalToken,
+              status: patch.status,
+              attempts,
+              lastError: error ?? null,
+            },
+          ],
+          skipDuplicates: true,
+        });
+        // updateMany never throws when the row was skipped above, which keeps a concurrent
+        // transition from turning into a hard failure.
+        await transaction.ingestionLedger.updateMany({
+          where: { jobId },
+          data: {
             status: patch.status,
+            periodToken: canonicalToken,
             attempts,
             lastError: error ?? null,
           },
-        ],
-        skipDuplicates: true,
-      });
-      // updateMany never throws when the row was skipped above, which keeps a concurrent
-      // transition from turning into a hard failure.
-      await transaction.ingestionLedger.updateMany({
-        where: { jobId },
-        data: {
-          status: patch.status,
-          periodToken: canonicalToken,
-          attempts,
-          lastError: error ?? null,
-        },
-      });
-    }, { timeout: LEDGER_TRANSACTION_TIMEOUT_MS });
+        });
+      },
+      { timeout: LEDGER_TRANSACTION_TIMEOUT_MS },
+    );
   }
 
   public async get(jobId: string): Promise<StoredLedger | undefined> {

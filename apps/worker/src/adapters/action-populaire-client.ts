@@ -1,7 +1,9 @@
 import {
+  EventIdentityMismatchError,
   HttpError,
   NetworkError,
   TimeoutError,
+  UnknownEventError,
   UnknownGroupError,
   validateActionPopulaireEvent,
   validateGroupCatalogue,
@@ -29,11 +31,40 @@ export class ActionPopulaireClient {
     return validateGroupCatalogue(await this.request('/carte/liste_groupes/'));
   }
 
-  public async fetchEventPage(groupId: string, page: number, pageSize: number): Promise<ActionPopulaireEventPayload[]> {
-    const query = new URLSearchParams({ page: String(page), page_size: String(Math.min(1000, Math.max(1, pageSize))) });
+  /**
+   * One event's detail resource. A 404 is a definitive answer, and a document that
+   * describes another event is an upstream inconsistency that must stay retryable.
+   */
+  public async fetchEventDetails(eventId: string): Promise<ActionPopulaireEventPayload> {
     let value: unknown;
     try {
-      value = await this.request(`/api/groupes/${encodeURIComponent(groupId)}/evenements/a-venir/?${query}`);
+      value = await this.request(`/api/evenements/${encodeURIComponent(eventId)}/details/`);
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) {
+        throw new UnknownEventError(eventId);
+      }
+      throw error;
+    }
+
+    const event = validateActionPopulaireEvent(value);
+    if (event.id !== eventId) throw new EventIdentityMismatchError(eventId, event.id);
+    return event;
+  }
+
+  public async fetchEventPage(
+    groupId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<ActionPopulaireEventPayload[]> {
+    const query = new URLSearchParams({
+      page: String(page),
+      page_size: String(Math.min(1000, Math.max(1, pageSize))),
+    });
+    let value: unknown;
+    try {
+      value = await this.request(
+        `/api/groupes/${encodeURIComponent(groupId)}/evenements/a-venir/?${query}`,
+      );
     } catch (error) {
       // Only a definitive "this group does not exist" answer may stop a retrieval;
       // every other status keeps the current retry behaviour.
@@ -72,12 +103,16 @@ export class ActionPopulaireClient {
     try {
       const headers: Record<string, string> = { accept: 'application/json' };
       if (this.options.token) headers.authorization = `Bearer ${this.options.token}`;
-      const response = await this.fetcher(new URL(path, this.options.baseUrl), { headers, signal: controller.signal });
+      const response = await this.fetcher(new URL(path, this.options.baseUrl), {
+        headers,
+        signal: controller.signal,
+      });
       if (!response.ok) throw new HttpError(response.status, undefined, retryAfterMs(response));
-      return await response.json() as unknown;
+      return (await response.json()) as unknown;
     } catch (error) {
       if (error instanceof HttpError) throw error;
-      if (error instanceof DOMException && error.name === 'AbortError') throw new TimeoutError('upstream request timed out');
+      if (error instanceof DOMException && error.name === 'AbortError')
+        throw new TimeoutError('upstream request timed out');
       if (error instanceof Error) throw new NetworkError(error.message);
       throw new NetworkError('upstream request failed');
     } finally {

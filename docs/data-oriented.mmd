@@ -11,16 +11,21 @@ erDiagram
         datetime period_end_utc
     }
 
-    GROUP_SCOPE {
-        string scope_id PK "Action Populaire group id"
+    INGESTION_SCOPE {
+        string scope_id PK "group id, or event id for an event scope"
+        string scope_key "lower(trim(scope_id))"
+        string scope_kind "group | event"
         string display_name
-        boolean active "source is_active"
-        string scope_type
-        int source_subtype
-        boolean certified
-        string location_id FK
-        string source_link
-        string source_filter
+        string discovery_source "directory | event_payload"
+        string map_status "listed inactive unlisted removed not_applicable"
+        string retrieval_status "pending active stopped_inactive stopped_unknown retired"
+        datetime event_ends_at "event scopes only"
+        string scope_type "group only"
+        int source_subtype "group only"
+        boolean certified "group only"
+        string location_id FK "group only"
+        string source_link "group only"
+        string source_filter "group only"
     }
 
     %% =========================================================
@@ -115,7 +120,7 @@ erDiagram
 
 
     %% 2. Adresses & Géolocalisation brute (Centre-Gauche)
-    GROUP_SCOPE ||--|| LOCATION_RECORD : group_location
+    INGESTION_SCOPE |o--o| LOCATION_RECORD : group_location
     LOCATION_RECORD ||--o| GEO_POINT : coordinates
     EVENT_RECORD ||--|| LOCATION_RECORD : event_location
 
@@ -129,5 +134,5 @@ erDiagram
     COMMUNE ||--o{ EVENT_RECORD : hosts
 
     %% 5. Tables de Liaison N:M (Bas du diagramme)
-    GROUP_SCOPE ||--|{ EVENT_GROUP_LINK : organizes
+    INGESTION_SCOPE ||--o{ EVENT_GROUP_LINK : organizes
     EVENT_RECORD ||--|{ EVENT_GROUP_LINK : belongs_to

@@ -228,6 +228,7 @@ export class PostgresSnapshotPublisher {
       revision: snapshot.revision,
       generatedAt: snapshot.generatedAt,
       ...(snapshot.periodToken === undefined ? {} : { periodToken: snapshot.periodToken }),
+      ...(snapshot.scopeKind === undefined ? {} : { scopeKind: snapshot.scopeKind }),
       events,
       status: 'complete',
     });

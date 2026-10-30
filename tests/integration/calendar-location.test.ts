@@ -15,7 +15,7 @@ beforeEach(async () => {
   await harness.prisma.geoPoint.deleteMany();
   await harness.prisma.locationRecord.deleteMany();
   await harness.prisma.calendarSnapshot.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
 });
 
 afterAll(async () => {

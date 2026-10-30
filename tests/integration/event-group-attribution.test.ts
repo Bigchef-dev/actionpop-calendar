@@ -15,7 +15,7 @@ beforeEach(async () => {
   await harness.prisma.calendarSnapshot.deleteMany();
   await harness.prisma.eventRecord.deleteMany();
   await harness.prisma.processingPeriod.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
 });
 
 afterAll(async () => {
@@ -68,12 +68,12 @@ describe('event attribution from the source payload', () => {
 
     expect(await attributionOf('event-1')).toEqual(['group-b<-listing-a', 'group-c<-listing-a']);
 
-    const groups = await harness.prisma.groupScope.findMany({ orderBy: { scopeId: 'asc' } });
+    const groups = await harness.prisma.ingestionScope.findMany({ orderBy: { scopeId: 'asc' } });
     expect(groups.map((group) => group.scopeId)).toEqual(['group-b', 'group-c', 'listing-a']);
     const discovered = groups.filter((group) => group.scopeId !== 'listing-a');
     expect(discovered.map((group) => group.retrievalStatus)).toEqual(['pending', 'pending']);
     expect(discovered.map((group) => group.mapStatus)).toEqual(['unlisted', 'unlisted']);
-    expect(harness.prisma.groupScope.findMany).toBeDefined();
+    expect(harness.prisma.ingestionScope.findMany).toBeDefined();
   });
 
   it('unions the observations and removes only the contribution that stopped stating a group', async () => {
@@ -141,7 +141,7 @@ describe('event attribution from the source payload', () => {
 
     const links = await harness.prisma.eventGroupLink.findMany({ where: { eventId: 'event-1' } });
     expect(links).toHaveLength(2);
-    const groups = await harness.prisma.groupScope.findMany({
+    const groups = await harness.prisma.ingestionScope.findMany({
       where: { scopeId: 'group-b' },
     });
     expect(groups).toHaveLength(1);
@@ -153,7 +153,7 @@ describe('event attribution from the source payload', () => {
 
     expect(second.attributionsRemoved).toBe(0);
     expect(await attributionOf('event-1')).toEqual(['Group-A<-listing-1', 'Group-A<-listing-2']);
-    const groups = await harness.prisma.groupScope.findMany({ orderBy: { scopeId: 'asc' } });
+    const groups = await harness.prisma.ingestionScope.findMany({ orderBy: { scopeId: 'asc' } });
     expect(groups.map((group) => group.scopeId)).toEqual(['Group-A', 'listing-1', 'listing-2']);
   });
 
@@ -171,14 +171,14 @@ describe('event attribution from the source payload', () => {
   it('keeps an inactive group inactive even when a payload names it', async () => {
     const registry = new PostgresGroupRegistry(harness.prisma);
     await registry.bootstrapScope('group-b');
-    await harness.prisma.groupScope.update({
+    await harness.prisma.ingestionScope.update({
       where: { scopeId: 'group-b' },
       data: { mapStatus: 'inactive', retrievalStatus: 'stopped_inactive' },
     });
 
     await publish('listing-a', [publishedEvent('event-1', ['group-b'])]);
 
-    const group = await harness.prisma.groupScope.findUnique({ where: { scopeId: 'group-b' } });
+    const group = await harness.prisma.ingestionScope.findUnique({ where: { scopeId: 'group-b' } });
     expect(group?.mapStatus).toBe('inactive');
     expect(group?.retrievalStatus).toBe('stopped_inactive');
     expect(await attributionOf('event-1')).toEqual(['group-b<-listing-a']);
@@ -191,7 +191,7 @@ describe('event attribution from the source payload', () => {
 
     await publish('listing-a', [publishedEvent('event-1', ['group-b'])]);
 
-    const group = await harness.prisma.groupScope.findUnique({ where: { scopeId: 'group-b' } });
+    const group = await harness.prisma.ingestionScope.findUnique({ where: { scopeId: 'group-b' } });
     expect(group?.retrievalStatus).toBe('active');
     expect(group?.stoppedReason).toBeNull();
   });

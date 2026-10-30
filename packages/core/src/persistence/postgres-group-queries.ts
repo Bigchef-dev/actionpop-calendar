@@ -6,8 +6,8 @@ import type { GroupRegistryCounts, RegistryClient } from './postgres-group-regis
 
 export async function activeGroupScopeIds(client: RegistryClient): Promise<readonly string[]> {
   const rows = await client.$queryRaw<{ scope_id: string }[]>(Prisma.sql`
-    SELECT "scope_id" FROM "group_scope"
-    WHERE "retrieval_status" = 'active'
+    SELECT "scope_id" FROM "ingestion_scope"
+    WHERE "scope_kind" = 'group' AND "retrieval_status" = 'active'
     ORDER BY "scope_id" ASC
   `);
   return rows.map((row) => row.scope_id);
@@ -31,7 +31,8 @@ export async function findGroupScope(
   >(Prisma.sql`
     SELECT "scope_id", "display_name", "scope_type", "source_subtype", "certified",
            "source_link", "source_filter", "map_status"
-    FROM "group_scope" WHERE "scope_key" = ${normalizeScopeIdentity(scopeId)}::text
+    FROM "ingestion_scope"
+    WHERE "scope_kind" = 'group' AND "scope_key" = ${normalizeScopeIdentity(scopeId)}::text
   `);
   const row = rows[0];
   if (row === undefined) return undefined;
@@ -56,7 +57,8 @@ export async function countGroupScopes(client: RegistryClient): Promise<GroupReg
       count(*) FILTER (WHERE "retrieval_status" = 'pending') AS pending,
       count(*) FILTER (WHERE "map_status" = 'unlisted') AS unlisted,
       count(*) FILTER (WHERE "retrieval_status" LIKE 'stopped_%') AS stopped
-    FROM "group_scope"
+    FROM "ingestion_scope"
+    WHERE "scope_kind" = 'group'
   `);
   const row = rows[0];
   return {

@@ -44,23 +44,23 @@ export async function synchronizeGroupDirectory(
     );
 
     await client.$executeRaw(Prisma.sql`
-      INSERT INTO "group_scope" (
-        "scope_id", "scope_key", "display_name", "discovery_source", "map_status",
+      INSERT INTO "ingestion_scope" (
+        "scope_id", "scope_key", "scope_kind", "display_name", "discovery_source", "map_status",
         "retrieval_status", "stopped_at", "stopped_reason"
       )
-      SELECT "scope_id", "scope_key", "display_name", 'directory', "map_status",
+      SELECT "scope_id", "scope_key", 'group', "display_name", 'directory', "map_status",
              "retrieval_status", "stopped_at", "stopped_reason"
       FROM (VALUES ${values}) AS incoming(
         "scope_id", "scope_key", "display_name", "map_status", "retrieval_status",
         "stopped_at", "stopped_reason"
       )
-      ON CONFLICT ("scope_key") DO UPDATE SET
+      ON CONFLICT ("scope_kind", "scope_key") DO UPDATE SET
         "display_name" = EXCLUDED."display_name",
         "map_status" = EXCLUDED."map_status",
         "retrieval_status" = EXCLUDED."retrieval_status",
         "stopped_at" = CASE
           WHEN EXCLUDED."retrieval_status" = 'active' THEN NULL
-          ELSE COALESCE("group_scope"."stopped_at", EXCLUDED."stopped_at")
+          ELSE COALESCE("ingestion_scope"."stopped_at", EXCLUDED."stopped_at")
         END,
         "stopped_reason" = CASE
           WHEN EXCLUDED."retrieval_status" = 'active' THEN NULL
@@ -74,8 +74,8 @@ export async function synchronizeGroupDirectory(
     keys.length === 0 ? Prisma.empty : Prisma.sql`AND "scope_key" NOT IN (${Prisma.join(keys)})`;
 
   await client.$executeRaw(Prisma.sql`
-    UPDATE "group_scope" SET "map_status" = 'removed'
-    WHERE "map_status" IN ('listed', 'inactive')
+    UPDATE "ingestion_scope" SET "map_status" = 'removed'
+    WHERE "scope_kind" = 'group' AND "map_status" IN ('listed', 'inactive')
     ${absentClause}
   `);
 }

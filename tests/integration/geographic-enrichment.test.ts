@@ -11,7 +11,7 @@ const repository = new PostgresCalendarDatasetRepository(harness.prisma);
 beforeEach(async () => {
   await harness.prisma.eventRecord.deleteMany();
   await harness.prisma.calendarSnapshot.deleteMany();
-  await harness.prisma.groupScope.deleteMany();
+  await harness.prisma.ingestionScope.deleteMany();
   await truncateGeographicReference(harness.prisma);
 });
 

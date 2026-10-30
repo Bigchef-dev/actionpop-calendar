@@ -8,6 +8,7 @@ const unlistedPending: GroupLifecycle = { mapStatus: 'unlisted', retrievalStatus
 const unlistedActive: GroupLifecycle = { mapStatus: 'unlisted', retrievalStatus: 'active' };
 const stoppedUnknown: GroupLifecycle = { mapStatus: 'unlisted', retrievalStatus: 'stopped_unknown' };
 const removed: GroupLifecycle = { mapStatus: 'removed', retrievalStatus: 'active' };
+const eventScope: GroupLifecycle = { mapStatus: 'not_applicable', retrievalStatus: 'pending' };
 
 describe('group lifecycle transitions', () => {
   it('starts a discovered group pending and unlisted', () => {
@@ -59,5 +60,11 @@ describe('group lifecycle transitions', () => {
       mapStatus: 'listed',
       retrievalStatus: 'stopped_unknown',
     });
+  });
+
+  it('never applies a directory transition to an event scope', () => {
+    expect(nextGroupStatus(eventScope, { type: 'directory', isActive: true })).toEqual(eventScope);
+    expect(nextGroupStatus(eventScope, { type: 'directory', isActive: false })).toEqual(eventScope);
+    expect(nextGroupStatus(eventScope, { type: 'directory-absent' })).toEqual(eventScope);
   });
 });

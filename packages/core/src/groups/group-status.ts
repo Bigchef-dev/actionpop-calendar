@@ -1,5 +1,10 @@
-export type MapStatus = 'listed' | 'inactive' | 'unlisted' | 'removed';
-export type RetrievalStatus = 'pending' | 'active' | 'stopped_inactive' | 'stopped_unknown';
+export type MapStatus = 'listed' | 'inactive' | 'unlisted' | 'removed' | 'not_applicable';
+export type RetrievalStatus =
+  | 'pending'
+  | 'active'
+  | 'stopped_inactive'
+  | 'stopped_unknown'
+  | 'retired';
 
 export interface GroupLifecycle {
   readonly mapStatus: MapStatus;
@@ -28,6 +33,9 @@ export function nextGroupStatus(
   current: GroupLifecycle,
   transition: GroupTransition,
 ): GroupLifecycle {
+  // An event scope holds no map status, so no group transition may ever move it.
+  if (current.mapStatus === 'not_applicable') return current;
+
   switch (transition.type) {
     case 'directory':
       return transition.isActive

@@ -6,11 +6,16 @@ sequenceDiagram
     participant R as Données Redis (AOF)
     participant V as Volume Docker nommé
 
-    Note over Q,W: Le job est identifié par scope + période
+    Note over Q,W: Le job est identifié par scope + période, et porte scope_kind
     Q->>W: Assigne le job au Worker disponible (verrouillage)
-    
-    W->>AP: HTTP GET /events?group=X
-    AP-->>W: Réponse JSON (Liste des événements)
+
+    alt scope_kind = group
+        W->>AP: HTTP GET /events?group=X
+        AP-->>W: Réponse JSON (Liste des événements)
+    else scope_kind = event
+        W->>AP: HTTP GET /api/evenements/{id}/details/
+        AP-->>W: Document JSON unique (un événement)
+    end
 
     W->>W: Valide et transforme les données
     

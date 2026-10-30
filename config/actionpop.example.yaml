@@ -54,11 +54,13 @@ queue:
   dispatcherIntervalMs: 900000
 
 ingestion:
-  # INGESTION_MAX_NEW_GROUPS_PER_CYCLE — ceiling of newly scheduled groups per cycle (>= 1)
-  #   Groups discovered in event payloads become retrievable scopes from the next
-  #   dispatch cycle; the excess waits in discovery order instead of being dropped.
+  # INGESTION_MAX_NEW_GROUPS_PER_CYCLE — ceiling of newly scheduled scopes per cycle (>= 1)
+  #   The budget is shared: discovered groups and event ingestions (events that state
+  #   no group) both consume it, in discovery order. Whatever exceeds the ceiling waits
+  #   for a later cycle instead of being dropped.
   maxNewGroupsPerCycle: 200
-  # INGESTION_WORKER_CONCURRENCY — concurrent group retrievals per worker (>= 1)
-  #   The upstream throttles bursts with HTTP 429; a 429 is retried in place after
-  #   the delay it asks for, and the worker retries the job only if that fails.
+  # INGESTION_WORKER_CONCURRENCY — concurrent scope retrievals per worker (>= 1)
+  #   Group listings and event detail readings both consume it. The upstream throttles
+  #   bursts with HTTP 429; a 429 is retried in place after the delay it asks for, and
+  #   the worker retries the job only if that fails.
   workerConcurrency: 2

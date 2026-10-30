@@ -16,6 +16,15 @@ From the repository root, Compose can build both application images directly:
 docker compose -f infra/compose/docker-compose.yml up --build
 ```
 
+`up` also runs the one-shot `migrate` service, which applies the Prisma migrations with
+the CLI bundled in the worker image; `api` and `worker` start only once it succeeded, so
+the schema can never lag behind the images. Run it alone to migrate without restarting
+the applications:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml run --rm migrate
+```
+
 For local development, use the API from the private Compose network or add a
 local-only port override. Production traffic goes through the HTTPS edge.
 

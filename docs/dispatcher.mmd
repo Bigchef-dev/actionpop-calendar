@@ -10,7 +10,13 @@ sequenceDiagram
     Note over D,W: Période de traitement calculée dans Europe/Paris
 
     D->>D: Vérifie que le cycle précédent est terminé
-    D->>D: Charge les groupes actifs et la période courante
+    D->>D: Charge la période courante
+
+    Note over D: Deux natures de scope : groupe (liste_groupes) et événement (détail d'un événement)
+
+    D->>D: Retire les ingestions événement dont event_ends_at <= now (avant toute promotion)
+    D->>D: Budget = plafond partagé (INGESTION_MAX_NEW_GROUPS_PER_CYCLE) - déjà planifié sur la période
+    D->>D: Promeut les scopes pending, les deux natures, par first_observed_at croissant
 
     loop Pour chaque scope actif
         D->>D: Calcule job_id = scope_id + period_token
@@ -24,8 +30,13 @@ sequenceDiagram
 
     Q-->>W: Déclenche le job suivant disponible
     W->>W: Claim du job (lock de propriété)
-    W->>A: GET /carte/liste_groupes/ ou /events?page=X&page_size=Y
-    A-->>W: Réponse JSON paginée
+    alt scope_kind = group
+        W->>A: GET /carte/liste_groupes/ ou /events?page=X&page_size=Y
+        A-->>W: Réponse JSON paginée
+    else scope_kind = event
+        W->>A: GET /api/evenements/{id}/details/
+        A-->>W: Document JSON unique, sans pagination
+    end
     W->>W: Valide le payload, normalise, calcule content_hash
 
     loop Pour chaque événement récupéré
@@ -40,6 +51,7 @@ sequenceDiagram
     end
 
     W->>R: Publier le snapshot ou mettre à jour le dataset préparé
+    Note over W,R: Une lecture de détail publie l'événement, met à jour event_ends_at et retire<br/>son ingestion si l'événement est terminé, si un groupe est déclaré, ou si la source répond 404
     W->>Q: Confirmer le job comme terminé
     Q-->>D: Cycle terminé / état visible
     F->>R: Lire les événements préparés pour le calendrier

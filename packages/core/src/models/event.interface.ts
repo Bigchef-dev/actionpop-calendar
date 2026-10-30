@@ -4,6 +4,7 @@ import {
 } from '../adapters/action-populaire-schemas.js';
 import type { GeographicAttachment } from '../geography/reference-types.js';
 import type { ObservedGroup } from '../groups/observed-groups.js';
+import type { ScopeKind } from '../scopes/scope-kind.js';
 
 export type LocationEvent = Pick<
   ActionPopulaireLocation,
@@ -39,6 +40,8 @@ export interface PublishedEvent extends IncomingEvent {
 
 export interface PublishedGroupSnapshot {
   scopeId: string;
+  /** Ingestion kind of the observing scope; absent means a group listing. */
+  scopeKind?: ScopeKind;
   revision: number;
   generatedAt: string;
   /** Processing period of the observation, used for attribution metrics. */

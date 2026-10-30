@@ -5,17 +5,35 @@ classDiagram
         class Scope {
             +UUID scopeId
             +string scopeKey
+            +ScopeKind kind
             +string displayName
             +MapStatus mapStatus
             +RetrievalStatus retrievalStatus
             +Instant firstObservedAt
             +Instant lastObservedAt
+            +Instant eventEndsAt
             +discovered()
             +listed()
             +deactivated()
             +stopped(reason)
             +promoted()
+            +retired(reason)
+            +reopened()
         }
+
+        class GroupScope {
+            +MapStatus mapStatus
+            +RetrievalStatus retrievalStatus
+        }
+
+        class EventScope {
+            +Instant eventEndsAt
+            +retired(reason)
+            +reopened()
+        }
+
+        Scope <|-- GroupScope
+        Scope <|-- EventScope
 
         class ProcessingPeriod {
             +Instant periodStartUtc
@@ -109,7 +127,7 @@ classDiagram
         class ActionPopulaireClient <<adapter>> {
             +listGroups()
             +listUpcomingEvents(UUID groupId, int page, int pageSize)
-            +getEvent(UUID eventId)
+            +fetchEventDetails(UUID eventId)
         }
 
         class EventMapper <<mapper>> {

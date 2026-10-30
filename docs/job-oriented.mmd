@@ -18,15 +18,23 @@ erDiagram
     INGESTION_JOB {
         string job_id PK "deterministic scope-period id"
         string scope_id FK
+        string scope_kind "group | event, chooses the processor"
         string period_token FK
         string status "waiting delayed active completed failed"
         int attempts_made
         string worker_id "current owner"
     }
 
+    INGESTION_SCOPE {
+        string scope_id PK
+        string scope_kind "group | event"
+        string retrieval_status "pending active stopped_inactive stopped_unknown retired"
+        datetime event_ends_at "event scopes only"
+        datetime first_observed_at "promotion order, shared ceiling"
+    }
 
-    GROUP_SCOPE ||--o{ INGESTION_JOB : scopes
-    GROUP_SCOPE ||--o{ INGESTION_LEDGER : owns
+    INGESTION_SCOPE ||--o{ INGESTION_JOB : scopes
+    INGESTION_SCOPE ||--o{ INGESTION_LEDGER : owns
     INGESTION_JOB ||--|| INGESTION_LEDGER : tracked_by
     PROCESSING_PERIOD ||--o{ INGESTION_JOB : schedules
     PROCESSING_PERIOD ||--o{ INGESTION_LEDGER : records

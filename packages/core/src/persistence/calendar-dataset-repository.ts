@@ -1,5 +1,6 @@
 import { buildRedisKey, normalizeScopeToken } from '../index-internal.js';
 import { PublishedEvent } from '../index.js';
+import type { ScopeKind } from '../scopes/scope-kind.js';
 
 export interface StoredCalendarEvent {
   sourceEventId: string;
@@ -14,6 +15,8 @@ export interface StoredCalendarEvent {
 
 export interface CalendarDataset {
   scopeId: string;
+  /** Ingestion kind of the observing scope; absent means a group listing. */
+  scopeKind?: ScopeKind;
   revision: number;
   generatedAt: string;
   /** Period the observation belongs to; attributed counters are recorded against it. */
