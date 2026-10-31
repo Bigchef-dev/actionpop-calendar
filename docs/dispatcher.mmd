@@ -12,11 +12,11 @@ sequenceDiagram
     D->>D: Vérifie que le cycle précédent est terminé
     D->>D: Charge la période courante
 
-    Note over D: Deux natures de scope : groupe (liste_groupes) et événement (détail d'un événement)
+    Note over D: Trois natures de scope : groupe (liste_groupes), événement (détail) et carte (liste_evenements)
 
     D->>D: Retire les ingestions événement dont event_ends_at <= now (avant toute promotion)
     D->>D: Budget = plafond partagé (INGESTION_MAX_NEW_GROUPS_PER_CYCLE) - déjà planifié sur la période
-    D->>D: Promeut les scopes pending, les deux natures, par first_observed_at croissant
+    D->>D: Promeut les scopes pending groupe/événement par first_observed_at croissant
 
     loop Pour chaque scope actif
         D->>D: Calcule job_id = scope_id + period_token
@@ -36,6 +36,10 @@ sequenceDiagram
     else scope_kind = event
         W->>A: GET /api/evenements/{id}/details/
         A-->>W: Document JSON unique, sans pagination
+    else scope_kind = map
+        W->>A: GET /carte/liste_evenements/
+        A-->>W: Tableau complet, sans pagination
+        W->>R: Enregistrer les observations et demander des event scopes pending
     end
     W->>W: Valide le payload, normalise, calcule content_hash
 

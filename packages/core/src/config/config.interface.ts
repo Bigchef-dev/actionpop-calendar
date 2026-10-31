@@ -39,6 +39,9 @@ export interface IngestionScopeConfig {
   readonly maxNewGroupsPerCycle: number;
   /** Concurrent group retrievals per worker process. */
   readonly workerConcurrency: number;
+  readonly mapDiscoveryEnabled: boolean;
+  readonly mapFreshnessHorizonMs: number;
+  readonly mapReconciliationIntervalMs: number;
 }
 
 export interface UpstreamScopeConfig {

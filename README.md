@@ -50,6 +50,26 @@ machine, start the dependencies once with `sudo pnpm dev:infra` (or add your use
 the `docker` group) before running `pnpm dev`. Startup aborts with a single message
 naming the unreachable dependency instead of retrying forever.
 
+### Map event discovery
+
+The worker reads the public map listing (`GET /carte/liste_evenements/`) once per
+cycle to fill coverage gaps left by group and event ingestions. A listed identity is
+selected only when no active scope keeps it fresh, it has no pending or active event
+scope, it has not ended, and its reconciliation is due. Selected identities become
+**pending event scopes**, so the existing promotion ceiling, detail processor,
+publication and attribution remain the only path to the calendar.
+
+The map summary is never canonical: it supplies identity and change hints only. The
+detail document remains the sole source of content. Absence from the listing never
+cancels or removes an event. Configuration:
+
+- `INGESTION_MAP_DISCOVERY_ENABLED` (default `true`)
+- `INGESTION_MAP_FRESHNESS_HORIZON_MS` (default one hour)
+- `INGESTION_MAP_RECONCILIATION_INTERVAL_MS` (default seven days)
+
+Operator counters include `map.entries`, `map.gap_candidates`, `map.selected`,
+`map.skipped`, `map.rejected`, `map.hints_dropped` and the `map.outcomes_*` family.
+
 ### Geographic reference
 
 Events are attached to a country, a department and a commune from the raw Action

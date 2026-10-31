@@ -70,6 +70,46 @@ describe('parseRuntimeConfig', () => {
     ).toThrow(/INGESTION_WORKER_CONCURRENCY/);
   });
 
+  it('defaults map discovery to enabled with a one-hour horizon and weekly reconciliation', () => {
+    const config = parseRuntimeConfig(
+      { REDIS_URL: 'redis://localhost:6379' },
+      'worker',
+      emptyConfigRoot(),
+    );
+
+    expect(config.ingestion.mapDiscoveryEnabled).toBe(true);
+    expect(config.ingestion.mapFreshnessHorizonMs).toBe(3_600_000);
+    expect(config.ingestion.mapReconciliationIntervalMs).toBe(604_800_000);
+  });
+
+  it('reads map discovery settings from the environment and rejects invalid values', () => {
+    const config = parseRuntimeConfig(
+      {
+        REDIS_URL: 'redis://localhost:6379',
+        INGESTION_MAP_DISCOVERY_ENABLED: 'false',
+        INGESTION_MAP_FRESHNESS_HORIZON_MS: '120000',
+        INGESTION_MAP_RECONCILIATION_INTERVAL_MS: '86400000',
+      },
+      'worker',
+    );
+
+    expect(config.ingestion.mapDiscoveryEnabled).toBe(false);
+    expect(config.ingestion.mapFreshnessHorizonMs).toBe(120_000);
+    expect(config.ingestion.mapReconciliationIntervalMs).toBe(86_400_000);
+    expect(() =>
+      parseRuntimeConfig(
+        { REDIS_URL: 'redis://localhost:6379', INGESTION_MAP_DISCOVERY_ENABLED: 'maybe' },
+        'worker',
+      ),
+    ).toThrow(/INGESTION_MAP_DISCOVERY_ENABLED/);
+    expect(() =>
+      parseRuntimeConfig(
+        { REDIS_URL: 'redis://localhost:6379', INGESTION_MAP_FRESHNESS_HORIZON_MS: '0' },
+        'worker',
+      ),
+    ).toThrow(/INGESTION_MAP_FRESHNESS_HORIZON_MS/);
+  });
+
   it('rejects missing Redis configuration and invalid values', () => {
     expect(() => parseRuntimeConfig({}, 'worker')).toThrow(/REDIS_URL/);
     expect(() =>

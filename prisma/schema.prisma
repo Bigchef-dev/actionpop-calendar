@@ -258,3 +258,20 @@ model CommuneReference {
   @@index([postalCodes], type: Gin)
   @@map("commune_reference")
 }
+
+model MapEventObservation {
+  eventId            String    @id @map("event_id")
+  summaryFingerprint String    @map("summary_fingerprint")
+  displayName        String?   @map("display_name")
+  startTime          DateTime? @map("start_time") @db.Timestamptz(3)
+  endTime            DateTime? @map("end_time") @db.Timestamptz(3)
+  subtypeId          Int?      @map("subtype_id")
+  firstSeenAt        DateTime  @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt         DateTime  @map("last_seen_at") @db.Timestamptz(3)
+  lastRequestedAt    DateTime? @map("last_requested_at") @db.Timestamptz(3)
+  lastOutcome        String?   @map("last_outcome")
+  nextReconcileAt    DateTime? @map("next_reconcile_at") @db.Timestamptz(3)
+
+  @@index([nextReconcileAt])
+  @@map("map_event_observation")
+}

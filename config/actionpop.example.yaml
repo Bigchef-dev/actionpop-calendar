@@ -64,3 +64,11 @@ ingestion:
   #   bursts with HTTP 429; a 429 is retried in place after the delay it asks for, and
   #   the worker retries the job only if that fails.
   workerConcurrency: 2
+  # INGESTION_MAP_DISCOVERY_ENABLED — read the public map listing once per cycle (boolean)
+  #   The listing fills gaps left by group and event ingestions. It never publishes:
+  #   selected identities become pending event scopes and consume the ceiling above.
+  mapDiscoveryEnabled: true
+  # INGESTION_MAP_FRESHNESS_HORIZON_MS — age under which an active observation covers an event (>= 1)
+  mapFreshnessHorizonMs: 3600000
+  # INGESTION_MAP_RECONCILIATION_INTERVAL_MS — re-read an unchanged resolved event after this delay (>= 1)
+  mapReconciliationIntervalMs: 604800000

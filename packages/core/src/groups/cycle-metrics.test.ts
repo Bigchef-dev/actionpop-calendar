@@ -16,6 +16,17 @@ describe('cycle metrics', () => {
       'event_scopes.created',
       'event_scopes.retired',
       'event_scopes.reading_failed',
+      'map.entries',
+      'map.rejected',
+      'map.duplicates',
+      'map.hints_dropped',
+      'map.gap_candidates',
+      'map.selected',
+      'map.skipped',
+      'map.outcomes_resolved',
+      'map.outcomes_unknown',
+      'map.outcomes_mismatched',
+      'map.outcomes_failed',
     ]);
   });
 

@@ -140,3 +140,25 @@ describe('dispatcher cycle report', () => {
     });
   });
 });
+
+describe('map observation gauge', () => {
+  it('reports the map ledger size when the runtime provides it', async () => {
+    const metrics = new MetricsRegistry();
+
+    await reportDispatcherCycle(
+      { periodToken: '2026-10-29T10:00:00.000Z', promoted: [], scheduled: 0, retired: 0 },
+      {
+        registry: { counts: async () => counts },
+        eventScopes: eventScopes(),
+        mapObservations: { countObservations: async () => 42 },
+        cycleMetrics: { latestBefore: async () => undefined, increment: async () => undefined },
+        metrics,
+        logger: logger([]),
+      },
+    );
+
+    expect(
+      metrics.snapshot().find((sample) => sample.name === 'actionpop_map_observations')?.value,
+    ).toBe(42);
+  });
+});

@@ -15,6 +15,8 @@ export interface CycleReportDependencies {
   readonly registry: { counts(): Promise<GroupRegistryCounts> };
   /** Counts of the event ingestion kind, reported apart from the group gauges. */
   readonly eventScopes: { countEventScopes(): Promise<EventScopeCounts> };
+  /** Size of the map discovery ledger; absent in runtimes without map discovery. */
+  readonly mapObservations?: { countObservations(): Promise<number> };
   readonly cycleMetrics: {
     latestBefore(periodToken: string): Promise<CycleMetricReading | undefined>;
     increment(periodToken: string, samples: readonly CycleMetricSample[]): Promise<void>;
@@ -42,6 +44,13 @@ export async function reportDispatcherCycle(
   deps.metrics.setGauge('actionpop_event_scopes_pending', {}, events.pending);
   deps.metrics.setGauge('actionpop_event_scopes_active', {}, events.active);
   deps.metrics.setGauge('actionpop_event_scopes_retired', {}, events.retired);
+  if (deps.mapObservations !== undefined) {
+    deps.metrics.setGauge(
+      'actionpop_map_observations',
+      {},
+      await deps.mapObservations.countObservations(),
+    );
+  }
 
   if (cycle.promoted.length > 0) {
     deps.metrics.increment('actionpop_groups_scheduled_total', {}, cycle.promoted.length);

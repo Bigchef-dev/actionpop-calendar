@@ -40,6 +40,54 @@ const coordinateSchema = z
   })
   .strip();
 
+export const MAP_EVENT_HINT_FIELDS = [
+  'name',
+  'coordinates',
+  'date',
+  'link',
+  'start_time',
+  'end_time',
+  'subtype',
+] as const;
+
+export type MapEventHintField = (typeof MAP_EVENT_HINT_FIELDS)[number];
+
+export interface MapEventSummary {
+  readonly id: string;
+  readonly name?: string;
+  readonly coordinates?: GeoPoint;
+  readonly date?: string;
+  readonly link?: string;
+  readonly start_time?: string;
+  readonly end_time?: string;
+  readonly subtype?: number;
+}
+
+export const mapEventIdSchema = z.string().trim().min(1);
+
+export const mapEventHintSchemas = {
+  name: z.string().trim().min(1),
+  coordinates: coordinateSchema,
+  date: z.string().trim().min(1),
+  link: z.string().url(),
+  start_time: isoTimestampSchema,
+  end_time: isoTimestampSchema,
+  subtype: z.number().int(),
+} satisfies Record<MapEventHintField, z.ZodType>;
+
+export const mapEventSummarySchema = z
+  .object({
+    id: mapEventIdSchema,
+    name: mapEventHintSchemas.name.optional(),
+    coordinates: mapEventHintSchemas.coordinates.nullable().optional(),
+    date: mapEventHintSchemas.date.optional(),
+    link: mapEventHintSchemas.link.optional(),
+    start_time: mapEventHintSchemas.start_time.optional(),
+    end_time: mapEventHintSchemas.end_time.optional(),
+    subtype: mapEventHintSchemas.subtype.optional(),
+  })
+  .strip();
+
 const communeSchema = z
   .object({
     name: optionalText,
@@ -141,6 +189,96 @@ function parseSchema<T>(schema: z.ZodType<T>, value: unknown, label: string): T 
     .map((issue) => `${issue.path.join('.') || label} ${issue.message}`)
     .join('; ');
   throw new PayloadValidationError(`${label}: ${details}`);
+}
+
+export interface MapEventSummaryParse {
+  readonly summary?: MapEventSummary;
+  readonly droppedHints: readonly MapEventHintField[];
+}
+
+/**
+ * Identity-first entry validation: only an unusable identity rejects the entry.
+ * Each optional hint is validated alone, so one malformed value never hides a
+ * valid event from discovery. The detail document remains authoritative.
+ */
+export function parseMapEventSummaryEntry(value: unknown): MapEventSummaryParse {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { droppedHints: [] };
+  }
+  const record = value as Record<string, unknown>;
+  const identity = mapEventIdSchema.safeParse(record.id);
+  if (!identity.success) return { droppedHints: [] };
+
+  const droppedHints: MapEventHintField[] = [];
+  const summary: {
+    id: string;
+    name?: string;
+    coordinates?: GeoPoint;
+    date?: string;
+    link?: string;
+    start_time?: string;
+    end_time?: string;
+    subtype?: number;
+  } = { id: identity.data };
+
+  const name = mapEventHintSchemas.name.safeParse(record.name);
+  if (name.success) {
+    summary.name = name.data;
+  } else if (record.name !== undefined && record.name !== null) {
+    droppedHints.push('name');
+  }
+
+  if (record.coordinates !== undefined && record.coordinates !== null) {
+    const coordinates = mapEventHintSchemas.coordinates.safeParse(record.coordinates);
+    if (coordinates.success) summary.coordinates = coordinates.data;
+    else droppedHints.push('coordinates');
+  }
+
+  const date = mapEventHintSchemas.date.safeParse(record.date);
+  if (date.success) {
+    summary.date = date.data;
+  } else if (record.date !== undefined && record.date !== null) {
+    droppedHints.push('date');
+  }
+
+  const link = mapEventHintSchemas.link.safeParse(record.link);
+  if (link.success) {
+    summary.link = link.data;
+  } else if (record.link !== undefined && record.link !== null) {
+    droppedHints.push('link');
+  }
+
+  const startTime = mapEventHintSchemas.start_time.safeParse(record.start_time);
+  if (startTime.success) {
+    summary.start_time = startTime.data;
+  } else if (record.start_time !== undefined && record.start_time !== null) {
+    droppedHints.push('start_time');
+  }
+
+  const endTime = mapEventHintSchemas.end_time.safeParse(record.end_time);
+  if (endTime.success) {
+    summary.end_time = endTime.data;
+  } else if (record.end_time !== undefined && record.end_time !== null) {
+    droppedHints.push('end_time');
+  }
+
+  const subtype = mapEventHintSchemas.subtype.safeParse(record.subtype);
+  if (subtype.success) {
+    summary.subtype = subtype.data;
+  } else if (record.subtype !== undefined && record.subtype !== null) {
+    droppedHints.push('subtype');
+  }
+
+  if (
+    summary.start_time !== undefined &&
+    summary.end_time !== undefined &&
+    Date.parse(summary.end_time) < Date.parse(summary.start_time)
+  ) {
+    delete summary.end_time;
+    droppedHints.push('end_time');
+  }
+
+  return { summary, droppedHints };
 }
 
 export function validateActionPopulaireEvent(value: unknown): ActionPopulaireEventPayload {

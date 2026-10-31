@@ -7,8 +7,10 @@ import {
   UnknownGroupError,
   validateActionPopulaireEvent,
   validateGroupCatalogue,
+  validateMapEventListing,
   type ActionPopulaireEventPayload,
   type GroupCatalogueEntry,
+  type MapEventListingValidation,
 } from '@actionpop/core';
 
 export interface ActionPopulaireClientOptions {
@@ -29,6 +31,10 @@ export class ActionPopulaireClient {
 
   public async fetchGroupCatalogue(): Promise<GroupCatalogueEntry[]> {
     return validateGroupCatalogue(await this.request('/carte/liste_groupes/'));
+  }
+
+  public async fetchMapEventListing(): Promise<MapEventListingValidation> {
+    return validateMapEventListing(await this.request('/carte/liste_evenements/'));
   }
 
   /**

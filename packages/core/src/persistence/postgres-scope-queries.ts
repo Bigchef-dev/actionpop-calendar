@@ -20,7 +20,8 @@ export async function activeScopes(client: RegistryClient): Promise<readonly Act
   `);
   return rows.map((row) => ({
     scopeId: row.scope_id,
-    scopeKind: row.scope_kind === 'event' ? 'event' : 'group',
+    scopeKind:
+      row.scope_kind === 'map' ? 'map' : row.scope_kind === 'event' ? 'event' : 'group',
   }));
 }
 

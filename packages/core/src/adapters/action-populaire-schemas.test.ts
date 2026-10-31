@@ -4,6 +4,7 @@ import {
   validateActionPopulaireEvent,
   validateGroupCatalogue,
 } from './action-populaire-schemas.js';
+import { validateMapEventListing } from '../discovery/map-listing.js';
 
 const location = {
   name: 'Town hall',
@@ -142,5 +143,33 @@ describe('Action Populaire schemas', () => {
         location,
       }),
     ).toThrow(/ISO 8601|timezone/i);
+  });
+});
+
+describe('map event summaries', () => {
+  const summary = {
+    id: 'event-1',
+    name: 'Meeting',
+    coordinates: { type: 'Point', coordinates: [2.35, 48.85] },
+    date: 'le 23 octobre 2027 à 16:00 (Europe/Paris)',
+    link: 'https://actionpopulaire.fr/evenements/carte/event-1/',
+    start_time: '2027-10-23T16:00:00+02:00',
+    end_time: '2027-10-23T18:00:00+02:00',
+    subtype: 16,
+  };
+
+  it('never accepts a map summary as a canonical event', () => {
+    expect(() => validateActionPopulaireEvent(summary)).toThrow(/startTime/);
+  });
+
+  it('exposes only summary fields and never canonical fields', () => {
+    const parsed = validateMapEventListing([summary]).summaries[0];
+
+    expect(parsed).toEqual(summary);
+    expect(parsed).not.toHaveProperty('startTime');
+    expect(parsed).not.toHaveProperty('endTime');
+    expect(parsed).not.toHaveProperty('timezone');
+    expect(parsed).not.toHaveProperty('location');
+    expect(parsed).not.toHaveProperty('groups');
   });
 });

@@ -1,6 +1,7 @@
 import {
   CYCLE_METRICS,
   cycleMetricSamples,
+  EventIdentityMismatchError,
   UnknownEventError,
   type ActionPopulaireEventPayload,
   type CycleMetricSample,
@@ -35,8 +36,14 @@ interface LedgerTransition {
   error?: string;
 }
 
+export type MapOutcome = 'resolved' | 'unknown' | 'mismatched' | 'failed';
+
 export interface EventIngestionDependencies {
   readonly client: { fetchEventDetails(eventId: string): Promise<unknown> };
+  /** Optional so group-discovered event scopes keep working without a map observation. */
+  readonly mapDiscovery?: {
+    recordOutcome(eventId: string, outcome: MapOutcome, at: Date): Promise<boolean>;
+  };
   readonly ledger: { transition(jobId: string, patch: LedgerTransition): Promise<void> };
   readonly eventTypes: EventTypeReader;
   readonly geographicReference: GeographicReferenceReader;
@@ -61,6 +68,25 @@ export interface EventIngestionDependencies {
   readonly cycleMetrics: {
     increment(periodToken: string, samples: readonly CycleMetricSample[]): Promise<void>;
   };
+}
+
+async function recordMapOutcome(
+  deps: EventIngestionDependencies,
+  eventId: string,
+  outcome: MapOutcome,
+): Promise<void> {
+  if (deps.mapDiscovery === undefined) return;
+  try {
+    await deps.mapDiscovery.recordOutcome(eventId, outcome, new Date());
+  } catch (error) {
+    // Observability must not turn a successful publication into a failed job.
+    deps.logger.warn('map outcome recording failed', {
+      operation: 'map-discovery',
+      eventId,
+      outcome,
+      failure: error instanceof Error ? error.message : 'unknown error',
+    });
+  }
 }
 
 /**
@@ -93,6 +119,7 @@ export async function processEventIngestion(
       job.periodToken,
       deps,
     );
+    await recordMapOutcome(deps, job.scopeId, 'resolved');
     await deps.ledger.transition(job.jobId, { status: 'succeeded', attempts });
 
     countPublication(deps.metrics, summary);
@@ -118,9 +145,15 @@ export async function processEventIngestion(
     });
   } catch (error) {
     if (error instanceof UnknownEventError) {
+      await recordMapOutcome(deps, job.scopeId, 'unknown');
       await stopEventIngestion(job, deps);
       return;
     }
+    await recordMapOutcome(
+      deps,
+      job.scopeId,
+      error instanceof EventIdentityMismatchError ? 'mismatched' : 'failed',
+    );
     deps.metrics.increment('actionpop_event_readings_failed_total', {});
     await deps.cycleMetrics.increment(
       job.periodToken,

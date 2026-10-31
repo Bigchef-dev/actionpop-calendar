@@ -9,9 +9,15 @@ import {
   processEventIngestion,
   type EventIngestionDependencies,
 } from './event-ingestion-processor.js';
+import {
+  processMapDiscovery,
+  type MapDiscoveryDependencies,
+} from './map-discovery-processor.js';
 
-/** The dependency superset both ingestion kinds need. */
-export type IngestionDependencies = CalendarIngestionDependencies & EventIngestionDependencies;
+/** The dependency superset every ingestion kind needs. */
+export type IngestionDependencies = CalendarIngestionDependencies &
+  EventIngestionDependencies &
+  MapDiscoveryDependencies;
 
 export interface DispatchedIngestionJob extends IngestionJobContext {
   readonly scopeKind: ScopeKind;
@@ -25,6 +31,10 @@ export async function processIngestionJob(
   job: DispatchedIngestionJob,
   deps: IngestionDependencies,
 ): Promise<void> {
+  if (job.scopeKind === 'map') {
+    await processMapDiscovery(job, deps);
+    return;
+  }
   if (job.scopeKind === 'event') {
     await processEventIngestion(job, deps);
     return;

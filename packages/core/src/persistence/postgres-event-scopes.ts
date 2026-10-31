@@ -7,7 +7,8 @@ import type { RegistryClient } from './postgres-group-registry.js';
 export interface EventScopeRequest {
   readonly eventId: string;
   readonly displayName: string;
-  readonly endTime: string;
+  readonly endTime: string | null;
+  readonly discoverySource?: string;
 }
 
 export interface EventScopeRequestOutcome {
@@ -23,7 +24,8 @@ function requestValues(requests: readonly EventScopeRequest[], observedAt: Date)
           ${request.eventId}::text,
           ${normalizeScopeIdentity(request.eventId)}::text,
           ${request.displayName}::text,
-          ${new Date(request.endTime)}::timestamptz,
+          ${request.endTime === null ? null : new Date(request.endTime)}::timestamptz,
+          ${request.discoverySource ?? 'event_payload'}::text,
           ${observedAt}::timestamptz
         )`,
     ),
@@ -49,9 +51,9 @@ export async function requestEventScopes(
       "scope_id", "scope_key", "scope_kind", "display_name", "discovery_source",
       "map_status", "retrieval_status", "first_observed_at", "last_observed_at", "event_ends_at"
     )
-    SELECT "scope_id", "scope_key", 'event', "display_name", 'event_payload',
+    SELECT "scope_id", "scope_key", 'event', "display_name", "discovery_source",
            'not_applicable', 'pending', "observed_at", "observed_at", "ends_at"
-    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "observed_at")
+    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "discovery_source", "observed_at")
     ON CONFLICT DO NOTHING
     RETURNING "scope_id"
   `);
@@ -60,8 +62,9 @@ export async function requestEventScopes(
     UPDATE "ingestion_scope" AS g
     SET "retrieval_status" = 'pending', "stopped_at" = NULL, "stopped_reason" = NULL,
         "display_name" = COALESCE(incoming."display_name", g."display_name"),
-        "event_ends_at" = incoming."ends_at", "last_observed_at" = incoming."observed_at"
-    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "observed_at")
+        "event_ends_at" = COALESCE(incoming."ends_at", g."event_ends_at"),
+        "last_observed_at" = incoming."observed_at"
+    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "discovery_source", "observed_at")
     WHERE g."scope_kind" = 'event'
       AND g."scope_key" = incoming."scope_key"
       AND g."retrieval_status" = 'retired'
@@ -71,9 +74,9 @@ export async function requestEventScopes(
   await transaction.$executeRaw(Prisma.sql`
     UPDATE "ingestion_scope" AS g
     SET "display_name" = COALESCE(incoming."display_name", g."display_name"),
-        "event_ends_at" = incoming."ends_at",
+        "event_ends_at" = COALESCE(incoming."ends_at", g."event_ends_at"),
         "last_observed_at" = incoming."observed_at"
-    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "observed_at")
+    FROM (VALUES ${values}) AS incoming("scope_id", "scope_key", "display_name", "ends_at", "discovery_source", "observed_at")
     WHERE g."scope_kind" = 'event' AND g."scope_key" = incoming."scope_key"
   `);
 

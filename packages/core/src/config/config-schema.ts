@@ -10,6 +10,9 @@ import { ConfigurationError } from '../operations/errors.js';
 import {
   DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
   DEFAULT_INGESTION_WORKER_CONCURRENCY,
+  DEFAULT_MAP_DISCOVERY_ENABLED,
+  DEFAULT_MAP_FRESHNESS_HORIZON_MS,
+  DEFAULT_MAP_RECONCILIATION_INTERVAL_MS,
   DEFAULT_CALENDAR_ENABLED,
   DEFAULT_CALENDAR_LOOKAHEAD_DAYS,
   DEFAULT_CALENDAR_LOOKBACK_DAYS,
@@ -64,6 +67,17 @@ const ingestionSchema = z
       .int()
       .min(1)
       .default(DEFAULT_INGESTION_WORKER_CONCURRENCY),
+    mapDiscoveryEnabled: z.boolean().default(DEFAULT_MAP_DISCOVERY_ENABLED),
+    mapFreshnessHorizonMs: z
+      .number()
+      .int()
+      .min(1)
+      .default(DEFAULT_MAP_FRESHNESS_HORIZON_MS),
+    mapReconciliationIntervalMs: z
+      .number()
+      .int()
+      .min(1)
+      .default(DEFAULT_MAP_RECONCILIATION_INTERVAL_MS),
   })
   .strict();
 
@@ -109,6 +123,9 @@ export interface ParsedConfigurationDocument {
   readonly ingestion: {
     readonly maxNewGroupsPerCycle: number;
     readonly workerConcurrency: number;
+    readonly mapDiscoveryEnabled: boolean;
+    readonly mapFreshnessHorizonMs: number;
+    readonly mapReconciliationIntervalMs: number;
   };
 }
 

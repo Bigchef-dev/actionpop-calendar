@@ -51,6 +51,21 @@ export const ENVIRONMENT_MAPPINGS: readonly EnvironmentMapping[] = [
     variable: 'INGESTION_WORKER_CONCURRENCY',
     read: asInteger,
   },
+  {
+    key: 'ingestion.mapDiscoveryEnabled',
+    variable: 'INGESTION_MAP_DISCOVERY_ENABLED',
+    read: asBoolean,
+  },
+  {
+    key: 'ingestion.mapFreshnessHorizonMs',
+    variable: 'INGESTION_MAP_FRESHNESS_HORIZON_MS',
+    read: asInteger,
+  },
+  {
+    key: 'ingestion.mapReconciliationIntervalMs',
+    variable: 'INGESTION_MAP_RECONCILIATION_INTERVAL_MS',
+    read: asInteger,
+  },
 ];
 
 export function variableFor(key: string): string | undefined {

@@ -14,6 +14,9 @@ import {
   DEFAULT_DISPATCHER_INTERVAL_MS,
   DEFAULT_INGESTION_MAX_NEW_GROUPS_PER_CYCLE,
   DEFAULT_INGESTION_WORKER_CONCURRENCY,
+  DEFAULT_MAP_DISCOVERY_ENABLED,
+  DEFAULT_MAP_FRESHNESS_HORIZON_MS,
+  DEFAULT_MAP_RECONCILIATION_INTERVAL_MS,
 } from './defaults.config.js';
 import { findWorkspaceRoot } from './load-env.js';
 
@@ -24,6 +27,14 @@ function parsePositiveInt(val: string | undefined, name: string, fallback: numbe
     throw new ConfigurationError(`${name} must be a positive integer`);
   }
   return num;
+}
+
+function parseBoolean(val: string | undefined, name: string, fallback: boolean): boolean {
+  if (val === undefined || val.trim() === '') return fallback;
+  const value = val.trim().toLowerCase();
+  if (value === 'true' || value === '1') return true;
+  if (value === 'false' || value === '0') return false;
+  throw new ConfigurationError(`${name} must be a boolean`);
 }
 
 function parseTimezone(value: string | undefined): string {
@@ -100,6 +111,9 @@ export function parseIngestionConfig(
   document: {
     maxNewGroupsPerCycle?: number | undefined;
     workerConcurrency?: number | undefined;
+    mapDiscoveryEnabled?: boolean | undefined;
+    mapFreshnessHorizonMs?: number | undefined;
+    mapReconciliationIntervalMs?: number | undefined;
   } = {},
 ): IngestionScopeConfig {
   return {
@@ -116,6 +130,27 @@ export function parseIngestionConfig(
         env.INGESTION_WORKER_CONCURRENCY,
         'INGESTION_WORKER_CONCURRENCY',
         DEFAULT_INGESTION_WORKER_CONCURRENCY,
+      ),
+    mapDiscoveryEnabled:
+      document.mapDiscoveryEnabled ??
+      parseBoolean(
+        env.INGESTION_MAP_DISCOVERY_ENABLED,
+        'INGESTION_MAP_DISCOVERY_ENABLED',
+        DEFAULT_MAP_DISCOVERY_ENABLED,
+      ),
+    mapFreshnessHorizonMs:
+      document.mapFreshnessHorizonMs ??
+      parsePositiveInt(
+        env.INGESTION_MAP_FRESHNESS_HORIZON_MS,
+        'INGESTION_MAP_FRESHNESS_HORIZON_MS',
+        DEFAULT_MAP_FRESHNESS_HORIZON_MS,
+      ),
+    mapReconciliationIntervalMs:
+      document.mapReconciliationIntervalMs ??
+      parsePositiveInt(
+        env.INGESTION_MAP_RECONCILIATION_INTERVAL_MS,
+        'INGESTION_MAP_RECONCILIATION_INTERVAL_MS',
+        DEFAULT_MAP_RECONCILIATION_INTERVAL_MS,
       ),
   };
 }

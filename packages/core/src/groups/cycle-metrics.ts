@@ -10,6 +10,17 @@ export const CYCLE_METRICS = {
   eventScopesCreated: 'event_scopes.created',
   eventScopesRetired: 'event_scopes.retired',
   eventScopesReadingFailed: 'event_scopes.reading_failed',
+  mapEntries: 'map.entries',
+  mapRejected: 'map.rejected',
+  mapDuplicates: 'map.duplicates',
+  mapHintsDropped: 'map.hints_dropped',
+  mapGapCandidates: 'map.gap_candidates',
+  mapSelected: 'map.selected',
+  mapSkipped: 'map.skipped',
+  mapOutcomesResolved: 'map.outcomes_resolved',
+  mapOutcomesUnknown: 'map.outcomes_unknown',
+  mapOutcomesMismatched: 'map.outcomes_mismatched',
+  mapOutcomesFailed: 'map.outcomes_failed',
 } as const;
 
 export type CycleMetricKey = (typeof CYCLE_METRICS)[keyof typeof CYCLE_METRICS];

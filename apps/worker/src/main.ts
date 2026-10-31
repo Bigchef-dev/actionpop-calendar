@@ -16,10 +16,16 @@ import {
   PostgresGeographicReferenceRepository,
   PostgresGeographicReferenceWriter,
   countEventScopes,
+  countObservations,
   PostgresGroupRegistry,
   probeRedis,
   retireEndedEventScopes,
   retireUnknownEventScope,
+  recordListing,
+  selectGapCandidates,
+  requestEventScopes,
+  markRequested,
+  recordOutcome,
   type ScopeKind,
   runPreflight,
 } from '@actionpop/core';
@@ -122,6 +128,29 @@ export function createWorkerRuntime(
     metrics: observability.metrics,
     logger: observability.logger,
     cycleMetrics,
+    mapDiscovery: {
+      recordListing: (summaries, observedAt) => recordListing(postgres, summaries, observedAt),
+      selectGapCandidates: (summaries, options) =>
+        selectGapCandidates(postgres, summaries, options),
+      requestEventScopes: (requests, observedAt) =>
+        requestEventScopes(postgres, requests, observedAt),
+      markRequested: (eventIds, requestedAt, nextReconcileAt) =>
+        markRequested(postgres, eventIds, requestedAt, nextReconcileAt),
+      recordOutcome: (eventId, outcome, at) =>
+        recordOutcome(
+          postgres,
+          eventId,
+          outcome,
+          at,
+          outcome === 'failed'
+            ? at
+            : new Date(at.getTime() + config.ingestion.mapReconciliationIntervalMs),
+        ),
+    },
+    isEnabled: async () =>
+      config.ingestion.mapDiscoveryEnabled && (await registry.isMapScopeActive()),
+    freshnessHorizonMs: config.ingestion.mapFreshnessHorizonMs,
+    reconciliationIntervalMs: config.ingestion.mapReconciliationIntervalMs,
   };
 
   const worker = new Worker(
@@ -183,6 +212,7 @@ export function createWorkerRuntime(
       reportDispatcherCycle(cycle, {
         registry,
         eventScopes: { countEventScopes: () => countEventScopes(postgres) },
+        mapObservations: { countObservations: () => countObservations(postgres) },
         cycleMetrics,
         metrics: observability.metrics,
         logger: observability.logger,
@@ -265,6 +295,7 @@ export function createWorkerRuntime(
         });
         throw new Error(describeDependencyFailures(failures));
       }
+      await registry.ensureMapScope(config.ingestion.mapDiscoveryEnabled);
       observability.logger.info('worker starting', {
         operation: 'startup',
         outcome: 'started',

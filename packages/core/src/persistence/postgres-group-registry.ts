@@ -34,19 +34,58 @@ export class PostgresGroupRegistry {
    * holds no map status, so it boots `not_applicable` instead of `unlisted`.
    */
   public async bootstrapScope(scopeId: string, kind: ScopeKind = 'group'): Promise<void> {
-    const mapStatus = kind === 'event' ? 'not_applicable' : 'unlisted';
+    const mapStatus = kind === 'group' ? 'unlisted' : 'not_applicable';
+    const retrievalStatus = kind === 'map' ? 'active' : 'pending';
+    const discoverySource = kind === 'map' ? 'map_listing' : 'event_payload';
     await this.client.$executeRaw(Prisma.sql`
       INSERT INTO "ingestion_scope" (
         "scope_id", "scope_key", "scope_kind", "discovery_source", "map_status", "retrieval_status"
       )
       VALUES (
         ${scopeId}::text, ${normalizeScopeIdentity(scopeId)}::text, ${kind}::text,
-        'event_payload', ${mapStatus}::text, 'pending'
+        ${discoverySource}::text, ${mapStatus}::text, ${retrievalStatus}::text
       )
       -- Target-less on purpose: a concurrent identical insert may conflict on the
       -- primary key or on the (kind, key) index, and both mean "already bootstrapped".
       ON CONFLICT DO NOTHING
     `);
+  }
+
+  /**
+   * The map discovery is a singleton scheduling target. Enabling it activates the
+   * row; disabling it stops scheduling without deleting the observation ledger.
+   */
+  public async ensureMapScope(enabled: boolean): Promise<void> {
+    const retrievalStatus = enabled ? 'active' : 'stopped_disabled';
+    await this.client.$executeRaw(Prisma.sql`
+      INSERT INTO "ingestion_scope" (
+        "scope_id", "scope_key", "scope_kind", "display_name", "discovery_source",
+        "map_status", "retrieval_status", "stopped_reason"
+      )
+      VALUES (
+        'map-discovery', 'map-discovery', 'map', 'Map event discovery', 'map_listing',
+        'not_applicable', ${retrievalStatus}::text,
+        ${enabled ? null : 'feature_disabled'}::text
+      )
+      ON CONFLICT ("scope_kind", "scope_key") DO UPDATE SET
+        "retrieval_status" = ${retrievalStatus}::text,
+        "stopped_at" = CASE WHEN ${enabled} THEN NULL ELSE "ingestion_scope"."stopped_at" END,
+        "stopped_reason" = CASE WHEN ${enabled} THEN NULL ELSE 'feature_disabled' END
+    `);
+  }
+
+  public setMapScopeEnabled(enabled: boolean): Promise<void> {
+    return this.ensureMapScope(enabled);
+  }
+
+  public async isMapScopeActive(): Promise<boolean> {
+    const rows = await this.client.$queryRaw<{ active: boolean }[]>(Prisma.sql`
+      SELECT true AS active
+      FROM "ingestion_scope"
+      WHERE "scope_kind" = 'map' AND "retrieval_status" = 'active'
+      LIMIT 1
+    `);
+    return rows.length > 0;
   }
 
   /** Delegates to the discovery module so this registry stays about lifecycle. */
