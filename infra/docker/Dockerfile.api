@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 RUN corepack enable
 # Sources are copied before installing: the workspace packages are `file:` dependencies,
@@ -22,7 +22,7 @@ RUN rm -rf packages/core/src packages/core/tests apps/api/src apps/api/tests \
            apps/worker/src apps/worker/tests apps/api/tsconfig.tsbuildinfo \
            apps/worker/tsconfig.tsbuildinfo packages/core/tsconfig.tsbuildinfo
 
-FROM node:20-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S actionpop && adduser -S actionpop -G actionpop
