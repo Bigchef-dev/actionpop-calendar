@@ -61,6 +61,7 @@ export interface EventIngestionDependencies {
       snapshot: PublishedGroupSnapshot,
       events: PublishedEvent[],
     ): Promise<PublicationSummary>;
+    markEventCancelled?: (sourceEventId: string) => Promise<boolean>;
   };
   readonly scopes: { retireUnknownEvent(scopeId: string, at: Date): Promise<boolean> };
   readonly metrics: MetricsRegistry;
@@ -146,6 +147,7 @@ export async function processEventIngestion(
   } catch (error) {
     if (error instanceof UnknownEventError) {
       await recordMapOutcome(deps, job.scopeId, 'unknown');
+      await deps.publisher.markEventCancelled?.(job.scopeId);
       await stopEventIngestion(job, deps);
       return;
     }

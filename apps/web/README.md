@@ -1,135 +1,95 @@
-# Agenda de Campagne — Faire Mieux Rennes
+# Agenda des actions — Action Populaire
 
-Application web (Vue 3 + Vite) affichant l'agenda militant de la campagne **Faire Mieux Rennes 2026**, synchronisé en temps réel avec des calendriers Nextcloud via CalDAV.
+Application web statique (Vue 3 + Vite) qui permet de trouver les actions d'un lieu ou d'un groupe
+d'action, de les filtrer, puis d'emporter un lien de calendrier personnel. Elle lit
+`actionpop-calendar` : plus de Nextcloud, plus de proxy CORS tiers.
 
 Ce paquet vit dans `apps/web` du monorepo `actionpop-calendar` et se déploie sur GitHub Pages.
 
-> Pour comprendre les limites du format `.ics` face à CalDAV, voir [docs/web-caldav.md](../../docs/web-caldav.md).
-
 ---
 
-## Fonctionnalités
+## Parcours
 
-### Calendrier
+1. **Chercher** — une barre de recherche centrale résout une ville, un département ou un groupe
+   d'action en un **sujet de calendrier** (`GET /search/subjects`).
+2. **Lire** — les actions du sujet viennent du flux publié par l'API (`GET /calendar.ics`), filtrées
+   par type d'action dans le navigateur.
+3. **Emporter** — le panneau d'abonnement produit un lien personnel (abonnement, `webcal`, copie,
+   Outlook) qui couvre le sujet, avec ou sans le filtre affiché.
 
-- Affichage **jour / semaine / mois / liste** (vue hebdomadaire par défaut sur desktop, journalière sur mobile)
-- Navigation entre les semaines, retour rapide à "Aujourd'hui"
-- Mise en évidence du jour courant
-- Plage horaire affichée : 7h–22h
-
-### Agendas multiples avec filtres
-
-- 8 agendas catégorisés (Grands événements, Manifestations, Marchés/Tractage, Porte-à-portes, Collages, Réunions internes, Écoles, Actions jeunes)
-- Chaque agenda a sa propre couleur
-- Filtres cliquables pour afficher/masquer chaque catégorie à la volée
-
-### Météo intégrée
-
-- Données horaires récupérées depuis **Open-Meteo** pour Rennes (lat/lon fixés)
-- Icône météo affichée directement dans le bloc de l'événement (code WMO → emoji)
-- Affichage des précipitations (en mm) si > 0
-- Affichage de la vitesse du vent si > 20 km/h
-
-### Statut des événements (CalDAV / iCalendar RFC 5545)
-
-La propriété `STATUS` du standard iCalendar est prise en charge :
-
-| Statut                 | Affichage dans le calendrier                           | Affichage dans la modale |
-| ---------------------- | ------------------------------------------------------ | ------------------------ |
-| `CONFIRMED` _(défaut)_ | Normal                                                 | Aucun badge              |
-| `TENTATIVE`            | **Hachuré** (bandes diagonales) + badge « Provisoire » | Badge jaune ⚠️           |
-| `CANCELLED`            | Titre **barré** + atténué + badge « Annulé »           | Badge rouge ✗            |
-
-### Modale de détail
-
-Clic sur un événement ouvre une modale avec :
-
-- Titre, heure et date formatée en français
-- Lieu avec lien **Google Maps** direct
-- Description complète
-- Boutons d'ajout : **Google Agenda** et **Apple / Outlook** (téléchargement `.ics`)
-- Badge de statut si l'événement est provisoire ou annulé
-
-### Abonnement aux agendas
-
-Section dédiée en bas de page pour s'abonner à chaque agenda :
-
-- **Google Agenda** (lien `addbyurl`)
-- **iPhone / Mac** (lien `webcal://`)
-- **Copier le lien** pour Outlook ou tout autre client CalDAV
-
----
-
-## Architecture technique
-
-| Élément                     | Détail                                                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Structure**               | Application Vue 3 découpée par domaine : `src/features/calendar`, `src/features/poll`, `src/shared`                                                                            |
-| **Calendrier**              | [FullCalendar 6](https://fullcalendar.io/) via `@fullcalendar/vue3` (dépendance npm)                                                                                           |
-| **Parsing ICS**             | [ical.js](https://github.com/nicowillis/ical.js) (dépendance npm), utilisé directement via `parse()` pour accéder aux propriétés non exposées par le plugin FC (dont `STATUS`) |
-| **Météo**                   | [Open-Meteo API](https://open-meteo.com/) (sans clé, gratuit)                                                                                                                  |
-| **Proxy CORS**              | [corsproxy.io](https://corsproxy.io/) — clé `1aae6667` — pour contourner les restrictions CORS des flux Nextcloud                                                              |
-| **Styles**                  | [Tailwind CSS 4](https://tailwindcss.com/) via PostCSS + CSS inline pour les surcharges FullCalendar                                                                           |
-| **Hébergement calendriers** | Nextcloud — `cloud.lfirennes.fun` — calendriers publics                                                                                                                        |
-
-### Flux de données
-
-```
-Nextcloud (CalDAV) → corsproxy.io → fetch() → ICAL.parse() → FullCalendar.addEvent()
-                                                    ↓
-                                          STATUS extrait et transmis
-                                          en extendedProps + classNames
-```
-
----
-
-## Développement
-
-Depuis la racine du monorepo :
-
-```bash
-pnpm install
-pnpm --filter @actionpop/web dev       # serveur de développement Vite
-pnpm --filter @actionpop/web typecheck # vue-tsc --noEmit
-pnpm --filter @actionpop/web build     # build de production dans apps/web/dist
-pnpm --filter @actionpop/web preview   # prévisualisation du build
-```
-
-Le build est servi sous `base: '/agenda-rennes/'` (`vite.config.ts`), qui correspond à
-l'URL publiée actuelle sur GitHub Pages.
+Aucun compte, aucune géolocalisation, aucune donnée personnelle conservée : seule la dernière
+recherche est mémorisée localement, et l'adresse prime toujours sur cette mémoire.
 
 ## Configuration
 
-Le seul réglage d'exécution est l'URL du backend de sondage, un service Node externe
-(non fourni par ce dépôt) :
+| Variable                | Défaut (dev)                 | Rôle                                                             |
+| ----------------------- | ---------------------------- | ---------------------------------------------------------------- |
+| `VITE_API_BASE_URL`     | `http://127.0.0.1:3000`      | Origine de l'API ActionPop Calendar                              |
+| `VITE_POLL_BACKEND_URL` | `https://poll.lfirennes.fun` | Sondage en standby, non routé                                    |
+| `VITE_REVIEW_PROPOSALS` | non défini                   | Expose les variantes d'interface en revue (jamais en production) |
+
+L'origine publiée doit figurer dans `API_CORS_ORIGINS` côté API, sinon la recherche est bloquée par
+le navigateur.
+
+## Commandes
+
+Depuis la racine du dépôt, une seule commande lance l'API et le site ensemble :
 
 ```bash
-cp .env.example .env.local
-# VITE_POLL_BACKEND_URL=https://poll.lfirennes.fun
+pnpm dev            # API sur :3000 + site sur http://127.0.0.1:5173/agenda-rennes/
 ```
 
-Sans valeur, l'application retombe sur `https://poll.lfirennes.fun`.
+| Command                            | Starts                                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm dev`                         | dépendances Docker, migrations, build de `@actionpop/core`, puis API **et** site |
+| `pnpm dev:web`                     | le site seul, quand l'API tourne déjà ailleurs                                   |
+| `pnpm --filter @actionpop/web dev` | équivalent direct, sans préparation préalable                                    |
 
-Pour ajouter ou modifier un agenda, éditer le tableau `AGENDAS` dans `src/config.ts` :
-
-```ts
-export const AGENDAS: AgendaConfig[] = [
-  { name: '🌟 Grands événements', id: 'ID_NEXTCLOUD', color: '#D50000' },
-  // ...
-];
+```bash
+pnpm --filter @actionpop/web dev        # http://127.0.0.1:5173/agenda-rennes/
+pnpm --filter @actionpop/web test       # règles métier (Vitest)
+pnpm --filter @actionpop/web typecheck  # vue-tsc
+pnpm --filter @actionpop/web build      # dist/ + base /agenda-rennes/
 ```
 
-## Déploiement
+Le build est servi sous `base: '/agenda-rennes/'` (`vite.config.ts`). Le workflow `web.yml`
+vérifie tests, typage et build sur chaque pull request ; `pages.yml` publie `dist/`.
 
-Le workflow `.github/workflows/pages.yml` construit `apps/web` et publie `apps/web/dist`
-sur GitHub Pages à chaque modification du front. Le workflow `web.yml` vérifie le typage
-et le build sur chaque pull request concernée.
+## Architecture
 
-Aucun service à héberger : l'application est entièrement statique et interroge les flux
-Nextcloud et Open-Meteo depuis le navigateur.
+```text
+src/
+├── App.vue                    # aiguillage découverte / calendrier, résolution du sujet
+├── config.ts                  # environnement typé, cadence du placeholder
+├── shared/
+│   ├── api/client.ts          # recherche, flux, résolution d'un sujet
+│   ├── components/            # AppShell, AppHeader, StateMessage, CopyButton
+│   └── composables/useUrlState.ts   # état d'adresse (sujet, types, vue, événement)
+└── features/
+    ├── discovery/             # thème A — recherche, placeholder animé, propositions d'interface
+    ├── calendar/              # thèmes B & C — lecture du flux, filtres, détail d'événement
+    ├── subscription/          # thème B — construction et présentation du lien
+    └── poll/                  # sondage en standby (code conservé, non routé)
+```
 
----
+Les règles métier (analyse du flux, filtrage par type, libellés des propriétés publiées, fenêtre
+météo, construction du lien, état d'adresse) vivent dans des modules purs sous `utils/` et sont
+couvertes par `tests/`. Les composants restent purement visuels.
 
-## Crédits
+## Détail d'un événement
 
-GT Outils numériques Rennes 2026 — Mathéo, Lily, Amadou
+- Type d'action avec emoji et libellé lisibles (repli neutre pour un type inconnu).
+- Date, heure, lieu, lien carte, météo attendue quand l'événement est dans l'horizon de prévision.
+- Section « Informations publiées » repliable, alimentée par les propriétés `X-ACTIONPOP-*`
+  réellement présentes ; un champ absent ne laisse aucun vide.
+- Statut explicite en texte (confirmé, provisoire, annulé).
+- Actions : ajout à l'agenda, téléchargement `.ics`, et lien sortant vers la page Action Populaire
+  où se trouve le contact de la personne responsable.
+
+## Nettoyage
+
+- Le script d'autocomplétion Tampermonkey est archivé dans
+  [`docs/archive/`](../../docs/archive/) et n'est plus servi.
+- L'ancienne configuration mono-lieu (liste d'agendas, coordonnées fixes, base Nextcloud) a disparu
+  du chemin public ; le module de sondage la conserve pour son propre usage tant qu'il est en
+  standby.

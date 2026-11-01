@@ -12,11 +12,12 @@ import {
   PostgresCalendarEventQuery,
   PostgresGeographicReferenceRepository,
   PostgresEventQuery,
+  PostgresSubjectSearch,
   probeRedis,
   runPreflight,
 } from '@actionpop/core';
 import { buildApp } from './server.js';
-import { loadApiConfiguration } from './config.js';
+import { loadApiConfiguration, loadCorsOrigins } from './config.js';
 import { logger } from './logger.js';
 
 process.on('uncaughtException', (error: Error) => {
@@ -72,6 +73,8 @@ export async function startApi(): Promise<void> {
   const app = await buildApp({
     datasetRepository: new PostgresCalendarDatasetRepository(postgres),
     eventQuery: new PostgresEventQuery(postgres),
+    subjectSearch: new PostgresSubjectSearch(postgres),
+    corsOrigins: loadCorsOrigins(),
     calendarService: new FilteredCalendarService(
       new PostgresCalendarEventQuery(postgres),
       {

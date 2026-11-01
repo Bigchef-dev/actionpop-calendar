@@ -59,6 +59,7 @@ export async function resolveCalendarCriteria(
       ...(parsed.department === undefined ? {} : { department: parsed.department }),
       ...(communeIds.length === 0 ? {} : { communeIds }),
       ...(parsed.eventTypes === undefined ? {} : { eventTypes: parsed.eventTypes }),
+      ...(parsed.groupIds === undefined ? {} : { groupIds: parsed.groupIds }),
     },
   };
 }

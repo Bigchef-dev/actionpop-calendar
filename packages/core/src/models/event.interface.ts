@@ -23,6 +23,7 @@ export interface IncomingEvent extends Pick<
   ActionPopulaireEventPayload,
   'id' | 'name' | 'startTime' | 'endTime' | 'description'
 > {
+  status?: 'ACTIVE' | 'CANCELLED';
   location: LocationEvent | null;
   eventType?: string;
   geography?: GeographicAttachment;

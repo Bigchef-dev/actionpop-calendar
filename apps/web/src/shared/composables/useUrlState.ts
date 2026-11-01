@@ -1,54 +1,130 @@
-/**
- * Manages shareable URL state via the location hash.
- * Format: #v=timeGridWeek&d=2026-03-10&a=id1,id2&e=uid123
- *
- * v = FullCalendar view name
- * d = ISO date (YYYY-MM-DD) of the current calendar date
- * a = comma-separated list of active agenda IDs (omitted when all are active)
- * e = UID of the currently open event modal (omitted when none)
- */
+import { reactive } from 'vue';
 
-export interface UrlState {
-  v?: string
-  d?: string
-  a?: string
-  e?: string
+import type { CalendarLayout } from '../../types';
+
+export const LAYOUTS: readonly CalendarLayout[] = ['mois', 'semaine', 'liste'];
+
+export interface RouteState {
+  subject: { kind: string; id: string } | null;
+  types: string[];
+  layout: CalendarLayout;
+  eventId: string | null;
+  /** Human-readable reports of the values that could not be used as written. */
+  notices: string[];
 }
 
-function getParams(): URLSearchParams {
-  const hash = window.location.hash.replace(/^#/, '')
-  return new URLSearchParams(hash)
+export interface ParseOptions {
+  /** Layout applied when none is valid; the caller decides from the viewport width. */
+  defaultLayout: CalendarLayout;
+  /** Known action-type slugs; when provided, an unknown slug is reported and dropped. */
+  knownTypes?: readonly string[];
 }
 
-function setParams(params: URLSearchParams): void {
-  const str = params.toString()
-  history.replaceState(null, '', str ? '#' + str : window.location.pathname + window.location.search)
+export function parseLayout(value: string | null): CalendarLayout | null {
+  return LAYOUTS.find((layout) => layout === value) ?? null;
 }
 
-export function parseHash(): UrlState {
-  const params = getParams()
-  const result: UrlState = {}
-  if (params.has('v')) result.v = params.get('v')!
-  if (params.has('d')) result.d = params.get('d')!
-  if (params.has('a')) result.a = params.get('a')!
-  if (params.has('e')) result.e = params.get('e')!
-  return result
+export function parseSubjectKey(value: string | null): { kind: string; id: string } | null {
+  if (value === null) return null;
+  const separator = value.indexOf(':');
+  if (separator <= 0 || separator === value.length - 1) return null;
+  const kind = value.slice(0, separator).trim();
+  const id = value.slice(separator + 1).trim();
+  if (kind === '' || id === '' || id.includes(':')) return null;
+  return { kind, id };
 }
 
-export function updateHash(patch: Partial<UrlState>): void {
-  const params = getParams()
-  for (const [key, val] of Object.entries(patch)) {
-    if (val === undefined || val === null || val === '') {
-      params.delete(key)
-    } else {
-      params.set(key, val)
+export function subjectKey(subject: { kind: string; id: string } | null): string | null {
+  return subject === null ? null : `${subject.kind}:${subject.id}`;
+}
+
+/** Reads an address without ever throwing: every unusable value falls back and is reported. */
+export function parseRoute(search: string, options: ParseOptions): RouteState {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const notices: string[] = [];
+
+  const rawSubject = params.get('sujet');
+  const subject = parseSubjectKey(rawSubject);
+  if (rawSubject !== null && subject === null) {
+    notices.push(`Sujet « ${rawSubject} » illisible : recherche nécessaire.`);
+  }
+
+  const rawTypes = params.get('types');
+  const types: string[] = [];
+  if (rawTypes !== null) {
+    for (const slug of rawTypes.split(',').map((value) => value.trim())) {
+      if (slug === '') continue;
+      if (options.knownTypes !== undefined && !options.knownTypes.includes(slug)) {
+        notices.push(`Type d'action « ${slug} » inconnu : filtre ignoré.`);
+        continue;
+      }
+      if (!types.includes(slug)) types.push(slug);
     }
   }
-  setParams(params)
+
+  const rawLayout = params.get('vue');
+  const layout = parseLayout(rawLayout);
+  if (rawLayout !== null && layout === null) {
+    notices.push(`Vue « ${rawLayout} » inconnue : affichage par défaut.`);
+  }
+
+  const rawEvent = params.get('evenement');
+
+  return {
+    subject,
+    types,
+    layout: layout ?? options.defaultLayout,
+    eventId: rawEvent === null || rawEvent.trim() === '' ? null : rawEvent.trim(),
+    notices,
+  };
 }
 
-export function removeHashParam(key: keyof UrlState): void {
-  const params = getParams()
-  params.delete(key)
-  setParams(params)
+/** Serializes a route, omitting values that equal the defaults so the address stays short. */
+export function serializeRoute(
+  state: Omit<RouteState, 'notices'>,
+  defaultLayout: CalendarLayout,
+): string {
+  const params = new URLSearchParams();
+  const key = subjectKey(state.subject);
+  if (key !== null) params.set('sujet', key);
+  if (state.types.length > 0) params.set('types', [...state.types].sort().join(','));
+  if (state.layout !== defaultLayout) params.set('vue', state.layout);
+  if (state.eventId !== null) params.set('evenement', state.eventId);
+  const serialized = params.toString();
+  return serialized === '' ? '' : `?${serialized}`;
+}
+
+export function replaceRoute(search: string): void {
+  if (typeof window === 'undefined') return;
+  const { pathname, hash } = window.location;
+  window.history.replaceState(null, '', `${pathname}${search}${hash}`);
+}
+
+/** Reactive route shared by every component of the experience. */
+const route = reactive<{ search: string }>({
+  search: typeof window === 'undefined' ? '' : window.location.search,
+});
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    route.search = window.location.search;
+  });
+}
+
+export function useRoute(): {
+  readonly state: { search: string };
+  write: (search: string) => void;
+} {
+  return {
+    state: route,
+    write(search: string): void {
+      replaceRoute(search);
+      route.search = search;
+    },
+  };
+}
+
+/** Layout used when the address does not state one: list on a narrow screen, month otherwise. */
+export function defaultLayoutFor(width: number): CalendarLayout {
+  return width < 768 ? 'liste' : 'mois';
 }

@@ -10,6 +10,8 @@ export default tseslint.config(
       // TODO(web): lint the Vue app once eslint-plugin-vue and the browser globals for
       // the public userscript are configured. Its own `vue-tsc` gate runs in web.yml.
       'apps/web/**',
+      // Archived browser userscript kept for history only; not part of any build.
+      'docs/archive/**',
     ],
   },
   {

@@ -11,6 +11,7 @@ export const SUPPORTED_PARAMETERS = new Set([
   'commune_name',
   'insee_commune',
   'event_type',
+  'group',
 ]);
 
 export const UNSUPPORTED_PARAMETERS = new Set([

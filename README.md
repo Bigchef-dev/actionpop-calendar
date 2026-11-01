@@ -119,10 +119,25 @@ grouped updates for npm, GitHub Actions and Docker, and leaves major upgrades of
 `prisma`, `@prisma/client`, `typescript` and `bullmq` to manual work.
 
 `pnpm dev` starts the Redis and Postgres containers, applies pending Prisma
-migrations, then builds and runs the API. If Docker requires elevated rights on your
-machine, start the dependencies once with `sudo pnpm dev:infra` (or add your user to
-the `docker` group) before running `pnpm dev`. Startup aborts with a single message
-naming the unreachable dependency instead of retrying forever.
+migrations, builds `@actionpop/core`, then runs the API **and** the public web
+application together: the API on `http://127.0.0.1:3000` and the site on
+`http://127.0.0.1:5173/agenda-rennes/`. The command also allows the two local development
+origins through CORS, so the search works without any extra setup. If Docker requires
+elevated rights on your machine, start the dependencies once with `sudo pnpm dev:infra`
+(or add your user to the `docker` group) before running `pnpm dev`. Startup aborts with a
+single message naming the unreachable dependency instead of retrying forever.
+
+| Command           | Starts                                                               |
+| ----------------- | -------------------------------------------------------------------- |
+| `pnpm dev`        | dependencies, migrations, core build, then **API + web** in parallel |
+| `pnpm dev:api`    | the same preparation, then the API only (`tsx watch`)                |
+| `pnpm dev:web`    | the web application only, useful when the API already runs elsewhere |
+| `pnpm dev:worker` | the same preparation, then the worker (`tsx watch`)                  |
+
+`pnpm dev:web` reads the API origin from `VITE_API_BASE_URL` (default
+`http://127.0.0.1:3000`). When the site is served from another port or another host, add that
+origin to `API_CORS_ORIGINS` on the API side, otherwise the browser blocks the search
+request.
 
 ### Map event discovery
 
@@ -198,7 +213,7 @@ docker rm -f bull-board dev-redisinsight
 ```
 
 Prisma Studio is available at `http://127.0.0.1:5552` and binds only to loopback.
-The API can then be started in a second terminal:
+The API and the web application are then started together with:
 
 ```bash
 pnpm dev
@@ -254,9 +269,26 @@ docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
 The public surface is the read-only `GET /feed/{scopeId}` route, the read-only
-`GET /events` route, and the read-only `GET /calendar.ics` route. `/events` filters events
-by `country`, `department`, `commune` and `event_type` with `AND` semantics. Geographic
-identifiers are strings, so `01`, `2A` and `01001` keep their leading zeroes.
+`GET /events` route, the read-only `GET /search/subjects` route, and the read-only
+`GET /calendar.ics` route. `/events` filters events by `country`, `department`, `commune` and
+`event_type` with `AND` semantics. Geographic identifiers are strings, so `01`, `2A` and `01001`
+keep their leading zeroes.
+
+`GET /search/subjects` resolves a human query to calendar subjects so a visitor can start from
+"my town", "my department" or "my action group":
+
+```text
+GET /search/subjects?q=lyon
+GET /search/subjects?q=rhone&kind=department
+GET /search/subjects?q=npa&kind=group&limit=10
+```
+
+It returns at most six entries per kind and eighteen in total, ranked exact match first, then
+prefix, then contains. Each entry carries the exact filter parameters to use, so a client never
+derives them. A too-short, too-long, unknown-kind or invalid-limit request answers `400` with a
+diagnostic; an unavailable data source answers `503`. The route is served with CORS restricted to
+`API_CORS_ORIGINS` (comma-separated origins, empty by default, which means no cross-origin access).
+Contract: `specs/007-public-calendar-experience/contracts/search-api.md`.
 
 `GET /calendar.ics` returns the matching events as an iCalendar (RFC 5545) document that a
 calendar client can subscribe to:
@@ -266,12 +298,14 @@ GET /calendar.ics?department=69&insee_commune=69123,69124&event_type=tractage
 GET /calendar.ics?commune_name=Lyon,Villeurbanne&event_type=tractage
 ```
 
-It accepts `country`, `department`, `commune_name`, `insee_commune` and `event_type`. Values
+It accepts `country`, `department`, `commune_name`, `insee_commune`, `event_type` and `group`.
+Values
 inside one parameter combine with OR, distinct parameters combine with AND, and
 `commune_name`/`insee_commune` form one commune dimension whose values union. A commune name
 that stays ambiguous without a `department` is rejected with a diagnostic instead of being
-chosen arbitrarily. The calendar covers a configurable window and includes an event when it
-overlaps it.
+chosen arbitrarily. `group` selects the events attributed to at least one listed action group, so
+a group found through `/search/subjects` can be followed as a calendar. The calendar covers a
+configurable window and includes an event when it overlaps it.
 
 Each entry carries the standard `LOCATION`, `URL`, `CATEGORIES` and `GEO` properties when the
 event states them, plus `X-ACTIONPOP-*` experimental properties whose set depends on the

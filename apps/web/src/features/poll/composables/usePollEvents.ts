@@ -1,7 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
 import { parse, Component } from 'ical.js'
-import type { AgendaConfig } from '../../../types'
-import { NEXTCLOUD_BASE } from '../../../config'
+import type { AgendaConfig } from '../legacy-agendas'
+import { LEGACY_CALDAV_BASE } from '../legacy-agendas'
+import { readDateValue, readText } from '../../calendar/utils/ical-values'
 
 export interface PollEvent {
   id: string
@@ -16,7 +17,7 @@ export interface PollEvent {
 }
 
 async function fetchAgendaEvents(agenda: AgendaConfig, date: Date): Promise<PollEvent[]> {
-  const feedUrl = `${NEXTCLOUD_BASE}/${agenda.id}?export&_nocache=${Date.now()}`
+  const feedUrl = `${LEGACY_CALDAV_BASE}/${agenda.id}?export&_nocache=${Date.now()}`
 
   const res = await fetch(feedUrl)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -41,27 +42,26 @@ async function fetchAgendaEvents(agenda: AgendaConfig, date: Date): Promise<Poll
   const exceptionKeys = new Set<string>()
   for (const v of exceptions) {
     const uid = String(v.getFirstPropertyValue('uid') ?? '')
-    const rid = v.getFirstProperty('recurrence-id')?.getFirstValue()
-    if (rid) exceptionKeys.add(`${uid}::${rid.toJSDate().toISOString()}`)
+    const rid = readDateValue(v.getFirstProperty('recurrence-id')?.getFirstValue())
+    if (rid !== null) exceptionKeys.add(`${uid}::${rid.date.toISOString()}`)
   }
 
   const mapVevent = (vevent: (typeof vevents)[number], isException: boolean): PollEvent | null => {
-    const summary = vevent.getFirstPropertyValue('summary') ?? '(sans titre)'
-    const uid = vevent.getFirstPropertyValue('uid') ?? ''
-    const description = String(vevent.getFirstPropertyValue('description') ?? '')
-    const statusRaw = vevent.getFirstPropertyValue('status')
-    const status = (statusRaw?.toUpperCase() as string | undefined) ?? 'CONFIRMED'
+    const summary = readText(vevent.getFirstPropertyValue('summary')) ?? '(sans titre)'
+    const uid = readText(vevent.getFirstPropertyValue('uid')) ?? ''
+    const description = readText(vevent.getFirstPropertyValue('description')) ?? ''
+    const status = readText(vevent.getFirstPropertyValue('status'))?.toUpperCase() ?? 'CONFIRMED'
 
     // Skip cancelled exceptions (deleted occurrences)
     if (isException && status === 'CANCELLED') return null
 
     const dtstartProp = vevent.getFirstProperty('dtstart')
     const dtendProp = vevent.getFirstProperty('dtend')
-    const startIcal = dtstartProp?.getFirstValue() ?? null
-    const endIcal = dtendProp?.getFirstValue() ?? null
-    const startDate: Date | null = startIcal?.toJSDate() ?? null
-    const endDate: Date | null = endIcal?.toJSDate() ?? null
-    const allDay = startIcal?.isDate ?? false
+    const startIcal = readDateValue(dtstartProp?.getFirstValue())
+    const endIcal = readDateValue(dtendProp?.getFirstValue())
+    const startDate: Date | null = startIcal?.date ?? null
+    const endDate: Date | null = endIcal?.date ?? null
+    const allDay = startIcal?.allDay ?? false
 
     // Skip master occurrences overridden by an exception
     if (!isException && startDate) {
@@ -71,7 +71,7 @@ async function fetchAgendaEvents(agenda: AgendaConfig, date: Date): Promise<Poll
 
     return {
       id: uid,
-      title: String(summary),
+      title: summary,
       description,
       startDate,
       endDate,

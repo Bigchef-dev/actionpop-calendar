@@ -17,6 +17,7 @@ interface Recorded {
   retired: { scopeId: string; reason: string }[];
   counters: { metric: string; value: number }[];
   published: number;
+  cancelled: string[];
 }
 
 function dependencies(error: Error | undefined, recorded: Recorded) {
@@ -75,6 +76,10 @@ function dependencies(error: Error | undefined, recorded: Recorded) {
           eventScopesRetired: 0,
         };
       },
+      markEventCancelled: async (eventId: string) => {
+        recorded.cancelled.push(eventId);
+        return true;
+      },
     },
     scopes: {
       retireUnknownEvent: async (scopeId: string) => {
@@ -101,7 +106,7 @@ const job = {
 };
 
 function recorded(): Recorded {
-  return { statuses: [], retired: [], counters: [], published: 0 };
+  return { statuses: [], retired: [], counters: [], published: 0, cancelled: [] };
 }
 
 describe('event ingestion', () => {
@@ -123,6 +128,7 @@ describe('event ingestion', () => {
     ).resolves.toBeUndefined();
 
     expect(state.retired).toEqual([{ scopeId: 'event-1', reason: 'event_unknown' }]);
+    expect(state.cancelled).toEqual(['event-1']);
     expect(state.statuses).toEqual(['running', 'stopped']);
     expect(state.published).toBe(0);
   });

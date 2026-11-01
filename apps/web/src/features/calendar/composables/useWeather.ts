@@ -1,92 +1,96 @@
-import { ref } from 'vue'
-import type { WeatherEntry } from '../../../types'
-import { CITY_LAT, CITY_LON } from '../../../config'
+import { computed, ref } from 'vue';
+
+import type { CalendarEvent, WeatherEntry } from '../../../types';
+import { weatherRequestFor, type WeatherRequest } from '../utils/weather-window';
 
 const WMO_ICONS: Record<number, string> = {
-  0: '☀️',  1: '🌤️', 2: '⛅',  3: '☁️',
-  45: '🌫️', 48: '🌫️',
-  51: '🌦️', 53: '🌦️', 55: '🌧️',
-  61: '☂️',  63: '🌧️', 65: '🌧️',
-  71: '❄️',  73: '❄️', 75: '❄️',
-  80: '🌦️', 81: '🌧️', 82: '⛈️',
-  95: '⛈️', 96: '⛈️', 99: '⛈️',
+  0: '☀️',
+  1: '🌤️',
+  2: '⛅',
+  3: '☁️',
+  45: '🌫️',
+  48: '🌫️',
+  51: '🌦️',
+  53: '🌦️',
+  55: '🌧️',
+  61: '☂️',
+  63: '🌧️',
+  65: '🌧️',
+  71: '❄️',
+  73: '❄️',
+  75: '❄️',
+  80: '🌦️',
+  81: '🌧️',
+  82: '⛈️',
+  95: '⛈️',
+  96: '⛈️',
+  99: '⛈️',
+};
+
+export function weatherIcon(code: number): string {
+  return WMO_ICONS[code] ?? '🌡️';
 }
 
-// Module-level cache — shared across the entire app (singleton)
-const cache = ref<Record<string, WeatherEntry>>({})
+/** hourKey → entry, per rounded coordinate pair. Shared for the whole page. */
+const hourly = ref<Record<string, Record<string, WeatherEntry>>>({});
+const inFlight = new Set<string>();
 
-export function getWeatherIcon(code: number): string {
-  return WMO_ICONS[code] ?? '🌡️'
+async function loadCoordinate(latitude: number, longitude: number, key: string): Promise<void> {
+  if (inFlight.has(key) || hourly.value[key] !== undefined) return;
+  inFlight.add(key);
+
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+      '&hourly=weather_code,precipitation,wind_speed_10m&timezone=auto';
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const data = (await response.json()) as {
+      hourly: {
+        time: string[];
+        weather_code: number[];
+        precipitation: number[];
+        wind_speed_10m: number[];
+      };
+    };
+    const entries: Record<string, WeatherEntry> = {};
+    data.hourly.time.forEach((time, index) => {
+      entries[time] = {
+        code: data.hourly.weather_code[index] ?? 0,
+        precip: data.hourly.precipitation[index] ?? 0,
+        wind: data.hourly.wind_speed_10m[index] ?? 0,
+      };
+    });
+    hourly.value = { ...hourly.value, [key]: entries };
+  } catch {
+    // Weather is an enhancement: an unavailable forecast leaves the badge empty.
+  } finally {
+    inFlight.delete(key);
+  }
 }
 
-export async function fetchWeather(): Promise<void> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${CITY_LAT}&longitude=${CITY_LON}&hourly=weather_code,precipitation,wind_speed_10m&timezone=auto`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Météo HTTP ${res.status}`)
-  const data = await res.json()
-  const map: Record<string, WeatherEntry> = {}
-  ;(data.hourly.time as string[]).forEach((time, i) => {
-    map[time] = {
-      code: data.hourly.weather_code[i] as number,
-      precip: data.hourly.precipitation[i] as number,
-      wind: data.hourly.wind_speed_10m[i] as number,
+export function useWeather() {
+  function requestFor(event: CalendarEvent): WeatherRequest | null {
+    return weatherRequestFor(event);
+  }
+
+  async function ensure(events: readonly CalendarEvent[]): Promise<void> {
+    const seen = new Set<string>();
+    const tasks: Promise<void>[] = [];
+    for (const event of events) {
+      const request = weatherRequestFor(event);
+      if (request === null || seen.has(request.coordinateKey)) continue;
+      seen.add(request.coordinateKey);
+      tasks.push(loadCoordinate(request.latitude, request.longitude, request.coordinateKey));
     }
-  })
-  cache.value = map
-}
-
-export function getWeatherForEvent(date: Date): WeatherEntry | null {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:00`
-  return cache.value[key] ?? null
-}
-
-// Severity order for WMO codes (higher = worse)
-const WMO_SEVERITY: Record<number, number> = {
-  0: 0, 1: 1, 2: 2, 3: 3,
-  45: 4, 48: 4,
-  51: 5, 53: 6, 55: 7,
-  61: 8, 63: 9, 65: 10,
-  71: 8, 73: 9, 75: 10,
-  80: 8, 81: 9, 82: 10,
-  95: 11, 96: 12, 99: 13,
-}
-
-/**
- * Returns aggregated weather for the full event duration:
- * worst WMO code, total precipitation, max wind speed.
- * Falls back to single-hour lookup when end is null.
- */
-export function getWeatherForEventRange(
-  start: Date,
-  end: Date | null,
-): WeatherEntry | null {
-  if (!end || end.getTime() <= start.getTime()) {
-    return getWeatherForEvent(start)
+    await Promise.all(tasks);
   }
 
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const entries: WeatherEntry[] = []
-
-  // Walk hour by hour from start to end (exclusive of the last boundary)
-  const cur = new Date(start)
-  cur.setMinutes(0, 0, 0)
-  while (cur < end) {
-    const key = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}T${pad(cur.getHours())}:00`
-    const entry = cache.value[key]
-    if (entry) entries.push(entry)
-    cur.setHours(cur.getHours() + 1)
+  function weatherFor(event: CalendarEvent): WeatherEntry | null {
+    const request = weatherRequestFor(event);
+    if (request === null) return null;
+    return hourly.value[request.coordinateKey]?.[request.hourKey] ?? null;
   }
 
-  if (entries.length === 0) return null
-
-  const worst = entries.reduce((a, b) =>
-    (WMO_SEVERITY[b.code] ?? 0) > (WMO_SEVERITY[a.code] ?? 0) ? b : a,
-  )
-
-  return {
-    code: worst.code,
-    precip: Math.round(entries.reduce((sum, e) => sum + e.precip, 0) * 10) / 10,
-    wind: Math.max(...entries.map((e) => e.wind)),
-  }
+  return { weatherFor, ensure, requestFor, hourly: computed(() => hourly.value) };
 }

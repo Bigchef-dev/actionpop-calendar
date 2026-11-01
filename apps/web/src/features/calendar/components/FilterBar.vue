@@ -1,38 +1,69 @@
 <script setup lang="ts">
-import type { AgendaConfig } from '../../../types'
+import { computed } from 'vue';
 
-defineProps<{
-  agendas: AgendaConfig[]
-  activeIds: Set<string>
-}>()
+import { actionTypeFor } from '../data/event-types';
+import type { AvailableType } from '../utils/type-filter';
+
+const props = defineProps<{
+  available: AvailableType[];
+  selected: readonly string[];
+  shown: number;
+  total: number;
+}>();
 
 const emit = defineEmits<{
-  (e: 'toggle', id: string): void
-}>()
+  (event: 'toggle', slug: string): void;
+  (event: 'clear'): void;
+}>();
+
+function typeOf(slug: string): ReturnType<typeof actionTypeFor> {
+  return actionTypeFor(slug);
+}
+
+const isActive = (slug: string): boolean => props.selected.includes(slug);
+const hasSelection = computed(() => props.selected.length > 0);
 </script>
 
 <template>
-  <div class="mb-6">
-    <h3 class="text-xs font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest mb-3">
-      Filtrer l'affichage
-    </h3>
-    <div class="flex flex-wrap gap-2">
+  <section aria-label="Filtrer par type d'action" class="mb-4">
+    <div class="flex items-baseline justify-between gap-3">
+      <h2 class="text-[11px] font-bold uppercase tracking-widest opacity-60">Type d'action</h2>
+      <p class="text-xs opacity-70" role="status">
+        {{ shown }} sur {{ total }} action{{ total > 1 ? 's' : '' }}
+      </p>
+    </div>
+
+    <div class="mt-2 flex flex-wrap gap-2">
       <button
-        v-for="agenda in agendas"
-        :key="agenda.id"
+        v-for="type in available"
+        :key="type.slug"
+        type="button"
+        class="ap-focusable rounded-full border px-3 py-2 text-xs font-semibold"
+        :aria-pressed="isActive(type.slug)"
         :style="
-          activeIds.has(agenda.id)
-            ? { backgroundColor: agenda.color, color: 'white', borderColor: agenda.color }
-            : { backgroundColor: '', color: '', borderColor: '' }
+          isActive(type.slug)
+            ? {
+                backgroundColor: 'var(--ap-primary)',
+                borderColor: 'var(--ap-primary)',
+                color: 'var(--ap-on-primary)',
+              }
+            : { borderColor: 'var(--ap-border)', color: 'var(--ap-ink)' }
         "
-        :class="[
-          'filter-btn border px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide',
-          activeIds.has(agenda.id) ? 'active' : 'bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-600'
-        ]"
-        @click="emit('toggle', agenda.id)"
+        @click="emit('toggle', type.slug)"
       >
-        {{ agenda.name }}
+        <span aria-hidden="true">{{ typeOf(type.slug).emoji }}</span>
+        {{ typeOf(type.slug).label }}
+        <span class="opacity-70">({{ type.count }})</span>
       </button>
     </div>
-  </div>
+
+    <button
+      v-if="hasSelection"
+      type="button"
+      class="ap-focusable mt-3 text-xs font-semibold underline opacity-80"
+      @click="emit('clear')"
+    >
+      Tout afficher
+    </button>
+  </section>
 </template>

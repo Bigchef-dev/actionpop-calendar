@@ -46,6 +46,7 @@ export function buildFilteredCalendarDocument(
       `DTEND:${formatUtcInstant(event.endTime)}`,
       `SUMMARY:${escapeText(event.summary)}`,
       `SEQUENCE:${event.sequence}`,
+      `STATUS:${event.status ?? 'ACTIVE'}`,
     );
     if (event.description !== null && event.description !== '') {
       lines.push(`DESCRIPTION:${escapeText(event.description)}`);

@@ -1,16 +1,32 @@
 <script setup lang="ts">
-defineProps<{ status: 'TENTATIVE' | 'CANCELLED' }>()
+import type { EventStatus } from '../../../types';
+
+defineProps<{ status: EventStatus }>();
+
+const LABELS: Record<EventStatus, string> = {
+  CONFIRMED: 'Confirmé',
+  TENTATIVE: 'Provisoire',
+  CANCELLED: 'Annulé',
+};
+
+const ICONS: Record<EventStatus, string> = {
+  CONFIRMED: '✓',
+  TENTATIVE: '⚠️',
+  CANCELLED: '✗',
+};
 </script>
 
 <template>
   <span
-    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-black uppercase"
-    :class="
+    v-if="status !== 'CONFIRMED'"
+    class="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-black uppercase"
+    :style="
       status === 'TENTATIVE'
-        ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300'
-        : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+        ? { backgroundColor: 'var(--ap-surface-muted)', color: 'var(--ap-ink)' }
+        : { backgroundColor: 'var(--ap-secondary)', color: '#fffcf4' }
     "
   >
-    {{ status === 'TENTATIVE' ? '⚠️ Prévu' : '✗ Annulé' }}
+    <span aria-hidden="true">{{ ICONS[status] }}</span>
+    {{ LABELS[status] }}
   </span>
 </template>

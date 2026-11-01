@@ -9,6 +9,7 @@ import {
   type CalendarDataset,
   type FilteredCalendarReader,
   type GeographicFilter,
+  type SubjectSearchReader,
 } from '@actionpop/core';
 import { apiReference } from '@scalar/nestjs-api-reference';
 
@@ -26,6 +27,9 @@ export interface ServerOptionsEventQuery {
 
 export interface ServerOptions {
   datasetRepository: DatasetReader;
+  subjectSearch?: SubjectSearchReader;
+  /** Origins allowed to read the public JSON reads; empty means no cross-origin access. */
+  corsOrigins?: readonly string[];
   eventQuery?: ServerOptionsEventQuery;
   calendarService?: FilteredCalendarReader;
   calendarSettings?: CalendarIcsSettings;
@@ -53,6 +57,14 @@ export async function buildApp(options: ServerOptions): Promise<NestFastifyAppli
     adapter,
     { logger: false, abortOnError: false },
   );
+
+  // Cross-origin access is allow-listed so the static site can read the search route.
+  const corsOrigins = options.corsOrigins ?? [];
+  app.enableCors({
+    origin: corsOrigins.length === 0 ? false : [...corsOrigins],
+    methods: ['GET', 'HEAD', 'OPTIONS'],
+    credentials: false,
+  });
 
   const requestStarts = new Map<string, number>();
 
@@ -98,8 +110,8 @@ export async function buildApp(options: ServerOptions): Promise<NestFastifyAppli
       .setTitle('ActionPop Calendar API')
       .setDescription(
         'Read-only calendar surfaces. `/feed/{scopeId}` returns the group-scoped calendar, ' +
-          '`/events` returns the filtered JSON event list, and `/calendar.ics` returns the filtered ' +
-          'iCalendar calendar. Geographic and event-type identifiers are strings so leading zeroes survive.',
+          '`/events` returns the filtered JSON event list, `/search/subjects` resolves a query to ' +
+          'calendar subjects, and `/calendar.ics` returns the filtered iCalendar calendar. Geographic and event-type identifiers are strings so leading zeroes survive.',
       )
       .setVersion('0.1.0')
       .build(),

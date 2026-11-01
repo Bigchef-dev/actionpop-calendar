@@ -1,135 +1,46 @@
-﻿@import "tailwindcss";
+@import 'tailwindcss';
+@import '../shared/styles/tokens.css';
 
-/* Class-based dark mode (toggled via .dark on <html>) */
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* ===== FULLCALENDAR BASE ===== */
-:root {
-  --brand-purple: #9750a4;
-  --brand-dark: #4a235a;
-  --brand-orange: #f97316;
-  --fc-button-bg-color: var(--brand-purple);
-  --fc-button-border-color: var(--brand-purple);
-  --fc-button-hover-bg-color: var(--brand-dark);
-  --fc-button-hover-border-color: var(--brand-dark);
-  --fc-button-active-bg-color: var(--brand-dark);
-  --fc-button-active-border-color: var(--brand-dark);
-  --fc-today-bg-color: #f3e8f5;
+html,
+body {
+  margin: 0;
+  background-color: var(--ap-paper);
+  color: var(--ap-ink);
 }
 
-.fc-toolbar-title {
-  font-size: 1.25rem !important;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--brand-dark);
+body {
+  font-family: var(--ap-font-body);
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (max-width: 767px) {
-  .fc-toolbar-title {
-    font-size: 0.95rem !important;
-  }
-  .fc-toolbar.fc-header-toolbar {
-    margin-bottom: 0.5em !important;
-  }
-}
-
-.fc-event {
-  border: none !important;
-  border-radius: 4px !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.fc-event:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  transition: transform 0.2s;
-}
-
-.fc-button {
-  text-transform: uppercase;
-  font-size: 0.75rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.05em;
-  padding: 0.4em 0.65em !important;
-}
-
-/* ===== STATUT CALDAV ===== */
-.event-tentative {
-  background-image: repeating-linear-gradient(
-    45deg,
-    transparent 0px,
-    transparent 4px,
-    rgba(255, 255, 255, 0.28) 4px,
-    rgba(255, 255, 255, 0.28) 8px
-  ) !important;
-}
-
-.event-cancelled {
+.ap-event-cancelled {
   opacity: 0.55;
+  text-decoration: line-through;
 }
 
-/* ===== FILTRES ===== */
-.filter-btn {
-  transition: all 0.2s;
-  opacity: 0.5;
-  filter: grayscale(100%);
-  transform: scale(0.98);
+.ap-event-tentative {
+  font-style: italic;
 }
 
-.filter-btn.active {
-  opacity: 1;
-  filter: grayscale(0%);
-  transform: scale(1);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border-color: transparent;
+.fc {
+  --fc-border-color: var(--ap-border);
+  --fc-page-bg-color: var(--ap-surface);
+  --fc-neutral-bg-color: var(--ap-surface-muted);
+  --fc-today-bg-color: color-mix(in srgb, var(--ap-primary) 8%, transparent);
+  --fc-event-bg-color: var(--ap-primary);
+  --fc-event-border-color: var(--ap-primary);
+  --fc-button-bg-color: var(--ap-surface);
+  --fc-button-border-color: var(--ap-border);
+  --fc-button-text-color: var(--ap-ink);
+  color: var(--ap-ink);
 }
 
-/* ===== DARK MODE — FULLCALENDAR ===== */
-.dark {
-  --fc-page-bg-color: #1c1917;
-  --fc-neutral-bg-color: #292524;
-  --fc-neutral-text-color: #a8a29e;
-  --fc-border-color: #44403c;
-  --fc-event-text-color: #fff;
-  --fc-today-bg-color: #2d1b38;
-  --fc-now-indicator-color: #f97316;
-  --fc-non-business-color: rgba(0, 0, 0, 0.25);
-  --fc-highlight-color: rgba(151, 80, 164, 0.15);
-  --fc-button-bg-color: #7e3b8a;
-  --fc-button-border-color: #7e3b8a;
-  --fc-button-hover-bg-color: #6b2f75;
-  --fc-button-hover-border-color: #6b2f75;
-  --fc-button-active-bg-color: #5c2665;
-  --fc-button-active-border-color: #5c2665;
-}
-
-.dark .fc-toolbar-title {
-  color: #e7d9ec;
-}
-
-.dark .fc-col-header-cell-cushion,
-.dark .fc-daygrid-day-number,
-.dark .fc-timegrid-slot-label-cushion,
-.dark .fc-list-day-text,
-.dark .fc-list-day-side-text {
-  color: #d6c8db;
-}
-
-.dark .fc-list-event:hover td {
-  background: #292524;
-}
-
-.dark .fc-list-event-title a {
-  color: #e7d9ec;
-}
-
-.dark .fc-scrollgrid {
-  border-color: #44403c !important;
-}
-
-.dark .fc-scrollgrid td,
-.dark .fc-scrollgrid th {
-  border-color: #44403c !important;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

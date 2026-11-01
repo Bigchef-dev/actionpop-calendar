@@ -6,8 +6,8 @@ import { usePollItems } from '../composables/usePollItems'
 import { usePollDrag } from '../composables/usePollDrag'
 import { useSendPoll } from '../composables/useSendPoll'
 import { formatTime } from '../utils/poll.utils'
-import { AGENDAS } from '../../../config'
-import type { AgendaConfig } from '../../../types'
+import { AGENDAS } from '../legacy-agendas'
+import type { AgendaConfig } from '../legacy-agendas'
 import PollItemRow from './PollItemRow.vue'
 
 const props = defineProps<{ chatId: string }>()

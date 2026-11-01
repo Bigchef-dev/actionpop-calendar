@@ -59,6 +59,7 @@ export interface CalendarIngestionDependencies {
       snapshot: PublishedGroupSnapshot,
       events: PublishedEvent[],
     ): Promise<PublicationSummary>;
+    markEventCancelled?: (sourceEventId: string) => Promise<boolean>;
   };
   readonly groups: {
     markStoppedUnknown(scopeId: string, reason: string, at: Date): Promise<boolean>;

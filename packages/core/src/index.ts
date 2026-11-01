@@ -57,6 +57,7 @@ export * from './persistence/event-record-writer.js';
 export * from './persistence/attribution-writer.js';
 export * from './models/event.interface.js';
 export * from './geography/index.js';
+export * from './search/index.js';
 export * from './discovery/map-listing.js';
 export * from './discovery/map-selection.js';
 export * from './persistence/postgres-map-discovery.js';

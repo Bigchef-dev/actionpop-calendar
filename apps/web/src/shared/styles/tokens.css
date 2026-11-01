@@ -1,0 +1,78 @@
+/*
+ * Campaign tokens derived from docs/design.md.
+ * Light and dark sets both meet WCAG 2.1 AA (FR-030).
+ */
+:root {
+  --ap-primary: #4c0297;
+  --ap-secondary: #d1271c;
+  --ap-paper: #fffcf4;
+  --ap-ink: #212320;
+  --ap-surface: #ffffff;
+  --ap-surface-muted: #f4efe6;
+  --ap-border: #d9d2c4;
+  --ap-on-primary: #fffcf4;
+  --ap-focus: #4c0297;
+  --ap-shadow: rgba(33, 35, 32, 0.12);
+  --ap-font-display: 'Union Gothic', 'Stack Sans Text', system-ui, sans-serif;
+  --ap-font-body: 'Stack Sans Text', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ap-paper: #16121b;
+    --ap-ink: #f4efe6;
+    --ap-surface: #221b2b;
+    --ap-surface-muted: #1c1623;
+    --ap-border: #3d3348;
+    --ap-secondary: #ff8a7a;
+    --ap-on-primary: #fffcf4;
+    --ap-focus: #ff8a7a;
+    --ap-shadow: rgba(0, 0, 0, 0.45);
+  }
+}
+
+.ap-page {
+  background-color: var(--ap-paper);
+  color: var(--ap-ink);
+  font-family: var(--ap-font-body);
+}
+
+.ap-surface {
+  background-color: var(--ap-surface);
+  border: 1px solid var(--ap-border);
+}
+
+.ap-primary-text {
+  color: var(--ap-primary);
+}
+
+.ap-secondary-text {
+  color: var(--ap-secondary);
+}
+
+.ap-button {
+  background-color: var(--ap-primary);
+  color: var(--ap-on-primary);
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.ap-button-secondary {
+  background-color: var(--ap-secondary);
+  color: #fffcf4;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.ap-button:focus-visible,
+.ap-button-secondary:focus-visible,
+.ap-focusable:focus-visible {
+  outline: 3px solid var(--ap-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ap-primary-text {
+    color: #c7a8ff;
+  }
+}

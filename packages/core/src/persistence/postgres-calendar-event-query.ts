@@ -15,6 +15,7 @@ const EVENT_SELECT = {
   startTime: true,
   endTime: true,
   sequence: true,
+  status: true,
   updatedAt: true,
   lastSeenPeriod: true,
   eventType: true,
@@ -76,12 +77,14 @@ function buildWhere(
 ): Prisma.EventRecordWhereInput {
   const communeIds = criteria.communeIds ?? [];
   const eventTypes = criteria.eventTypes ?? [];
+  const groupIds = criteria.groupIds ?? [];
 
   return {
     ...(criteria.country === undefined ? {} : { countryCode: criteria.country }),
     ...(criteria.department === undefined ? {} : { departmentCode: criteria.department }),
     ...(communeIds.length === 0 ? {} : { communeId: { in: [...communeIds] } }),
     ...(eventTypes.length === 0 ? {} : { eventType: { in: [...eventTypes] } }),
+    ...(groupIds.length === 0 ? {} : { groupLinks: { some: { scopeId: { in: [...groupIds] } } } }),
     endTime: { gte: window.startUtc },
     startTime: { lte: window.endUtc },
   };
@@ -96,6 +99,7 @@ function toCalendarEvent(row: EventRow): CalendarEvent {
     startTime: row.startTime,
     endTime: row.endTime,
     sequence: row.sequence,
+    status: row.status === 'CANCELLED' ? 'CANCELLED' : 'ACTIVE',
     updatedAt: row.updatedAt,
     lastSeenPeriod: row.lastSeenPeriod,
     eventType: row.eventType,
