@@ -36,6 +36,15 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
         versionId: version,
         OR: [{ normalizedName: key }, { pronounFreeNormalizedName: key }],
       },
+      select: {
+        inseeCode: true,
+        name: true,
+        normalizedName: true,
+        pronounFreeNormalizedName: true,
+        postalCodes: true,
+        departmentCode: true,
+        population: true,
+      },
       orderBy: { inseeCode: 'asc' },
     });
     return rows.map(toCommuneRecord);
@@ -47,6 +56,15 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
   ): Promise<CommuneReferenceRecord[]> {
     const rows = await this.prisma.communeReference.findMany({
       where: { versionId: version, postalCodes: { has: postalCode } },
+      select: {
+        inseeCode: true,
+        name: true,
+        normalizedName: true,
+        pronounFreeNormalizedName: true,
+        postalCodes: true,
+        departmentCode: true,
+        population: true,
+      },
       orderBy: { inseeCode: 'asc' },
     });
     return rows.map(toCommuneRecord);
@@ -84,6 +102,7 @@ function toCommuneRecord(row: {
   pronounFreeNormalizedName: string;
   postalCodes: string[];
   departmentCode: string;
+  population: number | null;
 }): CommuneReferenceRecord {
   return {
     inseeCode: row.inseeCode,
@@ -92,5 +111,6 @@ function toCommuneRecord(row: {
     pronounFreeNormalizedName: row.pronounFreeNormalizedName,
     postalCodes: row.postalCodes,
     departmentCode: row.departmentCode,
+    ...(row.population === null ? {} : { population: row.population }),
   };
 }

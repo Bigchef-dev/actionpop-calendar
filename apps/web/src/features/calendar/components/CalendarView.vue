@@ -6,38 +6,159 @@ import FullCalendar from '@fullcalendar/vue3';
 import { computed } from 'vue';
 
 import type { CalendarEvent, CalendarLayout, WeatherEntry } from '../../../types';
+import { actionTypeFor } from '../data/event-types';
+import { groupColorFor, type GroupColor } from '../utils/group-colors';
 import EventList from './EventList.vue';
 
 const props = defineProps<{
   events: CalendarEvent[];
   layout: CalendarLayout;
   weatherFor: (event: CalendarEvent) => WeatherEntry | null;
+  groupColors: { id: string; color: GroupColor }[];
 }>();
 
 const emit = defineEmits<{ (event: 'open', target: CalendarEvent): void }>();
 
-const calendarView = computed(() => (props.layout === 'semaine' ? 'timeGridWeek' : 'dayGridMonth'));
+const calendarView = computed(() => {
+  if (props.layout === 'semaine') return 'timeGridWeek';
+  if (props.layout === 'jour') return 'timeGridDay';
+  return 'dayGridMonth';
+});
+
+function minutesOfDay(value: Date): number {
+  return value.getHours() * 60 + value.getMinutes();
+}
+
+function isNextDay(start: Date, end: Date): boolean {
+  return (
+    start.getFullYear() !== end.getFullYear() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getDate() !== end.getDate()
+  );
+}
+
+function timeValue(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}:00`;
+}
+
+const timeGridWindow = computed(() => {
+  const defaultMin = 7 * 60;
+  const defaultMax = 22 * 60;
+  let min = defaultMax - 60;
+  let max = 0;
+  let hasTimedEvent = false;
+
+  for (const event of props.events) {
+    if (event.allDay) continue;
+    hasTimedEvent = true;
+    min = Math.min(min, minutesOfDay(event.start));
+    if (event.end === null) {
+      max = defaultMax;
+    } else if (isNextDay(event.start, event.end)) {
+      max = defaultMax;
+    } else {
+      max = Math.max(max, minutesOfDay(event.end));
+    }
+  }
+
+  if (!hasTimedEvent) {
+    min = defaultMin;
+    max = defaultMax;
+  } else if (max <= min) {
+    max = Math.min(min + 60, defaultMax);
+  }
+
+  return {
+    slotMinTime: timeValue(min),
+    slotMaxTime: timeValue(max),
+    scrollTime: timeValue(min),
+  };
+});
+
+interface CalendarPresentation {
+  emoji: string;
+  color: GroupColor;
+  label: string;
+}
+
+function calendarId(event: CalendarEvent): string {
+  return `${event.id}-${event.start.toISOString()}`;
+}
+
+const presentationByEvent = computed(() => {
+  const entries = new Map<string, CalendarPresentation>();
+  for (const event of props.events) {
+    const type = actionTypeFor(event.eventType);
+    const groupId = event.metadata
+      .find((entry) => entry.name === 'X-ACTIONPOP-GROUP')
+      ?.value.trim();
+    const group =
+      props.groupColors.find((candidate) => candidate.id === groupId)?.color ??
+      (groupId === undefined || groupId === '' ? null : groupColorFor(groupId));
+    entries.set(calendarId(event), {
+      emoji: type.emoji,
+      color: group ?? {
+        color: type.color,
+        tint: 'var(--ap-surface)',
+        foreground: '#FFFFFF',
+        marker: '',
+      },
+      label: type.label,
+    });
+  }
+  return entries;
+});
 
 const fullCalendarEvents = computed(() =>
   props.events.map((event) => ({
-    id: `${event.id}-${event.start.toISOString()}`,
+    id: calendarId(event),
     title: event.summary,
     start: event.start,
     ...(event.end === null ? {} : { end: event.end }),
     allDay: event.allDay,
-    classNames:
+    classNames: [
+      'ap-event-item',
       event.status === 'CANCELLED'
-        ? ['ap-event-cancelled']
+        ? 'ap-event-cancelled'
         : event.status === 'TENTATIVE'
-          ? ['ap-event-tentative']
-          : ['ap-event-confirmed'],
+          ? 'ap-event-tentative'
+          : 'ap-event-confirmed',
+    ],
   })),
 );
 
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function eventContent(payload: { event: { id: string; title: string }; timeText: string }): {
+  html: string;
+} {
+  const presentation = presentationByEvent.value.get(payload.event.id);
+  const emoji = presentation?.emoji ?? '';
+  const color = presentation?.color.color ?? 'var(--ap-primary)';
+  const foreground = presentation?.color.foreground ?? '#FFFFFF';
+  const label = escapeHtml(presentation?.label ?? 'Action');
+  const time =
+    payload.timeText === ''
+      ? ''
+      : `<span class="ap-event-time">${escapeHtml(payload.timeText)}</span>`;
+  const timeGridClass =
+    props.layout === 'jour' || props.layout === 'semaine' ? ' ap-event-chip-timegrid' : '';
+  return {
+    html:
+      `<span class="ap-event-chip${timeGridClass}" style="background-color:${color};border-left-color:${color};color:${foreground}" title="${label}">` +
+      `<span class="ap-event-emoji" role="img" aria-label="${label}">${emoji}</span>` +
+      time +
+      `<span class="ap-event-name">${escapeHtml(payload.event.title)}</span>` +
+      `</span>`,
+  };
+}
+
 function onEventClick(payload: { event: { id: string } }): void {
-  const target = props.events.find(
-    (event) => `${event.id}-${event.start.toISOString()}` === payload.event.id,
-  );
+  const target = props.events.find((event) => calendarId(event) === payload.event.id);
   if (target !== undefined) emit('open', target);
 }
 </script>
@@ -52,6 +173,7 @@ function onEventClick(payload: { event: { id: string } }): void {
     />
     <div v-else class="ap-surface rounded-2xl p-2 sm:p-3">
       <FullCalendar
+        :key="layout"
         :options="{
           plugins: [dayGridPlugin, timeGridPlugin],
           initialView: calendarView,
@@ -61,6 +183,11 @@ function onEventClick(payload: { event: { id: string } }): void {
           headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
           events: fullCalendarEvents,
           eventClick: onEventClick,
+          eventContent,
+          eventDisplay: 'block',
+          displayEventEnd: true,
+          ...timeGridWindow,
+          dayMaxEventRows: 3,
           eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
         }"
       />

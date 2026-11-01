@@ -233,6 +233,10 @@ export class PostgresSnapshotPublisher {
       status: 'complete',
     });
   }
+
+  public async markEventCancelled(sourceEventId: string): Promise<boolean> {
+    return this.repository.markEventCancelled(sourceEventId);
+  }
 }
 
 void hashCalendarContent;

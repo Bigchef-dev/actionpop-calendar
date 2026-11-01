@@ -40,13 +40,14 @@ function downloadCopy(): void {
     </button>
     <a
       v-if="source !== null"
-      class="ap-focusable rounded-xl border px-4 py-3 text-center text-sm font-semibold"
-      :style="{ borderColor: 'var(--ap-border)' }"
+      class="ap-focusable flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-bold"
+      :style="{ backgroundColor: '#f4c542', color: '#231800' }"
       :href="source"
       target="_blank"
       rel="noopener noreferrer"
     >
-      Contacter l'organisateur sur Action Populaire
+      <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#231800] text-xs text-[#f4c542]">AP</span>
+      Action Populaire
     </a>
   </div>
 </template>

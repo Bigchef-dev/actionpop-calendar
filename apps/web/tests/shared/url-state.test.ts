@@ -14,18 +14,27 @@ describe('parseRoute', () => {
     expect(parseRoute('', OPTIONS)).toEqual({
       subject: null,
       types: [],
+      group: [],
       layout: 'liste',
       eventId: null,
       notices: [],
     });
   });
 
-  it('reads subject, types, layout and open event', () => {
-    const state = parseRoute('?sujet=commune:69123&types=tractage&vue=mois&evenement=e1', OPTIONS);
+  it('reads subject, types, group, layout and open event', () => {
+    const state = parseRoute(
+      '?sujet=commune:69123&types=tractage&ga=GA%20Paris%2012&vue=mois&evenement=e1',
+      OPTIONS,
+    );
     expect(state.subject).toEqual({ kind: 'commune', id: '69123' });
     expect(state.types).toEqual(['tractage']);
+    expect(state.group).toEqual(['GA Paris 12']);
     expect(state.layout).toBe('mois');
     expect(state.eventId).toBe('e1');
+  });
+
+  it('accepts the day layout', () => {
+    expect(parseRoute('?vue=jour', OPTIONS).layout).toBe('jour');
   });
 
   it('falls back and reports every unusable value', () => {
@@ -70,11 +79,37 @@ describe('serializeRoute', () => {
     expect(parsed.layout).toBe('mois');
     expect(parsed.eventId).toBe('e1');
   });
+
+  it('carries multiple selected action groups and drops them when cleared', () => {
+    const kept = serializeRoute(
+      {
+        subject: { kind: 'commune', id: '75112' },
+        types: [],
+        group: ['GA Paris 12', 'GA Lyon'],
+        layout: 'liste',
+        eventId: null,
+      },
+      'liste',
+    );
+    expect(parseRoute(kept, OPTIONS).group).toEqual(['GA Lyon', 'GA Paris 12']);
+    expect(
+      serializeRoute(
+        {
+          subject: { kind: 'commune', id: '75112' },
+          types: [],
+          group: [],
+          layout: 'liste',
+          eventId: null,
+        },
+        'liste',
+      ),
+    ).not.toContain('ga=');
+  });
 });
 
 describe('defaultLayoutFor', () => {
-  it('lists on a narrow screen and shows a month otherwise', () => {
-    expect(defaultLayoutFor(375)).toBe('liste');
+  it('shows a day on a narrow screen and a month otherwise', () => {
+    expect(defaultLayoutFor(375)).toBe('jour');
     expect(defaultLayoutFor(1280)).toBe('mois');
   });
 });

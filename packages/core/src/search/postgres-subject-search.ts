@@ -65,13 +65,19 @@ export class PostgresSubjectSearch implements SubjectSearchReader {
     const [rows, total, departments] = await Promise.all([
       this.prisma.communeReference.findMany({
         where,
-        orderBy: [{ departmentCode: 'asc' }, { inseeCode: 'asc' }],
+        // Biggest places first, so the candidate window the ranking receives is the useful one.
+        orderBy: [
+          { population: { sort: 'desc', nulls: 'last' } },
+          { departmentCode: 'asc' },
+          { inseeCode: 'asc' },
+        ],
         take: candidateLimit,
         select: {
           inseeCode: true,
           name: true,
           departmentCode: true,
           postalCodes: true,
+          population: true,
         },
       }),
       this.prisma.communeReference.count({ where }),
@@ -95,6 +101,7 @@ export class PostgresSubjectSearch implements SubjectSearchReader {
         calendar: { path: '/calendar.ics', params: { insee_commune: row.inseeCode } },
         aliases: row.postalCodes,
         sortKey: `${row.departmentCode}:${row.inseeCode}`,
+        ...(row.population === null ? {} : { population: row.population }),
       };
     });
 

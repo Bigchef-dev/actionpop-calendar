@@ -247,6 +247,7 @@ model CommuneReference {
   pronounFreeNormalizedName String                     @map("pronoun_free_normalized_name")
   postalCodes               String[]                   @map("postal_codes")
   departmentCode            String                     @map("department_code")
+  population                Int?
   version                   GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
   department                DepartmentReference        @relation(fields: [versionId, departmentCode], references: [versionId, code], onDelete: Cascade)
 

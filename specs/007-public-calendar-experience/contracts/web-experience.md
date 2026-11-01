@@ -22,7 +22,7 @@ unavailable service, outdated address) are **states of these two screens**.
 | ----------- | ------------------------------ | ---------------------------------- | ------------------------------------------------------------------------- |
 | `sujet`     | `<kind>:<id>`                  | absent (discovery)                 | Unresolvable → discovery screen with an explicit message naming the value |
 | `types`     | comma-separated slugs          | all types                          | Unknown slug ignored and reported; all slugs invalid → all types          |
-| `vue`       | `mois` \| `semaine` \| `liste` | `liste` under 768 px, `mois` above | Falls back to the default                                                 |
+| `vue`       | `mois` \| `jour` \| `semaine` \| `liste` | `jour` under 768 px, `mois` above | Falls back to the default                                                 |
 | `evenement` | event `UID`                    | absent                             | Not displayed; the calendar still renders                                 |
 
 **Rules**
@@ -30,6 +30,16 @@ unavailable service, outdated address) are **states of these two screens**.
 - The address is written with `history.replaceState`; navigating within the experience never
   pushes a new history entry.
 - Any address, however malformed, renders a usable screen (FR-015, FR-035).
+- The calendar layout selector is ordered as list, day, week, month. Changing it starts the
+  selected calendar view at its initial viewport; it does not reuse the previous layout's
+  navigation or scroll position.
+- Day and week views show the complete start-to-end duration of timed events, including both
+  times. Their visible hours are bounded by the displayed timed events, defaulting to 06:00 as
+  the earliest hour when no earlier event requires expansion. All-day events do not define the
+  timed window.
+- The "Par GA" row remains a single horizontal row. It supports multiple selected groups, a
+  "Tous" state, and directional controls with accessible labels whenever content is hidden on
+  the corresponding side.
 - The address is the only source of truth for shareability (US6): what a second visitor sees is
   what the address says, not what the first visitor's browser remembered.
 

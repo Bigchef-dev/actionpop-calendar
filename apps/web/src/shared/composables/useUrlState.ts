@@ -2,16 +2,22 @@ import { reactive } from 'vue';
 
 import type { CalendarLayout } from '../../types';
 
-export const LAYOUTS: readonly CalendarLayout[] = ['mois', 'semaine', 'liste'];
+export const LAYOUTS: readonly CalendarLayout[] = ['mois', 'semaine', 'jour', 'liste'];
 
 export interface RouteState {
   subject: { kind: string; id: string } | null;
   types: string[];
+  group: string[];
   layout: CalendarLayout;
   eventId: string | null;
   /** Human-readable reports of the values that could not be used as written. */
   notices: string[];
 }
+
+/** Callers that never touch the group filter may omit it; it then stays absent from the address. */
+export type RouteStateInput = Omit<RouteState, 'notices' | 'group'> & {
+  group?: readonly string[];
+};
 
 export interface ParseOptions {
   /** Layout applied when none is valid; the caller decides from the viewport width. */
@@ -69,10 +75,18 @@ export function parseRoute(search: string, options: ParseOptions): RouteState {
   }
 
   const rawEvent = params.get('evenement');
+  const rawGroup = params.get('ga');
+  const group: string[] = [];
+  if (rawGroup !== null) {
+    for (const id of rawGroup.split(',').map((value) => value.trim())) {
+      if (id !== '' && !group.includes(id)) group.push(id);
+    }
+  }
 
   return {
     subject,
     types,
+    group,
     layout: layout ?? options.defaultLayout,
     eventId: rawEvent === null || rawEvent.trim() === '' ? null : rawEvent.trim(),
     notices,
@@ -80,14 +94,14 @@ export function parseRoute(search: string, options: ParseOptions): RouteState {
 }
 
 /** Serializes a route, omitting values that equal the defaults so the address stays short. */
-export function serializeRoute(
-  state: Omit<RouteState, 'notices'>,
-  defaultLayout: CalendarLayout,
-): string {
+export function serializeRoute(state: RouteStateInput, defaultLayout: CalendarLayout): string {
   const params = new URLSearchParams();
   const key = subjectKey(state.subject);
   if (key !== null) params.set('sujet', key);
   if (state.types.length > 0) params.set('types', [...state.types].sort().join(','));
+  if (state.group !== undefined && state.group.length > 0) {
+    params.set('ga', [...new Set(state.group)].sort().join(','));
+  }
   if (state.layout !== defaultLayout) params.set('vue', state.layout);
   if (state.eventId !== null) params.set('evenement', state.eventId);
   const serialized = params.toString();
@@ -124,7 +138,7 @@ export function useRoute(): {
   };
 }
 
-/** Layout used when the address does not state one: list on a narrow screen, month otherwise. */
+/** Layout used when the address does not state one: day on a narrow screen, month otherwise. */
 export function defaultLayoutFor(width: number): CalendarLayout {
-  return width < 768 ? 'liste' : 'mois';
+  return width < 768 ? 'jour' : 'mois';
 }

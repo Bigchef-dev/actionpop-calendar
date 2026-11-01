@@ -12,11 +12,14 @@ import type { CalendarEvent, CalendarLayout, SearchSubject } from '../../../type
 import SubscriptionPanel from '../../subscription/components/SubscriptionPanel.vue';
 import { ACTION_TYPES } from '../data/event-types';
 import { useCalendarFeed } from '../composables/useCalendarFeed';
+import { GROUP_METADATA, useGroupNames } from '../composables/useGroupNames';
 import { useWeather } from '../composables/useWeather';
 import { availableTypes, feedPeriod, filterByType, formatPeriod } from '../utils/type-filter';
+import { groupColorFor, groupColorsFor } from '../utils/group-colors';
 import CalendarView from './CalendarView.vue';
 import EventDetail from './EventDetail.vue';
 import FilterBar from './FilterBar.vue';
+import GroupFilterBar, { type AvailableGroup } from './GroupFilterBar.vue';
 
 const props = defineProps<{ subject: SearchSubject }>();
 const emit = defineEmits<{ (event: 'change-subject'): void }>();
@@ -38,13 +41,59 @@ const state = computed(() =>
 );
 const available = computed(() => availableTypes(events.value));
 const shown = computed(() => filterByType(events.value, state.value.types));
-const period = computed(() => feedPeriod(shown.value));
+const { names: groupNames } = useGroupNames(events);
+const groupIds = computed(() => {
+  const ids: string[] = [];
+  for (const event of events.value) {
+    for (const entry of event.metadata) {
+      const id = entry.name === GROUP_METADATA ? entry.value.trim() : '';
+      if (id !== '' && !ids.includes(id)) ids.push(id);
+    }
+  }
+  return ids;
+});
+const groupColors = computed(() => groupColorsFor(groupIds.value));
+const groups = computed<AvailableGroup[]>(() => {
+  if (state.value.subject?.kind === 'group') return [];
+  const counts = new Map<string, number>();
+  for (const event of events.value) {
+    const seen = new Set<string>();
+    for (const entry of event.metadata) {
+      const id = entry.value.trim();
+      if (entry.name !== GROUP_METADATA || id === '' || seen.has(id)) continue;
+      seen.add(id);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([id, count]) => ({
+      id,
+      label: groupNames.value[id] ?? 'Groupe sans nom',
+      count,
+      color: groupColors.value.get(id) ?? groupColorFor(id),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'fr'));
+});
+/** Groups that are no longer published by any event of the subject are ignored. */
+const activeGroups = computed(() => {
+  const availableIds = new Set(groups.value.map((group) => group.id));
+  return state.value.group.filter((id) => availableIds.has(id));
+});
+const shownWithGroup = computed(() => {
+  if (activeGroups.value.length === 0) return shown.value;
+  return shown.value.filter((event) =>
+    event.metadata.some(
+      (entry) => entry.name === GROUP_METADATA && activeGroups.value.includes(entry.value.trim()),
+    ),
+  );
+});
+const period = computed(() => feedPeriod(shownWithGroup.value));
 const selected = computed(
-  () => shown.value.find((event) => event.id === state.value.eventId) ?? null,
+  () => shownWithGroup.value.find((event) => event.id === state.value.eventId) ?? null,
 );
 
 watch(
-  shown,
+  shownWithGroup,
   (events) => {
     void weather.ensure(events);
   },
@@ -53,6 +102,7 @@ watch(
 
 function write(patch: {
   types?: readonly string[];
+  group?: readonly string[];
   layout?: CalendarLayout;
   eventId?: string | null;
 }): void {
@@ -61,6 +111,7 @@ function write(patch: {
       {
         subject: state.value.subject,
         types: [...(patch.types ?? state.value.types)],
+        group: patch.group === undefined ? state.value.group : [...patch.group],
         layout: patch.layout ?? state.value.layout,
         eventId: patch.eventId === undefined ? state.value.eventId : patch.eventId,
       },
@@ -70,10 +121,17 @@ function write(patch: {
 }
 
 function toggleType(slug: string): void {
-  const next = state.value.types.includes(slug)
-    ? state.value.types.filter((value) => value !== slug)
-    : [...state.value.types, slug];
-  write({ types: next });
+  const availableSlugs = available.value.map((type) => type.slug);
+  const selected = state.value.types.length === 0 ? availableSlugs : state.value.types;
+  const next = selected.includes(slug)
+    ? selected.filter((value) => value !== slug)
+    : [...selected, slug];
+  write({
+    types:
+      next.length === availableSlugs.length && availableSlugs.every((value) => next.includes(value))
+        ? []
+        : next,
+  });
 }
 
 function open(target: CalendarEvent): void {
@@ -99,7 +157,7 @@ function open(target: CalendarEvent): void {
           Changer de sujet
         </button>
         <a class="ap-button ap-focusable rounded-xl px-4 py-2 text-xs" href="#ap-subscription">
-          Mon lien de calendrier
+          Copier le lien
         </a>
       </div>
     </div>
@@ -125,27 +183,46 @@ function open(target: CalendarEvent): void {
     />
 
     <template v-else>
-      <FilterBar
-        v-if="available.length > 1"
-        class="mt-5"
-        :available="available"
-        :selected="state.types"
-        :shown="shown.length"
-        :total="events.length"
-        @toggle="toggleType"
-        @clear="write({ types: [] })"
-      />
+      <div
+        v-if="groups.length > 0 || available.length > 1"
+        class="ap-surface mt-4 space-y-2 rounded-2xl px-3 py-2.5"
+      >
+        <GroupFilterBar
+          v-if="groups.length > 0"
+          :available="groups"
+          :selected="activeGroups"
+          @select="write({ group: $event })"
+        />
+        <FilterBar
+          v-if="available.length > 1"
+          :available="available"
+          :selected="state.types"
+          :shown="shownWithGroup.length"
+          :total="events.length"
+          @toggle="toggleType"
+          @clear="write({ types: [] })"
+        />
+      </div>
 
-      <div class="mt-2 flex gap-1" role="group" aria-label="Affichage">
+      <div
+        class="mt-3 inline-flex gap-0.5 rounded-xl p-0.5"
+        role="group"
+        aria-label="Affichage"
+        :style="{ backgroundColor: 'var(--ap-surface-muted)' }"
+      >
         <button
-          v-for="layout in ['liste', 'semaine', 'mois'] as const"
+          v-for="layout in ['liste', 'jour', 'semaine', 'mois'] as const"
           :key="layout"
           type="button"
-          class="ap-focusable rounded-lg px-3 py-2 text-xs font-semibold capitalize"
+          class="ap-focusable rounded-[10px] px-3 py-1.5 text-xs font-semibold capitalize"
           :aria-pressed="state.layout === layout"
           :style="
             state.layout === layout
-              ? { backgroundColor: 'var(--ap-primary)', color: 'var(--ap-on-primary)' }
+              ? {
+                  backgroundColor: 'var(--ap-surface)',
+                  color: 'var(--ap-primary)',
+                  boxShadow: '0 1px 2px var(--ap-shadow)',
+                }
               : { color: 'var(--ap-ink)' }
           "
           @click="write({ layout })"
@@ -155,7 +232,7 @@ function open(target: CalendarEvent): void {
       </div>
 
       <StateMessage
-        v-if="feedStatus === 'empty' || shown.length === 0"
+        v-if="feedStatus === 'empty' || shownWithGroup.length === 0"
         class="mt-4"
         :title="
           feedStatus === 'empty'
@@ -168,14 +245,15 @@ function open(target: CalendarEvent): void {
             : 'Retirez un filtre pour retrouver les autres actions de ce sujet.'
         "
         :primary-label="feedStatus === 'empty' ? 'Voir mon lien de calendrier' : 'Tout afficher'"
-        @primary="feedStatus === 'empty' ? write({ types: [] }) : write({ types: [] })"
+        @primary="write({ types: [], group: [] })"
       />
 
       <CalendarView
         v-else
         class="mt-4"
-        :events="shown"
+        :events="shownWithGroup"
         :layout="state.layout"
+        :group-colors="groups"
         :weather-for="weather.weatherFor"
         @open="open"
       />

@@ -39,6 +39,7 @@ const SEARCH_ANSWER_SCHEMA = {
           label: { type: 'string', example: 'Lyon' },
           qualifier: { type: 'string', example: 'Rhône' },
           parent: { type: 'string', example: 'Rhône' },
+          population: { type: 'integer', example: 522228 },
           calendar: {
             type: 'object',
             properties: {

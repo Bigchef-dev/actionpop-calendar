@@ -20,12 +20,13 @@ function typeOf(slug: string): ReturnType<typeof actionTypeFor> {
   return actionTypeFor(slug);
 }
 
-const isActive = (slug: string): boolean => props.selected.includes(slug);
+const isActive = (slug: string): boolean =>
+  props.selected.length === 0 || props.selected.includes(slug);
 const hasSelection = computed(() => props.selected.length > 0);
 </script>
 
 <template>
-  <section aria-label="Filtrer par type d'action" class="mb-4">
+  <section aria-label="Filtrer par type d'action">
     <div class="flex items-baseline justify-between gap-3">
       <h2 class="text-[11px] font-bold uppercase tracking-widest opacity-60">Type d'action</h2>
       <p class="text-xs opacity-70" role="status">
@@ -33,19 +34,19 @@ const hasSelection = computed(() => props.selected.length > 0);
       </p>
     </div>
 
-    <div class="mt-2 flex flex-wrap gap-2">
+    <div class="mt-1.5 flex flex-wrap gap-1.5">
       <button
         v-for="type in available"
         :key="type.slug"
         type="button"
-        class="ap-focusable rounded-full border px-3 py-2 text-xs font-semibold"
+        class="ap-focusable rounded-full border px-2.5 py-1 text-[11px] font-semibold"
         :aria-pressed="isActive(type.slug)"
         :style="
           isActive(type.slug)
             ? {
-                backgroundColor: 'var(--ap-primary)',
-                borderColor: 'var(--ap-primary)',
-                color: 'var(--ap-on-primary)',
+                backgroundColor: `color-mix(in srgb, var(--ap-primary) 18%, var(--ap-surface))`,
+                borderColor: `var(--ap-primary)`,
+                color: 'var(--ap-ink)',
               }
             : { borderColor: 'var(--ap-border)', color: 'var(--ap-ink)' }
         "
@@ -60,7 +61,7 @@ const hasSelection = computed(() => props.selected.length > 0);
     <button
       v-if="hasSelection"
       type="button"
-      class="ap-focusable mt-3 text-xs font-semibold underline opacity-80"
+      class="ap-focusable mt-2 text-[11px] font-semibold underline opacity-80"
       @click="emit('clear')"
     >
       Tout afficher

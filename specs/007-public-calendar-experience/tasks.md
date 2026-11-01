@@ -146,7 +146,7 @@ subset of that type for that subject, then clear the filter and recover the full
 - [x] T051 [US2] Create `apps/web/src/features/calendar/composables/useCalendarFeed.ts`: build the feed request from `subject.calendar.path` and `params` verbatim, fetch once per subject, expose `events`, `droppedCount`, `period`, `status` and `retry()`
 - [x] T052 [US2] Split `apps/web/src/features/calendar/components/CalendarView.vue` into `CalendarView.vue` (widget wiring, ≤ 150 lines) and `EventList.vue` (chronological list) without behaviour change
 - [x] T053 [US2] Rewrite `apps/web/src/features/calendar/components/FilterBar.vue` to filter by action type with the emoji and readable name of each type, `aria-pressed` on each toggle, and an "N sur M" indicator
-- [x] T054 [US2] Implement the layout switch in `apps/web/src/features/calendar/components/CalendarView.vue` driven by `vue` (`mois`, `semaine`, `liste`), defaulting to `liste` under 768 px
+- [x] T054 [US2] Implement the layout switch in `apps/web/src/features/calendar/components/CalendarView.vue` driven by `vue` (`mois`, `jour`, `semaine`, `liste`), defaulting to `jour` under 768 px and resetting each calendar view to its initial viewport
 - [x] T055 [US2] Display the covered period and the subject name on the calendar screen in `apps/web/src/features/calendar/components/CalendarView.vue`, using the period asserted by the feed response and never a guessed value
 - [x] T056 [US2] Implement the no-event state and the loading skeleton in `apps/web/src/features/calendar/components/CalendarView.vue` via `StateMessage`, naming the subject and the period and offering subscription
 - [x] T057 [US2] Validate scenario 2 of `quickstart.md` and record the observed result

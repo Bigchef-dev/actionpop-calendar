@@ -35,8 +35,8 @@ browser renders any kind it receives without a code change.
 - Matching is accent-insensitive, case-insensitive and punctuation-insensitive, using the same
   normalization the ingestion path uses to decide that two names are the same name.
 - Ranking inside one kind is: exact match, then name starts with the query, then name contains
-  the query. Inside a tier, communes are ordered by department code then INSEE code, departments
-  by code, groups by name length then name.
+  the query. Inside a tier, communes are ordered by decreasing population, then department code
+  and INSEE code, departments by code, groups by name length then name.
 - A commune whose normalized name exists in several departments is returned once per department,
   each entry carrying the department name in `qualifier`. The read never merges them.
 - At most 6 entries per kind are returned, and never more than `limit` in total.
@@ -58,6 +58,7 @@ browser renders any kind it receives without a code change.
 | `label`     | Non-empty, as published upstream                                                                                                                                                                                                 |
 | `qualifier` | Disambiguating context: the department name of a homonymous commune; absent otherwise                                                                                                                                            |
 | `parent`    | Broader territory the entry belongs to. For a commune: the department name. For a group: the department name when the group's location is known. No region entity exists in the reference data, so a region MUST NOT be returned |
+| `population` | Population of the commune in the active geographic reference; used to order city suggestions by decreasing size. Absent for other kinds, or when the reference has no value                                        |
 | `calendar`  | `path` plus `params`, complete for that subject; used verbatim by the client                                                                                                                                                     |
 
 Terminology: the machine value is `group` (kind, parameter, identifier). "Groupe d'action" is a

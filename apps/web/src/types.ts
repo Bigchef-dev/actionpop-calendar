@@ -1,4 +1,4 @@
-export type CalendarLayout = 'mois' | 'semaine' | 'liste';
+export type CalendarLayout = 'mois' | 'semaine' | 'jour' | 'liste';
 
 export type EventStatus = 'CONFIRMED' | 'TENTATIVE' | 'CANCELLED';
 
@@ -9,6 +9,7 @@ export interface SearchSubject {
   label: string;
   qualifier?: string;
   parent?: string;
+  population?: number;
   calendar: { path: string; params: Record<string, string> };
 }
 

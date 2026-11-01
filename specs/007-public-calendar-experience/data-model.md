@@ -127,7 +127,7 @@ does not honour. A link is only offered when `params` contains a value the feed 
 | ----------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `sujet`     | `ScopeSelection.subject`     | `kind:id` (for example `commune:69123`). Absent → the discovery screen                                                        |
 | `types`     | `ScopeSelection.types`       | Comma-separated action-type slugs; absent → all types. An unknown slug is reported and ignored                                |
-| `vue`       | `ScopeSelection.view`        | `mois` \| `semaine` \| `liste`; default `liste` on a narrow screen, `mois` otherwise. Unknown value falls back to the default |
+| `vue`       | `ScopeSelection.view`        | `mois` \| `jour` \| `semaine` \| `liste`; default `jour` on a narrow screen, `mois` otherwise. Unknown value falls back to the default |
 | `evenement` | `ScopeSelection.openEventId` | Event `UID`; opens the detail. An unknown id shows the calendar without the detail, not an error                              |
 
 **Invariants**

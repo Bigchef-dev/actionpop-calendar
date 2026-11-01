@@ -35,6 +35,7 @@ export function buildReferenceIndex(rows: CommuneCsvRow[]): IndexedReference {
       ),
       postalCodes: row.postalCodes,
       departmentCode: row.departmentCode,
+      ...(row.population === undefined ? {} : { population: row.population }),
     });
   }
 
@@ -58,6 +59,7 @@ export function computeChecksum(rows: CommuneCsvRow[]): string {
         row.postalCodes.join('|'),
         row.departmentCode,
         row.departmentName,
+        row.population === undefined ? '' : String(row.population),
       ].join('\u0000'),
     );
     hash.update('\u0001');

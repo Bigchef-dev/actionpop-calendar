@@ -67,6 +67,7 @@ export class PostgresGeographicReferenceWriter {
             pronounFreeNormalizedName: commune.pronounFreeNormalizedName,
             postalCodes: commune.postalCodes,
             departmentCode: commune.departmentCode,
+            ...(commune.population === undefined ? {} : { population: commune.population }),
           })),
         });
       }

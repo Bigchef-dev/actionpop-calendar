@@ -16,6 +16,7 @@ export interface SearchSubject {
   readonly label: string;
   readonly qualifier?: string;
   readonly parent?: string;
+  readonly population?: number;
   readonly calendar: SubjectCalendar;
 }
 

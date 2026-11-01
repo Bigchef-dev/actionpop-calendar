@@ -31,6 +31,7 @@ function event(
     communeId?: string;
     eventType?: string;
     groups?: string[];
+    status?: 'ACTIVE' | 'CANCELLED';
   } = {},
 ) {
   return {
@@ -52,6 +53,7 @@ function event(
       communeId: options.communeId ?? '69123',
       referenceVersion: 'communes-test',
     },
+    status: options.status,
   };
 }
 
@@ -183,5 +185,31 @@ describe('PostgresCalendarEventQuery', () => {
 
     expect(result.events).toEqual([]);
     expect(result.truncated).toBe(false);
+  });
+
+  it('serves the last published geographic state without a worker cycle and preserves cancellation status', async () => {
+    await repository.saveCurrent({
+      scopeId: 'group-a',
+      revision: 7,
+      generatedAt: '2026-10-01T12:00:00.000Z',
+      status: 'complete',
+      events: [
+        event('event-department', { departmentCode: '35', communeId: '35238' }),
+        event('event-cancelled', {
+          departmentCode: '35',
+          communeId: '35238',
+          status: 'CANCELLED',
+        }),
+      ],
+    });
+
+    const result = await query.listCalendarEvents({ department: '35' }, window, 100);
+
+    expect(result.events.map((item) => item.sourceEventId)).toEqual(
+      expect.arrayContaining(['event-department', 'event-cancelled']),
+    );
+    expect(
+      result.events.find((item) => item.sourceEventId === 'event-cancelled')?.status,
+    ).toBe('CANCELLED');
   });
 });

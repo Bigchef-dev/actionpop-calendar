@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 import type { CalendarEvent, WeatherEntry } from '../../../types';
 import WeatherBadge from './WeatherBadge.vue';
-import TypeChip from './TypeChip.vue';
+import { actionTypeFor } from '../data/event-types';
 import StatusBadge from './StatusBadge.vue';
 
 const props = defineProps<{
@@ -49,16 +49,25 @@ function timeOf(event: CalendarEvent): string {
               {{ timeOf(event) }}
             </span>
             <span class="min-w-0 flex-1">
-              <span class="flex flex-wrap items-center gap-2">
-                <span class="text-sm font-semibold">{{ event.summary }}</span>
+              <span class="flex flex-wrap items-start gap-2">
+                <span
+                  class=""
+                  :title="actionTypeFor(event.eventType).label"
+                  role="img"
+                  :aria-label="actionTypeFor(event.eventType).label"
+                >
+                  {{ actionTypeFor(event.eventType).emoji }}
+                </span>
+                <span class="min-w-0 flex-1 text-sm font-semibold leading-snug">
+                  {{ event.summary }}
+                </span>
                 <StatusBadge :status="event.status" />
-              </span>
-              <span class="mt-1 flex flex-wrap items-center gap-2">
-                <TypeChip :slug="event.eventType" />
-                <WeatherBadge :entry="weatherFor(event)" />
               </span>
               <span v-if="event.location !== null" class="mt-1 block truncate text-xs opacity-70">
                 📍 {{ event.location }}
+              </span>
+              <span class="mt-1.5 flex flex-wrap items-center gap-2">
+                <WeatherBadge :entry="weatherFor(event)" />
               </span>
             </span>
           </button>

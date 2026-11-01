@@ -96,6 +96,10 @@ function compareRanked(
   const byKind = kindOrder(left.candidate.kind) - kindOrder(right.candidate.kind);
   if (byKind !== 0) return byKind;
   if (left.tier !== right.tier) return left.tier - right.tier;
+  if (left.candidate.kind === 'commune' && right.candidate.kind === 'commune') {
+    const byPopulation = (right.candidate.population ?? 0) - (left.candidate.population ?? 0);
+    if (byPopulation !== 0) return byPopulation;
+  }
   const byKey = tieBreaker(left.candidate).localeCompare(tieBreaker(right.candidate), 'fr');
   if (byKey !== 0) return byKey;
   return left.candidate.id.localeCompare(right.candidate.id);
@@ -117,6 +121,7 @@ function toSubject(candidate: SubjectCandidate): SearchSubject {
     label: candidate.label,
     ...(candidate.qualifier === undefined ? {} : { qualifier: candidate.qualifier }),
     ...(candidate.parent === undefined ? {} : { parent: candidate.parent }),
+    ...(candidate.population === undefined ? {} : { population: candidate.population }),
     calendar: candidate.calendar,
   };
 }

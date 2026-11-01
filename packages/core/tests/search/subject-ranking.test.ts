@@ -98,6 +98,20 @@ describe('rankSubjects', () => {
     expect(ranked.map((subject) => subject.kind)).toEqual(['commune', 'department', 'group']);
   });
 
+  it('orders commune suggestions by decreasing population inside a rank tier', () => {
+    const ranked = rankSubjects(
+      [
+        commune('01001', 'Ambérieu', '01', { population: 14000, sortKey: '01:01001' }),
+        commune('69123', 'Ambérieu', '69', { population: 522228, sortKey: '69:69123' }),
+        commune('2A004', 'Ambérieu', '2A', { population: 3200, sortKey: '2A:2A004' }),
+      ],
+      q('amberieu'),
+      { perKind: 6, total: 18 },
+    );
+    expect(ranked.map((subject) => subject.id)).toEqual(['69123', '01001', '2A004']);
+    expect(ranked[0]?.population).toBe(522228);
+  });
+
   it('keeps homonymous communes once per department', () => {
     const ranked = rankSubjects(
       [commune('93066', 'Saint-Denis', '93'), commune('97411', 'Saint-Denis', '974')],

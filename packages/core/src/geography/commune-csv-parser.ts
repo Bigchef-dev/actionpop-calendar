@@ -5,6 +5,7 @@ export interface CommuneCsvRow {
   postalCodes: string[];
   departmentCode: string;
   departmentName: string;
+  population?: number;
 }
 
 export interface CommuneCsvParseResult {
@@ -56,6 +57,7 @@ export function parseCommuneCsvLines(lines: string[]): CommuneCsvParseResult {
       postalCodes,
       departmentCode: valueAt(record, header, 'dep_code'),
       departmentName: valueAt(record, header, 'dep_nom'),
+      ...parsePopulation(valueAt(record, header, 'population')),
     };
 
     const missing = (
@@ -69,6 +71,12 @@ export function parseCommuneCsvLines(lines: string[]): CommuneCsvParseResult {
     if (missing.length > 0) {
       errors.push(`row ${lineNumber + 1}: missing ${missing.map(([column]) => column).join(', ')}`);
       continue;
+    }
+
+    function parsePopulation(value: string): { population: number } | Record<string, never> {
+      if (value === '') return {};
+      const population = Number(value);
+      return Number.isInteger(population) && population >= 0 ? { population } : {};
     }
     rows.push(row);
   }

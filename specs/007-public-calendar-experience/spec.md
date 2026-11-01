@@ -71,9 +71,9 @@ matching scope is requested directly.
 ### User Story 2 - See and filter the events of my choice (Priority: P1)
 
 Once a subject is chosen, the visitor sees its events. They can narrow the display by type of
-action (for example only leaflet distribution, only stalls, only meetings) and can switch
-between a calendar layout and a chronological list. The filter applies to what is displayed
-and never changes the subject itself.
+action (for example only leaflet distribution, only stalls, only meetings), narrow it by one or
+more action groups, and can switch between month, day, week and chronological list layouts. The
+filters apply to what is displayed and never change the subject itself.
 
 **Why this priority**: A visitor who cannot recognize their own actions among dozens gives up
 before importing anything; filtering is what turns a feed into a personal agenda.
@@ -89,6 +89,23 @@ clearing the filter and recovering the full set.
 3. **Given** a filtered display, **When** the visitor clears all filters, **Then** every event of the subject is displayed again.
 4. **Given** a subject with no event at all, **When** the visitor opens it, **Then** an explanatory message names the subject, states that no event is currently scheduled, and offers to subscribe anyway so future events arrive automatically.
 5. **Given** a small screen, **When** the visitor scrolls the events, **Then** all events remain reachable and the type of action remains readable without horizontal scrolling.
+6. **Given** a city or department with several action groups, **When** the visitor selects two
+   groups in "Par GA", **Then** events belonging to either selected group remain displayed and
+   both selections are visibly active.
+7. **Given** more action groups than fit in the available width, **When** the visitor moves
+   through the "Par GA" row, **Then** the row stays on one line, exposes left and right scroll
+   controls when content is hidden in that direction, and keeps every group reachable by touch
+   or keyboard.
+8. **Given** the visitor changes from month to day, week or list, **When** the new layout opens,
+   **Then** it displays the selected layout from its initial position rather than preserving the
+   previous layout's calendar viewport.
+9. **Given** timed events with a start and an end, **When** the visitor opens the day or week
+   layout, **Then** each event occupies its full start-to-end interval and visibly includes both
+   times; its title and time remain bold and readable against the group color.
+10. **Given** timed events only between 10:00 and 16:00, **When** the day or week layout opens,
+    **Then** the visible time window is reduced to the events' useful hours rather than showing
+    an empty 00:00-06:00 area. An event before 06:00, after the last event, or crossing midnight
+    expands the window as needed.
 
 ---
 
@@ -196,6 +213,12 @@ fresh session, and comparing the displayed events with the original.
 - A subject with a very large number of events: the display must stay usable and indicate the
   period covered.
 - Very long group names, including acronyms and parenthesised qualifiers, on a narrow screen.
+- A group row whose content is wider than the viewport, including when the row is already scrolled
+  to its left or right edge.
+- A subject containing only all-day events, no timed events, or events before 06:00 or crossing
+  midnight.
+- Switching layouts repeatedly, including while a calendar is scrolled or navigated away from
+  its initial period.
 - No network, slow network, or an unavailable events service.
 - A visitor who refuses or ignores a location permission prompt: the experience must never
   depend on it.
@@ -210,7 +233,7 @@ fresh session, and comparing the displayed events with the original.
 - **FR-001**: The home screen MUST present a single central search field as the primary action, with no other action competing for the same attention.
 - **FR-002**: The search MUST resolve one query to subjects of at least three kinds: city (commune), department, and action group; the set of kinds MUST be defined as an extensible catalogue so that a further kind can be added without redesigning the screen.
 - **FR-003**: Each suggested subject MUST display its readable name, its kind, and the broader territory it belongs to when one exists.
-- **FR-004**: Suggestions MUST appear while typing, tolerate accents, apostrophes, hyphens, casing and number-or-word department forms, and MUST rank subjects whose name starts with the query before those that merely contain it.
+- **FR-004**: Suggestions MUST appear while typing, tolerate accents, apostrophes, hyphens, casing and number-or-word department forms, and MUST rank subjects whose name starts with the query before those that merely contain it; within one rank tier, city suggestions MUST be ordered by decreasing population so that the largest place comes first.
 - **FR-005**: The search field MUST display, without any visitor interaction, a rotating set of example queries that are typed then erased; the rotation MUST stop on focus, stop when the visitor has typed something, and MUST be suppressed when the visitor has asked for reduced animation.
 - **FR-006**: The search MUST be fully operable with a keyboard alone (open suggestions, move, choose, dismiss) and MUST announce the number of available suggestions to assistive technologies.
 - **FR-007**: When a query matches nothing, the screen MUST explain the result, propose at least two nearby alternatives and invite another kind of search.
@@ -222,21 +245,26 @@ fresh session, and comparing the displayed events with the original.
 
 - **FR-011**: The events screen MUST display the events of the chosen subject over an explicit time window, and MUST state that window on screen.
 - **FR-012**: The visitor MUST be able to filter displayed events by type of action, with several types selectable at once, and each type identified by its emoji and readable name.
+- **FR-012a**: For a city or a department, the events screen MUST offer a compact group filter labelled "Par GA" above the type-of-action filter, built from the group published with each event; it MUST stay on one line, use little vertical space, and offer a "Tous" option plus multiple selectable groups. "Tous" MUST mean that no group restriction is applied; when several groups are selected, events belonging to at least one selected group MUST be shown. Each group MUST have a stable color and a distinct non-color marker, and the same full group color MUST be used on its event cards in the calendar.
+- **FR-012b**: When the group filter contains more groups than fit in its available width, it MUST remain a single horizontal row with touch and keyboard scrolling. A visible left control MUST appear when content is hidden to the left, and a visible right control MUST appear when content is hidden to the right; each control MUST scroll only the group row and MUST expose an accessible label.
 - **FR-013**: The type-of-action filter MUST act only on what is displayed and MUST NOT modify the chosen subject.
-- **FR-014**: The visitor MUST be able to switch between a calendar layout (month, week, list) and a chronological list, and the chosen layout MUST survive a reload.
+- **FR-014**: The visitor MUST be able to switch between month, day, week and list layouts, and the chosen layout MUST survive a reload. On a narrow mobile viewport, the day layout MUST be the initial layout when the address does not specify one. In day and week layouts, an event's displayed block MUST use its full start-to-end duration, and its content MUST be allowed to wrap within that block instead of being forced onto one line.
+- **FR-014a**: Changing the layout MUST reset the calendar view to the selected layout's initial viewport, rather than retaining stale navigation or scroll state from the previously displayed layout.
+- **FR-014b**: In day and week layouts, the visible time window MUST be derived from the displayed timed events. It MUST omit unused hours before the first useful event (with 06:00 as the default lower bound), extend earlier for events before 06:00, extend later through the latest end, and cover midnight-crossing events. All-day events MUST NOT create an artificial timed interval.
+- **FR-014c**: In every calendar layout that renders event cards, the event title and displayed start/end times MUST be bold and meet the experience's contrast requirement; day and week cards MUST allow the title to wrap inside the event duration.
 - **FR-015**: The active filters MUST be reflected in the page address and restored when the address is reopened; an address carrying an unknown filter value MUST be reported and recovered from.
 - **FR-016**: The events screen MUST expose the number of displayed events relative to the total number of events of the subject.
 - **FR-017**: The visitor MUST be able to obtain a personal calendar link for the chosen subject, presented in the forms the visitor's calendar application can consume (direct subscription address, downloadable file, and an action that opens a well-known calendar service pre-filled).
 - **FR-018**: The visitor MUST be able to choose whether the subscribed calendar reflects the currently displayed type-of-action filters or every event of the subject, and the screen MUST state which of the two is proposed.
-- **FR-019**: The subscription panel MUST state, in plain language, which subject, which filters and which period the link covers, and what happens after subscription (updates arrive automatically, no account needed).
-- **FR-020**: The visitor MUST be able to copy the link, with a visible confirmation, and the copied value MUST be complete and directly usable.
+- **FR-019**: The subscription panel MUST make the coverage of the link plain — the subject, the retained filters and the period are readable in the subscription address it displays — and MUST state what happens after subscription (updates arrive automatically, no account needed).
+- **FR-020**: The subscription panel MUST show the complete subscription address itself, without a human summary that hides it, and the visitor MUST be able to copy that address with a clipboard action and a visible confirmation; the copied value MUST be complete and directly usable.
 - **FR-021**: When the subject's calendar cannot be produced, the screen MUST state the problem plainly and offer an alternative way to reach the events; it MUST NOT present a broken or empty link as valid.
 - **FR-022**: A subject with no upcoming event MUST still offer subscription, so that future events are received automatically.
 
 ### Theme C — Understanding an event
 
-- **FR-023**: Every event MUST display the kind of action it represents, using the emoji and the readable name associated with that kind, with a neutral fallback when the kind is unknown.
-- **FR-024**: The event detail MUST give direct access to the responsible person by opening the Action Populaire page of the event in a new tab, since the contact itself is not carried by the published calendar; it MUST NOT display a contact field it does not own.
+- **FR-023**: Every event MUST display the kind of action it represents, always through the emoji associated with that kind and with a neutral fallback when the kind is unknown: the month layout MUST show that emoji in place of the default event marker, and the list MUST show the emoji alone, its readable name being carried by the accessible label rather than by a visible chip.
+- **FR-024**: The event detail MUST give direct access to the responsible person by opening the Action Populaire page of the event in a new tab, through a yellow button labelled "Action Populaire" carrying the campaign mark, since the contact itself is not carried by the published calendar; it MUST NOT display a contact field it does not own.
 - **FR-025**: The event detail MUST display the practical information already available to the calendar: dates and times in the visitor's language, place with an action to open it in a map service, expected weather for the place and time when a forecast is meaningful, and an action to add the event to the visitor's own calendar.
 - **FR-026**: The event detail MUST display every extra field published with the event, each with a human-readable label, and MUST omit absent fields entirely rather than displaying empty sections.
 - **FR-027**: The event detail MUST keep the event status visible (confirmed, provisional, cancelled) so a cancelled or provisional action cannot be mistaken for a confirmed one.
@@ -297,6 +325,16 @@ fresh session, and comparing the displayed events with the original.
 - **SC-011**: A shared address reproduces exactly the same subject, filters and period for the recipient, for 100% of the tested cases.
 - **SC-012**: With the worker stopped after a successful publication, 100% of tested commune, department and group requests continue to return the same matching published events rather than an empty result.
 - **SC-013**: In 100% of tested explicit detail `404` cases, the event remains in history, is shown as cancelled while inside the calendar window, and is absent from the public feed after the window; no transient failure causes cancellation.
+- **SC-014**: In 100% of tested group-filter cases, selecting multiple groups displays the union of
+  their events, selecting "Tous" removes the restriction, and every group remains reachable in
+  an intentionally overflowing row.
+- **SC-015**: In 100% of tested layout-switch cases, changing layout displays the requested
+  month, day, week or list view from its initial viewport without stale state from the prior view.
+- **SC-016**: In 100% of tested timed-event cases, day and week layouts display the complete
+  start-to-end interval, both times, and a useful time window without an unused 00:00-06:00
+  block when no event occurs there.
+- **SC-017**: At least 95% of participants in a mobile readability check can identify an event's
+  title, start time and end time from the calendar card without zooming.
 
 ## Assumptions
 

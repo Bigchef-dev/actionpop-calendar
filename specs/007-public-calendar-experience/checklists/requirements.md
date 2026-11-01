@@ -49,3 +49,7 @@
 - The specification intentionally records UX exploration as a deliverable (FR-010, FR-032,
   SC-005) because the requester asked for several interface proposals arbitrated by poll before
   implementation.
+- Iteration 4 (calendar interaction refinement): documented multi-selection and directional
+  scrolling for "Par GA", the day layout and mobile default, layout reset behavior, complete
+  start/end duration display, dynamic timed windows, and bold calendar-card readability. Re-
+  validated: all items still pass.

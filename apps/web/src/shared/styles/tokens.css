@@ -64,6 +64,16 @@
   min-height: 44px;
 }
 
+/* Horizontal rail: keeps a long filter row on one line without a visible scrollbar. */
+.ap-scroll-x {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ap-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
 .ap-button:focus-visible,
 .ap-button-secondary:focus-visible,
 .ap-focusable:focus-visible {
