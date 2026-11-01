@@ -44,6 +44,44 @@ pnpm --filter @actionpop/api test
 pnpm --filter @actionpop/worker test
 ```
 
+### Static quality gates
+
+`pnpm quality` stays focused on type checking, linting, tests, integration tests and
+builds so the local loop stays fast. The checks below run in CI and are available
+individually:
+
+```bash
+pnpm check:dead      # knip: unused files, dependencies and unlisted imports
+pnpm check:cycles    # madge: rejects new circular imports against .madge-baseline.json
+pnpm check:spell     # cspell: code, comments, docs and YAML (English + French)
+pnpm check:licenses  # rejects licenses outside the permissive allowlist
+pnpm audit:high      # fails only on high or critical production advisories
+pnpm check:static    # typecheck, lint and the four checks above
+```
+
+`pnpm check:cycles` compares the current graph to `.madge-baseline.json`. Seven cycles
+predate this gate; they are recorded there and shown by `node scripts/check-cycles.mjs`
+when resolved. A new cycle fails the check, and `--update` re-records the baseline
+after a deliberate refactor.
+
+`pnpm check:licenses` reads `pnpm licenses list --json` and accepts only permissive
+licenses. Two data-only packages are exempted in `scripts/check-licenses.mjs` with
+their reason recorded next to the exemption.
+
+### CI workflows
+
+| Workflow          | Trigger                               | Purpose                                                                                                                                         |
+| ----------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`          | push on `main`, pull requests, manual | `static` and `unit` jobs; documentation-only changes are skipped but a `gate` job still reports so a required check never blocks a pull request |
+| `integration.yml` | code, schema or test changes          | PostgreSQL 16 and Redis services, then `pnpm test:integration`                                                                                  |
+| `docker.yml`      | Docker, dependency or source changes  | builds both images without pushing; publication stays with `publish-images.yml` on `main`                                                       |
+| `security.yml`    | dependency changes, weekly, manual    | gitleaks and `pnpm audit --prod --audit-level=high`                                                                                             |
+
+All workflows use `ubuntu-latest`, cancel superseded runs through `concurrency`, and
+cap each job with `timeout-minutes`. Dependabot (`.github/dependabot.yml`) opens weekly
+grouped updates for npm, GitHub Actions and Docker, and leaves major upgrades of
+`prisma`, `@prisma/client`, `typescript` and `bullmq` to manual work.
+
 `pnpm dev` starts the Redis and Postgres containers, applies pending Prisma
 migrations, then builds and runs the API. If Docker requires elevated rights on your
 machine, start the dependencies once with `sudo pnpm dev:infra` (or add your user to

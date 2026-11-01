@@ -1,0 +1,31 @@
+{
+  "version": "0.2",
+  "language": "en,fr",
+  "dictionaryDefinitions": [
+    {
+      "name": "actionpop",
+      "path": "./.cspell/actionpop.txt"
+    }
+  ],
+  "dictionaries": [
+    "typescript",
+    "node",
+    "softwareTerms",
+    "companies",
+    "filetypes",
+    "en-gb",
+    "fr-fr",
+    "actionpop"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "pnpm-lock.yaml",
+    "data/**",
+    "**/prisma/migrations/**",
+    ".specify/**",
+    ".git/**"
+  ],
+  "import": ["@cspell/dict-fr-fr/cspell-ext.json"]
+}

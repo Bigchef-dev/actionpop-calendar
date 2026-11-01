@@ -1,0 +1,9 @@
+[
+  "apps/api/src/app.module.ts > apps/api/src/controllers/calendar-ics.controller.ts > apps/api/src/server.ts",
+  "apps/api/src/controllers/calendar-ics.controller.ts > apps/api/src/server.ts",
+  "apps/worker/src/ingestion/calendar-ingestion-processor.ts > apps/worker/src/ingestion/ingestion-outcome.ts",
+  "packages/core/src/index.ts > packages/core/src/persistence/calendar-dataset-repository.ts",
+  "packages/core/src/persistence/postgres-group-discovery.ts > packages/core/src/persistence/postgres-group-registry.ts",
+  "packages/core/src/persistence/postgres-group-queries.ts > packages/core/src/persistence/postgres-group-registry.ts",
+  "packages/core/src/persistence/postgres-group-registry.ts > packages/core/src/persistence/postgres-scope-queries.ts"
+]

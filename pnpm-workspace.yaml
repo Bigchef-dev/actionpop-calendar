@@ -8,3 +8,7 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
+
+overrides:
+  # GHSA-mrhx-c7xc-m3w5: zod < 4.6.6 can exhaust memory on oversized collections.
+  zod: ^4.6.7
