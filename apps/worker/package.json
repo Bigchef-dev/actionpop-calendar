@@ -9,7 +9,7 @@
   "dependencies": {
     "@actionpop/core": "workspace:*",
     "bullmq": "^5.29.2",
-    "ioredis": "^5.4.1"
+    "ioredis": "^6.0.0"
   },
   "exports": {
     ".": {
