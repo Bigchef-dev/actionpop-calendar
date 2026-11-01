@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 import type { IndexedReference } from '../geography/commune-name-index.js';
 import type { Diagnostic } from '../geography/reference-types.js';
@@ -16,6 +16,11 @@ export type ActivationResult =
 
 const BATCH_SIZE = 1000;
 
+// Staging inserts every commune of the dataset (tens of thousands of rows) inside one
+// transaction. The Prisma default of five seconds is too tight for that volume through a
+// driver adapter, and a rollback must still cover the whole staging step.
+const STAGE_TRANSACTION_TIMEOUT_MS = 60_000;
+
 export class PostgresGeographicReferenceWriter {
   public constructor(private readonly prisma: PrismaClient) {}
 
@@ -25,7 +30,7 @@ export class PostgresGeographicReferenceWriter {
     });
     if (existing !== null) return;
 
-    await this.prisma.$transaction(async (transaction) => {
+    const stageAll = async (transaction: Prisma.TransactionClient): Promise<void> => {
       await transaction.geographicReferenceVersion.create({
         data: {
           version: input.version,
@@ -65,7 +70,9 @@ export class PostgresGeographicReferenceWriter {
           })),
         });
       }
-    });
+    };
+
+    await this.prisma.$transaction(stageAll, { timeout: STAGE_TRANSACTION_TIMEOUT_MS });
   }
 
   public async activate(version: string): Promise<ActivationResult> {

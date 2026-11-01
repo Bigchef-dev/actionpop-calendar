@@ -22,6 +22,8 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: '@prisma/client'
         update-types: [version-update:semver-major]
+      # typescript-eslint requires typescript <6.1, so a major bump must be coordinated
+      # with the linter rather than merged automatically.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
       - dependency-name: bullmq

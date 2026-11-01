@@ -4,15 +4,32 @@ import { describe, expect, it } from 'vitest';
 const apiDockerfile = readFileSync('infra/docker/Dockerfile.api', 'utf8');
 const workerDockerfile = readFileSync('infra/docker/Dockerfile.worker', 'utf8');
 const compose = readFileSync('infra/compose/docker-compose.yml', 'utf8');
+const rootPackage = JSON.parse(readFileSync('package.json', 'utf8')) as {
+  engines?: { node?: string };
+};
+const nodeMajor = /^>=\s*(\d+)/.exec(rootPackage.engines?.node ?? '')?.[1];
 
 describe('runtime image contracts', () => {
   it('defines independent non-root API and worker targets', () => {
-    expect(apiDockerfile).toContain('FROM node:20-alpine AS runtime');
-    expect(workerDockerfile).toContain('FROM node:20-alpine AS runtime');
+    expect(nodeMajor).toBeDefined();
+    expect(apiDockerfile).toContain(`FROM node:${nodeMajor}-alpine AS runtime`);
+    expect(workerDockerfile).toContain(`FROM node:${nodeMajor}-alpine AS runtime`);
     expect(apiDockerfile).toContain('USER actionpop');
     expect(workerDockerfile).toContain('USER actionpop');
     expect(apiDockerfile).toContain('CMD ["node", "apps/api/dist/main.js"]');
     expect(workerDockerfile).toContain('CMD ["node", "apps/worker/dist/main.js"]');
+  });
+
+  it('runs the same Node major in every build and runtime stage', () => {
+    // The images must match `engines.node`: a drifting stage deploys a runtime the project
+    // never tested, which is how an old Node base image once survived a runtime upgrade.
+    for (const dockerfile of [apiDockerfile, workerDockerfile]) {
+      const stages = [...dockerfile.matchAll(/^FROM node:(\S+)/gm)].map((match) => match[1]);
+      expect(stages.length).toBeGreaterThan(0);
+      for (const tag of stages) {
+        expect(tag).toBe(`${nodeMajor}-alpine`);
+      }
+    }
   });
 
   it('generates the Prisma client from the schema before compiling', () => {

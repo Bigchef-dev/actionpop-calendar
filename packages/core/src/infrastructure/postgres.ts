@@ -1,10 +1,52 @@
+import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 
+/**
+ * Prisma 7 connects through a driver adapter, so the connection string is handed to the
+ * adapter instead of the removed `datasources` option. The pool it creates is owned by
+ * the adapter and released by `$disconnect`.
+ *
+ * The adapter ignores the `schema` query parameter that `datasources` used to honour, so
+ * it is read here and forwarded explicitly. Integration tests rely on it to isolate each
+ * file in its own schema.
+ */
 export function createPostgresClient(url = process.env.DATABASE_URL): PrismaClient {
   if (url === undefined || url.trim() === '') {
     throw new Error('DATABASE_URL is required');
   }
-  return new PrismaClient({ datasources: { db: { url } } });
+  return new PrismaClient({ adapter: createDriverAdapter(url) });
+}
+
+/**
+ * Builds the pg adapter from the connection string, forwarding the settings the Prisma
+ * engine used to read from it: `schema` for the search path and `connection_limit` for
+ * the pool size. A missing limit keeps the pg default.
+ *
+ * The adapter's `schema` option only qualifies generated model queries; raw `Prisma.sql`
+ * statements keep unqualified table names and resolve them through `search_path`. The
+ * search path is therefore also set on every pooled connection, which is what keeps
+ * unqualified SQL inside the intended schema.
+ */
+export function createDriverAdapter(url: string): PrismaPg {
+  const parameters = new URL(url).searchParams;
+  const schema = parameters.get('schema') ?? undefined;
+  const limit = Number(parameters.get('connection_limit'));
+
+  const pool: { connectionString: string; max?: number; options?: string } = {
+    connectionString: url,
+  };
+  if (Number.isSafeInteger(limit) && limit > 0) pool.max = limit;
+  if (schema !== undefined) pool.options = `-c search_path=${quoteIdentifier(schema)},public`;
+
+  return new PrismaPg(pool, schema === undefined ? {} : { schema });
+}
+
+/** A schema name is an identifier, never a value: quote it and refuse anything else. */
+function quoteIdentifier(identifier: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error(`invalid schema name: ${identifier}`);
+  }
+  return `"${identifier}"`;
 }
 
 export async function checkPostgresHealth(client: PrismaClient): Promise<void> {

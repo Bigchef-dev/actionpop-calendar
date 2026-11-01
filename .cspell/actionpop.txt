@@ -101,3 +101,5 @@ departement
 DEPARTEMENT
 mrhx
 gitleaks
+datasource
+elkjs

@@ -3,9 +3,15 @@ import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 import {
-  createPostgresClient,
   closePostgres,
+  createDriverAdapter,
+  createPostgresClient,
 } from '../../packages/core/src/infrastructure/postgres.js';
+
+/** Prisma 7 connects through a driver adapter, so a bare client needs one too. */
+function adminClient(url: string): PrismaClient {
+  return new PrismaClient({ adapter: createDriverAdapter(url) });
+}
 
 export function resolveTestDatabaseUrl(
   env: Record<string, string | undefined> = process.env,
@@ -19,9 +25,17 @@ export function resolveTestDatabaseUrl(
   return url;
 }
 
+/**
+ * Each integration file runs in its own schema. The pool is capped well below the pg
+ * default because every file owns a client and vitest runs them in parallel: 21 files
+ * with the default of ten connections would exceed Postgres `max_connections`.
+ */
+const TEST_CONNECTION_LIMIT = 3;
+
 export function withSchema(databaseUrl: string, schema: string): string {
   const url = new URL(databaseUrl);
   url.searchParams.set('schema', schema);
+  url.searchParams.set('connection_limit', String(TEST_CONNECTION_LIMIT));
   return url.toString();
 }
 
@@ -53,7 +67,7 @@ export async function startIntegrationPostgres(
   const schema = options.schema;
 
   if (schema !== undefined) {
-    const admin = new PrismaClient({ datasources: { db: { url: baseUrl } } });
+    const admin = adminClient(baseUrl);
     try {
       await admin.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
     } finally {
@@ -71,7 +85,7 @@ export async function startIntegrationPostgres(
     stop: async () => {
       await closePostgres(prisma);
       if (schema === undefined) return;
-      const admin = new PrismaClient({ datasources: { db: { url: baseUrl } } });
+      const admin = adminClient(baseUrl);
       try {
         await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
       } finally {

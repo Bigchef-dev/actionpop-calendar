@@ -20,12 +20,16 @@ const normalise = (cycle) => cycle.map((file) => file.replaceAll('\\', '/')).sor
 const current = result.circular().map(normalise);
 const keys = current.map((cycle) => cycle.join(' > '));
 
-let baseline = [];
-try {
-  baseline = JSON.parse(readFileSync(BASELINE, 'utf8'));
-} catch {
-  baseline = [];
+/** A missing or unreadable baseline accepts no cycle yet, so every cycle is reported. */
+function readBaseline() {
+  try {
+    return JSON.parse(readFileSync(BASELINE, 'utf8'));
+  } catch {
+    return [];
+  }
 }
+
+const baseline = readBaseline();
 
 const known = new Set(baseline);
 const introduced = current.filter((cycle) => !known.has(cycle.join(' > ')));

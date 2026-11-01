@@ -1,9 +1,14 @@
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
-RUN corepack enable
+# Node 26 no longer bundles corepack, so pnpm is installed at the version pinned by
+# `packageManager`. Keeping the pin explicit preserves reproducible installs.
+RUN npm install --global pnpm@12.8.1
 # Sources are copied before installing: the workspace packages are `file:` dependencies,
 # and pnpm must see them to link @actionpop/core.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+# Prisma 7 reads the datasource URL from prisma.config.ts, so the migrate service inside
+# the image cannot run without it.
+COPY prisma.config.ts ./
 COPY packages packages
 COPY apps apps
 COPY config config
@@ -22,7 +27,7 @@ RUN rm -rf packages/core/src packages/core/tests apps/api/src apps/api/tests \
            apps/worker/src apps/worker/tests apps/api/tsconfig.tsbuildinfo \
            apps/worker/tsconfig.tsbuildinfo packages/core/tsconfig.tsbuildinfo
 
-FROM node:20-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S actionpop && adduser -S actionpop -G actionpop

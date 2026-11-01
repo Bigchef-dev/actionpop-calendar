@@ -63,8 +63,9 @@ jobs:
           version: 12.8.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm prisma:generate
+      # `test:integration` generates the Prisma client and builds @actionpop/core itself,
+      # so the same command sequence works on any runner (GitHub, GitLab, local).
       - run: pnpm test:integration

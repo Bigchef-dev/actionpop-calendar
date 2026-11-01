@@ -19,10 +19,11 @@ const ALLOWED = new Set([
   'WTFPL',
 ]);
 
-// Data-only packages that carry a share-alike license on their word lists, never on
-// code that ships in a published image. Each exemption states why it is acceptable.
+// Packages whose license never reaches a published artifact. Each exemption states why
+// it is acceptable; anything else outside the allowlist fails the check.
 const EXEMPT = new Map([
   ['@cspell/dict-en-common-misspellings', 'CC BY-SA 4.0 applies to dictionary data, dev-only'],
+  ['elkjs', 'EPL-2.0, dev-only: pulled in by @prisma/studio-core inside the Prisma CLI'],
 ]);
 
 /** `A OR B` passes when any atom passes; `A AND B` passes only when all atoms pass. */

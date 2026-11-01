@@ -8,15 +8,23 @@ ActionPop Calendar is a pnpm TypeScript monorepo with three workspace units:
 
 ## Requirements
 
-- Node.js 20+ LTS
-- Corepack with pnpm enabled
+- Node.js 26+ (the floor is declared once in `engines.node` and mirrored by every
+  workflow and Docker image)
+- pnpm 12.8.1, the version pinned by `packageManager`
 
-Enable the pinned package-manager version and install dependencies from the lockfile:
+Install the pinned package manager, then install dependencies from the lockfile:
 
 ```bash
-corepack enable
+npm install --global pnpm@12.8.1
 pnpm install --frozen-lockfile
 ```
+
+Node 26 no longer bundles corepack, so the Docker images install pnpm the same way.
+
+TypeScript is held at 6.0.x on purpose: `typescript-eslint` declares `typescript
+
+> =4.8.4 <6.1.0`, so TypeScript 7 would silently disable type-aware linting. Dependabot
+> ignores that major; raising it needs the linter's support first.
 
 Run the complete repository quality pipeline:
 
@@ -44,6 +52,19 @@ pnpm --filter @actionpop/api test
 pnpm --filter @actionpop/worker test
 ```
 
+`pnpm install` runs `prisma generate` through the `prepare` script, so a fresh clone
+always has a generated client. The root `typecheck`, `test`, `test:integration` and
+`build` scripts generate it too, which makes each command self-sufficient on any runner:
+a pipeline only needs `pnpm install` and the command itself, with no hidden ordering.
+
+Generation needs no database: `scripts/prisma.mjs` requires `DATABASE_URL` only for the
+commands that open a connection (`migrate`, `studio`, `db`), so `generate` and `validate`
+work on a checkout without any `.env`.
+
+Vitest resolves `@actionpop/core` to its source through a `resolve.alias`, so no suite
+needs a prior `pnpm build`. The packaged artifacts are still verified by the Docker build
+in `docker.yml`.
+
 ### Static quality gates
 
 `pnpm quality` stays focused on type checking, linting, tests, integration tests and
@@ -55,8 +76,9 @@ pnpm check:dead      # knip: unused files, dependencies and unlisted imports
 pnpm check:cycles    # madge: rejects new circular imports against .madge-baseline.json
 pnpm check:spell     # cspell: code, comments, docs and YAML (English + French)
 pnpm check:licenses  # rejects licenses outside the permissive allowlist
+pnpm check:toolchain # dev tooling must run on the Node major CI installs
 pnpm audit:high      # fails only on high or critical production advisories
-pnpm check:static    # typecheck, lint and the four checks above
+pnpm check:static    # typecheck, lint and the five checks above
 ```
 
 `pnpm check:cycles` compares the current graph to `.madge-baseline.json`. Seven cycles
@@ -67,6 +89,16 @@ after a deliberate refactor.
 `pnpm check:licenses` reads `pnpm licenses list --json` and accepts only permissive
 licenses. Two data-only packages are exempted in `scripts/check-licenses.mjs` with
 their reason recorded next to the exemption.
+
+`pnpm check:toolchain` reads the `node-version` used by every workflow and fails when a
+dev dependency declares `engines.node` that excludes that major. This is the guard that
+catches a tool upgrade requiring a newer runtime before CI does, so raising the floor
+stays a deliberate choice. When a tool genuinely needs a newer Node, raise
+`node-version` in all workflows and `engines.node` together.
+
+Tests read the same configuration files as the runtime: `tests/setup-env.ts` loads
+`.env` and `.env.local` before any suite runs, so `pnpm test:integration` finds
+`DATABASE_URL` without an exported variable.
 
 ### CI workflows
 
