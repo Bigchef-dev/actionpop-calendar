@@ -13,7 +13,9 @@ COPY packages packages
 COPY apps apps
 COPY config config
 COPY prisma prisma
-RUN pnpm install --frozen-lockfile
+# Only the packages these images run are installed: the campaign agenda in apps/web is a
+# static front and must not pull Vue, FullCalendar and Vite into a server image.
+RUN pnpm install --frozen-lockfile --filter @actionpop/api...
 RUN rm -f packages/core/tsconfig.tsbuildinfo apps/api/tsconfig.tsbuildinfo apps/worker/tsconfig.tsbuildinfo
 # The client is generated before compiling: the type checker reads the models, so an
 # ungenerated client fails the build on missing `Prisma.sql` and `Prisma.JsonValue`.

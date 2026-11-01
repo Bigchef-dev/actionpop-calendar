@@ -1,10 +1,12 @@
 # ActionPop Calendar
 
-ActionPop Calendar is a pnpm TypeScript monorepo with three workspace units:
+ActionPop Calendar is a pnpm TypeScript monorepo with four workspace units:
 
 - `packages/core`: shared domain contracts and adapters
 - `apps/api`: public read-only calendar API
 - `apps/worker`: scheduled ingestion and BullMQ processing
+- `apps/web`: Vue 3 + Vite campaign agenda, published on GitHub Pages
+  (see [apps/web/README.md](apps/web/README.md))
 
 ## Requirements
 
@@ -108,6 +110,8 @@ Tests read the same configuration files as the runtime: `tests/setup-env.ts` loa
 | `integration.yml` | code, schema or test changes          | PostgreSQL 16 and Redis services, then `pnpm test:integration`                                                                                  |
 | `docker.yml`      | Docker, dependency or source changes  | builds both images without pushing; publication stays with `publish-images.yml` on `main`                                                       |
 | `security.yml`    | dependency changes, weekly, manual    | gitleaks and `pnpm audit --prod --audit-level=high`                                                                                             |
+| `web.yml`         | `apps/web` or lockfile changes        | `vue-tsc` type check and Vite build, with the bundle uploaded as an artifact                                                                    |
+| `pages.yml`       | `apps/web` changes on `main`          | publishes `apps/web/dist` to GitHub Pages                                                                                                       |
 
 All workflows use `ubuntu-latest`, cancel superseded runs through `concurrency`, and
 cap each job with `timeout-minutes`. Dependabot (`.github/dependabot.yml`) opens weekly

@@ -11,3 +11,6 @@ build/
 
 # The commented configuration reference must reach the images.
 !config/actionpop.example.yaml
+
+# The campaign agenda is a static front: it never ships in the API or worker images.
+apps/web/

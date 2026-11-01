@@ -103,3 +103,29 @@ mrhx
 gitleaks
 datasource
 elkjs
+# Web app: calendar formats, feeds and campaign vocabulary.
+addbyurl
+Aqqi
+corsproxy
+daygrid
+dtend
+dtstart
+fullcalendar
+lfirennes
+Meteo
+Mtpf
+precip
+timegrid
+vevent
+Vevent
+vevents
+webcal
+# CalDAV / iCalendar vocabulary used in docs/web-caldav.md.
+arran
+caldav
+CALNAME
+circo
+formattage
+spatie
+visio
+VTIMEZONE
