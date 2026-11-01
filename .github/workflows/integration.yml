@@ -58,7 +58,7 @@ jobs:
       UPSTREAM_BASE_URL: https://actionpopulaire.fr
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 12.8.1
       - uses: actions/setup-node@v4
