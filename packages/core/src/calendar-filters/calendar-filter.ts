@@ -15,6 +15,7 @@ export interface CalendarFilterCriteria {
   readonly communeIds?: readonly string[];
   readonly eventTypes?: readonly string[];
   readonly groupIds?: readonly string[];
+  readonly epciIds?: readonly string[];
 }
 
 export type CalendarFilterResult =
@@ -38,6 +39,8 @@ export function parseCalendarFilter(
   if (eventTypes.diagnostic !== undefined) diagnostics.push(eventTypes.diagnostic);
   const groupIds = readList(query.group, 'group');
   if (groupIds.diagnostic !== undefined) diagnostics.push(groupIds.diagnostic);
+  const epciIds = readList(query.epci, 'epci');
+  if (epciIds.diagnostic !== undefined) diagnostics.push(epciIds.diagnostic);
 
   if (diagnostics.length > 0) return { ok: false, diagnostics };
 
@@ -60,6 +63,7 @@ export function parseCalendarFilter(
   if (inseeCommunes.values !== undefined) criteria.communeIds = inseeCommunes.values;
   if (eventTypes.values !== undefined) criteria.eventTypes = eventTypes.values;
   if (groupIds.values !== undefined) criteria.groupIds = groupIds.values;
+  if (epciIds.values !== undefined) criteria.epciIds = epciIds.values;
 
   return { ok: true, criteria };
 }
@@ -71,6 +75,7 @@ interface MutableCriteria {
   communeIds?: readonly string[];
   eventTypes?: readonly string[];
   groupIds?: readonly string[];
+  epciIds?: readonly string[];
 }
 
 function invalidCountry(value: string): CalendarFilterDiagnostic {

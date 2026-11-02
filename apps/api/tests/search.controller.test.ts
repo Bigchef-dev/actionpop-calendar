@@ -7,9 +7,22 @@ import { buildApp } from '../src/server.js';
 
 class StubReader implements SubjectSearchReader {
   public fail = false;
+  public epciEnabled = false;
 
   public async read(kind: SubjectKind): Promise<SubjectReadResult> {
     if (this.fail) throw new Error('database down');
+    if (kind === 'epci' && this.epciEnabled) {
+      return {
+        total: 1,
+        candidates: [{
+          kind: 'epci',
+          id: '200000001',
+          label: 'Grand Exemple',
+          qualifier: 'Communauté de communes · 01',
+          calendar: { path: '/calendar.ics', params: { epci: '200000001' } },
+        }],
+      };
+    }
     if (kind !== 'commune') return { candidates: [], total: 0 };
     return {
       total: 2,
@@ -84,6 +97,29 @@ describe('GET /search/subjects', () => {
     expect(response.json()).toMatchObject({
       error: 'invalid search request',
       diagnostics: [{ code: 'query_too_short', field: 'q' }],
+    });
+  });
+
+  it('returns EPCI subjects and their stable calendar parameter', async () => {
+    const reader = new StubReader();
+    reader.epciEnabled = true;
+    const app = await buildReaderApp(reader, []);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/search/subjects?q=grand&kind=epci',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      kindCounts: { epci: 1 },
+      subjects: [
+        {
+          kind: 'epci',
+          id: '200000001',
+          calendar: { params: { epci: '200000001' } },
+        },
+      ],
     });
   });
 

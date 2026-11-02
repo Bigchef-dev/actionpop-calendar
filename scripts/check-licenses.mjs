@@ -13,6 +13,8 @@ const ALLOWED = new Set([
   'CC0-1.0',
   'ISC',
   'MIT',
+  // MIT-0 is MIT without the attribution requirement: strictly more permissive than MIT.
+  'MIT-0',
   'MPL-2.0',
   'Python-2.0',
   'Unlicense',

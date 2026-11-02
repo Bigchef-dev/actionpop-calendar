@@ -10,8 +10,8 @@ Ce paquet vit dans `apps/web` du monorepo `actionpop-calendar` et se déploie su
 
 ## Parcours
 
-1. **Chercher** — une barre de recherche centrale résout une ville, un département ou un groupe
-   d'action en un **sujet de calendrier** (`GET /search/subjects`).
+1. **Chercher** — une barre de recherche centrale résout une ville, un département, un groupe
+   d'action ou une intercommunalité en un **sujet de calendrier** (`GET /search/subjects`).
 2. **Lire** — les actions du sujet viennent du flux publié par l'API (`GET /calendar.ics`), filtrées
    par type d'action dans le navigateur.
 3. **Emporter** — le panneau d'abonnement produit un lien personnel (abonnement, `webcal`, copie,
@@ -19,6 +19,12 @@ Ce paquet vit dans `apps/web` du monorepo `actionpop-calendar` et se déploie su
 
 Aucun compte, aucune géolocalisation, aucune donnée personnelle conservée : seule la dernière
 recherche est mémorisée localement, et l'adresse prime toujours sur cette mémoire.
+
+Les intercommunalités sont proposées sous le libellé « Intercommunalité » et couvrent les
+communautés de communes, communautés d'agglomération, communautés urbaines et métropoles.
+Leur lien de calendrier conserve l'identifiant EPCI (`epci=...`) ainsi que les filtres choisis.
+Si les rattachements administratifs sont momentanément indisponibles, l'application affiche un
+état de récupération et ne remplace pas le territoire par un autre sujet.
 
 ## Configuration
 
@@ -50,6 +56,7 @@ pnpm --filter @actionpop/web dev        # http://127.0.0.1:5173/agenda-rennes/
 pnpm --filter @actionpop/web test       # règles métier (Vitest)
 pnpm --filter @actionpop/web typecheck  # vue-tsc
 pnpm --filter @actionpop/web build      # dist/ + base /agenda-rennes/
+pnpm test:e2e                           # acceptance navigateur (Playwright), depuis la racine
 ```
 
 Le build est servi sous `base: '/agenda-rennes/'` (`vite.config.ts`). Le workflow `web.yml`

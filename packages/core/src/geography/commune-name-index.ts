@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { normalizeGeographicName } from '../domain/geographic-identity.js';
+import { normalizeNameForSearch } from '../domain/geographic-identity.js';
 import type { CommuneCsvRow } from './commune-csv-parser.js';
 import type { CommuneReferenceRecord, DepartmentReferenceRecord } from './reference-types.js';
 
@@ -29,8 +29,9 @@ export function buildReferenceIndex(rows: CommuneCsvRow[]): IndexedReference {
     communes.push({
       inseeCode: row.inseeCode,
       name: row.name,
-      normalizedName: normalizeGeographicName(row.name),
-      pronounFreeNormalizedName: normalizeGeographicName(
+      // Imported with the same key used for queries, so a doubled letter matches itself.
+      normalizedName: normalizeNameForSearch(row.name),
+      pronounFreeNormalizedName: normalizeNameForSearch(
         row.pronounFreeName === '' ? row.name : row.pronounFreeName,
       ),
       postalCodes: row.postalCodes,

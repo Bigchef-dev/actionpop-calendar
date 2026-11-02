@@ -1,4 +1,4 @@
-import { normalizeDepartmentCode, normalizeGeographicName } from '../domain/geographic-identity.js';
+import { normalizeDepartmentCode, normalizeNameForSearch } from '../domain/geographic-identity.js';
 import type { GeographicReferenceReader } from './geographic-reference-reader.js';
 import { departmentFromPostalCode } from './postal-department.js';
 import type { CommuneReferenceRecord, Diagnostic, RawLocationFields } from './reference-types.js';
@@ -38,7 +38,7 @@ export async function resolveCommune(
 
   const candidates = await reader.findCommunesByNormalizedName(
     version,
-    normalizeGeographicName(name),
+    normalizeNameForSearch(name),
   );
 
   if (candidates.length === 0) {

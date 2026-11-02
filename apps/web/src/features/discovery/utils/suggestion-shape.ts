@@ -4,6 +4,7 @@ export const KIND_LABELS: Record<string, string> = {
   commune: 'Ville',
   department: 'Département',
   group: "Groupe d'action",
+  epci: 'Intercommunalité',
 };
 
 export interface SuggestionGroup {

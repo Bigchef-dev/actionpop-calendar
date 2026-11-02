@@ -162,6 +162,7 @@ describe('API reference', () => {
         'commune_name',
         'country',
         'department',
+        'epci',
         'event_type',
         'insee_commune',
       ]);

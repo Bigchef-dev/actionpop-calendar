@@ -15,10 +15,10 @@ description: "Implementation tasks for the public calendar discovery and composi
 
 **Purpose**: Establish the package structure and validation commands needed by every story.
 
-- [ ] T001 Add the web Vitest test script and test include configuration in `apps/web/package.json` and `vitest.config.ts`, preserving strict TypeScript and existing workspace commands
+- [X] T001 Add the web Vitest test script and test include configuration in `apps/web/package.json` and `vitest.config.ts`, preserving strict TypeScript and existing workspace commands
 - [ ] T002 [P] Create the feature test directories `apps/web/tests/discovery/`, `apps/web/tests/calendar/`, `apps/web/tests/subscription/`, `apps/web/tests/shared/`, and `tests/integration/`
-- [ ] T003 [P] Add typed web runtime configuration for API base URL, feed URL, CORS development origin, canonical `Europe/Paris` timezone, and optional proposal flag in `apps/web/src/config.ts`
-- [ ] T004 [P] Create shared domain types for search items, selected scopes, calendar events, action types, metadata and calendar links in `apps/web/src/types.ts`
+- [X] T003 [P] Add typed web runtime configuration for API base URL, feed URL, CORS development origin, canonical `Europe/Paris` timezone, and optional proposal flag in `apps/web/src/config.ts`
+- [X] T004 [P] Create shared domain types for search items, selected scopes, calendar events, action types, metadata and calendar links in `apps/web/src/types.ts`
 
 ## Phase 2: Foundational
 
@@ -27,10 +27,10 @@ description: "Implementation tasks for the public calendar discovery and composi
 - [ ] T005 Add typed API error handling, CORS configuration from `API_CORS_ORIGINS`, and public GET/HEAD/OPTIONS behavior in `apps/api/src/config.ts` and `apps/api/src/server.ts`
 - [ ] T006 [P] Implement the extensible `SearchSubject`, `SubjectCalendar`, and `SearchAnswer` types with required non-empty `kind`, `id`, and `label` validation in `packages/core/src/search/subject-search-types.ts`
 - [ ] T007 [P] Implement accent-, case-, punctuation-, and department-form normalization plus exact/prefix/contains ranking and per-kind limits in `packages/core/src/search/subject-ranking.ts`
-- [ ] T008 Implement browser address parsing and serialization for `sujets`, `groups`, `types`, `vue`, `evenement`, including invalid-value reporting, duplicate removal, and no period parameter, in `apps/web/src/shared/composables/useUrlState.ts`
+- [X] T008 Implement browser address parsing and serialization for `sujets`, `groups`, `types`, `vue`, `evenement`, including invalid-value reporting, duplicate removal, and no period parameter, in `apps/web/src/shared/composables/useUrlState.ts`
 - [ ] T009 [P] Add shared loading, no-result, no-event, unavailable, outdated-address, and empty-selection messaging primitives in `apps/web/src/shared/components/StateMessage.vue`
 - [ ] T010 [P] Add campaign design tokens, light/dark contrast values, reduced-motion defaults, and focus styles in `apps/web/src/shared/styles/`
-- [ ] T011 Add foundational unit tests for URL round trips, invalid state recovery, duplicate selected items, and exact absence of period parameters in `apps/web/tests/shared/url-state.test.ts`
+- [X] T011 Add foundational unit tests for URL round trips, invalid state recovery, duplicate selected items, and exact absence of period parameters in `apps/web/tests/shared/url-state.test.ts`
 
 **Checkpoint**: Shared types, URL state, error states, configuration, and test infrastructure are ready.
 
@@ -72,12 +72,12 @@ description: "Implementation tasks for the public calendar discovery and composi
 ### Implementation for User Story 2
 
 - [ ] T024 [US2] Thread repeatable comma-separated `group` values through validation, criteria, event query predicates, and ICS generation without changing requests that omit it in `packages/core/src/calendar-filters/calendar-filter.ts`, `packages/core/src/calendar-filters/calendar-criteria.ts`, `packages/core/src/calendar-filters/calendar-event.ts`, and `packages/core/src/persistence/postgres-calendar-event-query.ts`
-- [ ] T025 [US2] Implement feed loading for each selected search item's exact `calendar.params`, event parsing, deduplication, and combined loading/error states in `apps/web/src/features/calendar/composables/useCalendarFeed.ts`
+- [X] T025 [US2] Implement feed loading for each selected search item's exact `calendar.params`, event parsing, deduplication, and combined loading/error states in `apps/web/src/features/calendar/composables/useCalendarFeed.ts`
 - [ ] T026 [P] [US2] Implement action-type and multi-group filtering, stable group colors, non-color markers, counts, and "Par GA" horizontal keyboard/touch controls in `apps/web/src/features/calendar/components/FilterBar.vue` and `apps/web/src/features/calendar/utils/type-filter.ts`
 - [ ] T027 [P] [US2] Implement ICS event mapping for UID, dates, status, location, coordinates, action type, group metadata, and all `X-ACTIONPOP-*` fields in `apps/web/src/features/calendar/utils/ical-mapping.ts`
 - [ ] T028 [P] [US2] Implement month/day/week/list layouts, initial viewport reset, full start/end duration, wrapping cards, bold readable text, and useful timed-event bounds in `apps/web/src/features/calendar/components/CalendarView.vue` and `apps/web/src/features/calendar/utils/weather-window.ts`
-- [ ] T029 [US2] Implement selected-item chips, plus-triggered search overlay, explicit "Enlever le calendrier" actions, duplicate prevention, combined event count, no-event state, and return-to-home behavior in `apps/web/src/features/calendar/components/CalendarScreen.vue`
-- [ ] T030 [US2] Remove the fixed single-place assumptions and wire the route switch to discovery or composed calendar state in `apps/web/src/App.vue` and `apps/web/src/features/calendar/composables/useCalendarSelection.ts`
+- [X] T029 [US2] Implement selected-item chips, plus-triggered search overlay, explicit "Enlever le calendrier" actions, duplicate prevention, combined event count, no-event state, and return-to-home behavior in `apps/web/src/features/calendar/components/CalendarScreen.vue`
+- [X] T030 [US2] Remove the fixed single-place assumptions and wire the route switch to discovery or composed calendar state in `apps/web/src/App.vue` and `apps/web/src/features/calendar/composables/useCalendarSelection.ts`
 
 **Checkpoint**: US2 independently displays and filters a composed calendar, including all specified empty and narrow-screen states.
 
@@ -89,13 +89,13 @@ description: "Implementation tasks for the public calendar discovery and composi
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] Add calendar-link unit tests for multiple scope parameters, group/type criteria, exact display scope, city-only scope, complete URLs, and no period parameter in `apps/web/tests/subscription/calendar-link-builder.test.ts`
+- [X] T031 [P] [US3] Add calendar-link unit tests for multiple scope parameters, group/type criteria, exact display scope, city-only scope, complete URLs, and no period parameter in `apps/web/tests/subscription/calendar-link-builder.test.ts`
 - [ ] T032 [P] [US3] Add subscription-panel behavior tests for exact coverage text, copy confirmation, city-only label, service opening, download, and unavailable-feed handling in `apps/web/tests/subscription/subscription-panel.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Implement deterministic exact-display and city-only link construction for selected search items, groups, action types, direct subscription, webcal, download, and calendar-service URLs in `apps/web/src/features/subscription/utils/calendar-link-builder.ts`
-- [ ] T034 [US3] Implement coverage summary, complete visible URL, exact-display actions, explicitly labelled city-only copy action, clipboard confirmation, and unavailable-link state in `apps/web/src/features/subscription/components/SubscriptionPanel.vue`
+- [X] T033 [US3] Implement deterministic exact-display and city-only link construction for selected search items, groups, action types, direct subscription, webcal, download, and calendar-service URLs in `apps/web/src/features/subscription/utils/calendar-link-builder.ts`
+- [X] T034 [US3] Implement coverage summary, complete visible URL, exact-display actions, explicitly labelled city-only copy action, clipboard confirmation, and unavailable-link state in `apps/web/src/features/subscription/components/SubscriptionPanel.vue`
 - [ ] T035 [US3] Integrate subscription entry on every composed calendar screen and pass selected items and active criteria without introducing a period parameter in `apps/web/src/features/calendar/components/CalendarScreen.vue`
 
 **Checkpoint**: US3 delivers a usable link whose imported contents match the displayed selection exactly.

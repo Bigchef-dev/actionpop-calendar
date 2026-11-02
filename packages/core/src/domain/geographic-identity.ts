@@ -18,6 +18,19 @@ export function normalizeGeographicName(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/**
+ * Comparison key of a place name, used both when a reference is imported and when a query
+ * is read.
+ *
+ * A doubled letter carries no distinguishing meaning in a place name, so it is collapsed:
+ * "Rennes" and "Renes" share one key. Applying this on both sides is what makes the rule
+ * safe; applied to the query alone it would hide every place whose name actually has the
+ * doubled letter.
+ */
+export function normalizeNameForSearch(value: string): string {
+  return normalizeGeographicName(value).replace(/([a-z])\1+/g, '$1');
+}
+
 export function normalizeCountryCode(value: string): string | undefined {
   const normalized = value.trim().toUpperCase();
   return /^[A-Z]{2}$/.test(normalized) ? normalized : undefined;

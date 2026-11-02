@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { normalizeNameForSearch } from '../domain/geographic-identity.js';
 import { CommuneNameResolver } from './commune-name-resolver.js';
 import type { GeographicReferenceReader } from './geographic-reference-reader.js';
 import type {
@@ -38,10 +39,14 @@ const SAINTE_COLOMBE_27 = commune('27567', 'sainte-colombe', '27');
 const PARIS = commune('75056', 'paris', '75');
 
 function readerWith(byName: Record<string, CommuneReferenceRecord[]>): GeographicReferenceReader {
+  // The reader receives an already-normalized key, so the fixture is keyed the same way.
+  const keys = new Map(
+    Object.entries(byName).map(([name, communes]) => [normalizeNameForSearch(name), communes]),
+  );
   return {
     findActiveVersion: async () => VERSION,
     findDepartment: async (): Promise<DepartmentReferenceRecord | null> => null,
-    findCommunesByNormalizedName: async (_version, key) => byName[key] ?? [],
+    findCommunesByNormalizedName: async (_version, key) => keys.get(key) ?? [],
     findCommunesByPostalCode: async () => [],
   };
 }

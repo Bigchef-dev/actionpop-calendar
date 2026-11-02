@@ -55,6 +55,7 @@ export interface CalendarEventCriteria {
   readonly communeIds?: readonly string[] | undefined;
   readonly eventTypes?: readonly string[] | undefined;
   readonly groupIds?: readonly string[] | undefined;
+  readonly epciIds?: readonly string[] | undefined;
 }
 
 export interface CalendarWindow {

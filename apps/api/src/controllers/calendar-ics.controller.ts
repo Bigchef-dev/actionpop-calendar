@@ -50,6 +50,16 @@ export class CalendarIcsController {
     });
 
     if (!result.ok) {
+      const availabilityFailure = result.diagnostics.some((diagnostic) =>
+        diagnostic.code === 'epci_unavailable' ||
+        diagnostic.code === 'epci_membership_incomplete',
+      );
+      if (availabilityFailure) {
+        throw new ServiceUnavailableException({
+          error: 'calendar scope unavailable',
+          diagnostics: result.diagnostics,
+        });
+      }
       throw new BadRequestException({
         error: 'invalid calendar filter',
         diagnostics: result.diagnostics,

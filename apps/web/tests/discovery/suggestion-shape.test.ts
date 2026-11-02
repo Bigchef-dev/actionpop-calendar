@@ -27,6 +27,7 @@ describe('kindLabel', () => {
     expect(kindLabel('commune')).toBe('Ville');
     expect(kindLabel('department')).toBe('Département');
     expect(kindLabel('group')).toBe("Groupe d'action");
+    expect(kindLabel('epci')).toBe('Intercommunalité');
     expect(kindLabel('region')).toBe('region');
   });
 });
@@ -37,6 +38,9 @@ describe('suggestionContext', () => {
       'Ville · Seine-Saint-Denis',
     );
     expect(suggestionContext(subject('department', '69', 'Rhône'))).toBe('Département');
+    expect(suggestionContext(subject('epci', '200000001', 'Grand Exemple', 'Métropole · 75'))).toBe(
+      'Intercommunalité · Métropole · 75',
+    );
   });
 });
 

@@ -9,9 +9,7 @@ import StateMessage from './shared/components/StateMessage.vue';
 import {
   defaultLayoutFor,
   parseRoute,
-  replaceRoute,
   serializeRoute,
-  subjectKey,
   useRoute,
 } from './shared/composables/useUrlState';
 import type { SearchSubject } from './types';
@@ -22,28 +20,29 @@ const route = useRoute();
 const defaultLayout = typeof window === 'undefined' ? 'liste' : defaultLayoutFor(window.innerWidth);
 
 const state = computed(() => parseRoute(route.state.search, { defaultLayout }));
-const subject = ref<SearchSubject | null>(null);
+const subjects = ref<SearchSubject[]>([]);
+const adding = ref(false);
 const resolution = ref<Resolution>('idle');
 
 // The parsed route object is rebuilt on every address change, so the watcher tracks the
 // subject key itself: opening an event or toggling a filter must not re-resolve the subject.
 watch(
-  () => subjectKey(state.value.subject),
-  (key) => {
-    const target = state.value.subject;
-    if (key === null || target === null) {
-      subject.value = null;
+  () => state.value.subjects.map((subject) => `${subject.kind}:${subject.id}`).join(','),
+  (keys) => {
+    if (keys === '') {
+      subjects.value = [];
       resolution.value = 'idle';
       return;
     }
     resolution.value = 'loading';
-    resolveSubject(target.kind, target.id)
-      .then((found) => {
-        subject.value = found;
-        resolution.value = found === null ? 'unknown' : 'ready';
+    Promise.all(
+      state.value.subjects.map((target) => resolveSubject(target.kind, target.id)),
+    ).then((found) => {
+        subjects.value = found.filter((subject): subject is SearchSubject => subject !== null);
+        resolution.value = subjects.value.length === state.value.subjects.length ? 'ready' : 'unknown';
       })
       .catch(() => {
-        subject.value = null;
+        subjects.value = [];
         resolution.value = 'error';
       });
   },
@@ -51,11 +50,11 @@ watch(
 );
 
 function select(target: SearchSubject): void {
-  const hasParams = Object.keys(target.calendar.params).length > 0;
   route.write(
     serializeRoute(
       {
-        subject: { kind: target.kind, id: target.id },
+        subjects: [{ kind: target.kind, id: target.id }],
+        groups: [],
         types: [],
         layout: defaultLayout,
         eventId: null,
@@ -63,27 +62,77 @@ function select(target: SearchSubject): void {
       defaultLayout,
     ),
   );
-  if (hasParams) {
-    subject.value = target;
-    resolution.value = 'ready';
+  adding.value = false;
+  subjects.value = [target];
+  resolution.value = 'ready';
+}
+
+function handleSubjectSelect(target: SearchSubject): void {
+  if (subjects.value.length === 0) {
+    select(target);
+    return;
   }
+  addSubject(target);
 }
 
 function backToDiscovery(): void {
-  replaceRoute('');
   route.write('');
-  subject.value = null;
+  subjects.value = [];
   resolution.value = 'idle';
 }
 
+function addSubject(target: SearchSubject): void {
+  if (subjects.value.some((subject) => subject.kind === target.kind && subject.id === target.id)) {
+    adding.value = false;
+    return;
+  }
+  subjects.value = [...subjects.value, target];
+  route.write(
+    serializeRoute(
+      {
+        subjects: subjects.value.map((subject) => ({ kind: subject.kind, id: subject.id })),
+        groups: state.value.groups,
+        types: state.value.types,
+        layout: state.value.layout,
+        eventId: state.value.eventId,
+      },
+      defaultLayout,
+    ),
+  );
+  adding.value = false;
+}
+
+function removeSubject(target: SearchSubject): void {
+  const remaining = subjects.value.filter(
+    (subject) => subject.kind !== target.kind || subject.id !== target.id,
+  );
+  if (remaining.length === 0) {
+    backToDiscovery();
+    return;
+  }
+  subjects.value = remaining;
+  route.write(
+    serializeRoute(
+      {
+        subjects: remaining.map((subject) => ({ kind: subject.kind, id: subject.id })),
+        groups: state.value.groups,
+        types: state.value.types,
+        layout: state.value.layout,
+        eventId: state.value.eventId,
+      },
+      defaultLayout,
+    ),
+  );
+}
+
 function retryResolution(): void {
-  const target = state.value.subject;
-  if (target === null) return;
+  const targets = state.value.subjects;
+  if (targets.length === 0) return;
   resolution.value = 'loading';
-  resolveSubject(target.kind, target.id)
+  Promise.all(targets.map((target) => resolveSubject(target.kind, target.id)))
     .then((found) => {
-      subject.value = found;
-      resolution.value = found === null ? 'unknown' : 'ready';
+      subjects.value = found.filter((subject): subject is SearchSubject => subject !== null);
+      resolution.value = subjects.value.length === targets.length ? 'ready' : 'unknown';
     })
     .catch(() => {
       resolution.value = 'error';
@@ -92,12 +141,12 @@ function retryResolution(): void {
 </script>
 
 <template>
-  <AppShell :on-discovery="subject === null" @home="backToDiscovery">
+  <AppShell :on-discovery="subjects.length === 0" @home="backToDiscovery">
     <p v-for="notice in state.notices" :key="notice" class="mb-3 text-xs ap-secondary-text">
       {{ notice }}
     </p>
 
-    <SearchHero v-if="state.subject === null" @select="select" />
+    <SearchHero v-if="subjects.length === 0 || adding" @select="handleSubjectSelect" />
 
     <div
       v-else-if="resolution === 'loading'"
@@ -110,7 +159,7 @@ function retryResolution(): void {
       v-else-if="resolution === 'unknown'"
       class="mt-6"
       title="Ce sujet n'existe plus"
-      :message="`Le sujet « ${state.subject.kind}:${state.subject.id} » est introuvable. Il a peut-être été renommé ou fusionné.`"
+      message="Un item de recherche est introuvable. Il a peut-être été renommé ou fusionné."
       primary-label="Rechercher à nouveau"
       @primary="backToDiscovery"
     />
@@ -125,9 +174,10 @@ function retryResolution(): void {
     />
 
     <CalendarScreen
-      v-else-if="subject !== null"
-      :subject="subject"
-      @change-subject="backToDiscovery"
+      v-else-if="subjects.length > 0"
+      :subjects="subjects"
+      @add-subject="adding = true"
+      @remove-subject="removeSubject"
     />
   </AppShell>
 </template>

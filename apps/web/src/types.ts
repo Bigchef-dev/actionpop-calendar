@@ -55,8 +55,9 @@ export interface CalendarLink {
   webcalUrl: string;
   downloadUrl: string;
   calendarServiceUrl: string;
-  keepsFilters: boolean;
   description: string;
+  scope: 'display' | 'city-only';
+  keepsFilters?: boolean;
 }
 
 export interface WeatherEntry {

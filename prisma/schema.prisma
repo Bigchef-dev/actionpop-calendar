@@ -223,6 +223,8 @@ model GeographicReferenceVersion {
   validationErrors Json?                 @map("validation_errors")
   departments      DepartmentReference[]
   communes         CommuneReference[]
+  epcis            EpciReference[]
+  epciMemberships  EpciMembership[]
 
   @@map("geographic_reference_version")
 }
@@ -257,6 +259,35 @@ model CommuneReference {
   @@index([versionId, departmentCode])
   @@index([postalCodes], type: Gin)
   @@map("commune_reference")
+}
+
+model EpciReference {
+  versionId        String                     @map("version_id")
+  epciId           String                     @map("epci_id")
+  name             String
+  normalizedName   String                     @map("normalized_name")
+  kind             String
+  departmentCodes  String[]                   @map("department_codes")
+  active           Boolean                    @default(true)
+  version          GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  memberships      EpciMembership[]
+
+  @@id([versionId, epciId])
+  @@index([versionId, normalizedName])
+  @@map("epci_reference")
+}
+
+model EpciMembership {
+  versionId  String                     @map("version_id")
+  epciId     String                     @map("epci_id")
+  communeId  String                     @map("commune_id")
+  quality    String                     @default("complete")
+  version    GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  epci       EpciReference              @relation(fields: [versionId, epciId], references: [versionId, epciId], onDelete: Cascade)
+
+  @@id([versionId, epciId, communeId])
+  @@index([versionId, communeId])
+  @@map("epci_membership")
 }
 
 model MapEventObservation {

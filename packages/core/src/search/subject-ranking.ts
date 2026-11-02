@@ -1,4 +1,4 @@
-import { normalizeGeographicName } from '../domain/geographic-identity.js';
+import { normalizeNameForSearch } from '../domain/geographic-identity.js';
 
 import type { SearchSubject, SubjectCandidate } from './subject-search-types.js';
 
@@ -15,11 +15,15 @@ export interface RankingQuery {
   readonly normalized: string;
 }
 
-const KIND_ORDER: readonly string[] = ['commune', 'department', 'group'];
+const KIND_ORDER: readonly string[] = ['commune', 'department', 'group', 'epci'];
 const UNKNOWN_KIND_ORDER = 99;
 
+/**
+ * Canonical comparison form of a query. It is the same function the import uses, so both
+ * sides of a comparison always share one key.
+ */
 export function normalizeSubjectQuery(value: string): string {
-  return normalizeGeographicName(value).replace(/([a-z])\1+/g, '$1');
+  return normalizeNameForSearch(value);
 }
 
 /**

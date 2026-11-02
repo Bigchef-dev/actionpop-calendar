@@ -17,6 +17,10 @@ const license = process.env.GEOGRAPHIC_LICENSE ?? 'Licence Ouverte 2.0';
 const minimumCommuneCount = Number(process.env.GEOGRAPHIC_MINIMUM_COMMUNES ?? '1000');
 const publicationDate =
   process.env.GEOGRAPHIC_PUBLICATION_DATE ?? new Date().toISOString().slice(0, 10);
+// Optional: official EPCI membership export (CSV) or an already-normalized JSON snapshot.
+const epciPath = process.env.GEOGRAPHIC_EPCI_PATH;
+// Official "liste des groupements" export: authoritative identity and legal nature.
+const epciGroupementsPath = process.env.GEOGRAPHIC_EPCI_GROUPEMENTS_PATH;
 
 if (process.env.DATABASE_URL === undefined || process.env.DATABASE_URL.trim() === '') {
   console.error('DATABASE_URL is missing. Define it in .env or .env.local.');
@@ -24,11 +28,24 @@ if (process.env.DATABASE_URL === undefined || process.env.DATABASE_URL.trim() ==
 }
 
 console.log(`Geographic reference refresh: ${communesPath} (publication date ${publicationDate})`);
+console.log(
+  `EPCI reference: ${epciGroupementsPath ?? epciPath ?? 'derived from the commune dataset'}`,
+);
 
 const prisma = createPostgresClient(process.env.DATABASE_URL);
 try {
   const result = await refreshGeographicReference(
-    { communesPath, source, publicationDate, license, minimumCommuneCount },
+    {
+      communesPath,
+      source,
+      publicationDate,
+      license,
+      minimumCommuneCount,
+      ...(epciPath === undefined || epciPath.trim() === '' ? {} : { epciPath }),
+      ...(epciGroupementsPath === undefined || epciGroupementsPath.trim() === ''
+        ? {}
+        : { epciGroupementsPath }),
+    },
     new PostgresGeographicReferenceWriter(prisma),
   );
   console.log(JSON.stringify(result, null, 2));

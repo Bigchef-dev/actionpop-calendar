@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 
 import type { GeographicReferenceReader } from '../geography/geographic-reference-reader.js';
+import type { CommuneNameResolution } from '../calendar-filters/calendar-criteria.js';
+import { isEpciKind } from '../geography/epci-reference.js';
 import type {
   CommuneReferenceRecord,
   DepartmentReferenceRecord,
@@ -68,6 +70,65 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
       orderBy: { inseeCode: 'asc' },
     });
     return rows.map(toCommuneRecord);
+  }
+
+  public async resolveEpcis(ids: readonly string[]): Promise<CommuneNameResolution> {
+    const version = await this.findActiveVersion();
+    if (version === null) {
+      return {
+        inseeCodes: [],
+        diagnostics: [
+          {
+            code: 'epci_unavailable',
+            field: 'epci',
+            message: 'No active EPCI reference is available',
+            severity: 'error',
+          },
+        ],
+      };
+    }
+    const rows = await this.prisma.epciReference.findMany({
+      where: { versionId: version.version, epciId: { in: [...new Set(ids)] }, active: true },
+      select: { epciId: true, kind: true, memberships: { select: { communeId: true, quality: true } } },
+    });
+    const found = new Set(rows.map((row) => row.epciId));
+    const missing = ids.find((id) => !found.has(id));
+    if (missing !== undefined) {
+      return {
+        inseeCodes: [],
+        diagnostics: [
+          {
+            code: 'epci_invalid',
+            field: 'epci',
+            message: `EPCI "${missing}" is not active or does not exist`,
+            severity: 'error',
+          },
+        ],
+      };
+    }
+    const incomplete = rows.find(
+      (row) =>
+        !isEpciKind(row.kind) ||
+        row.memberships.length === 0 ||
+        row.memberships.some((membership) => membership.quality !== 'complete'),
+    );
+    if (incomplete !== undefined) {
+      return {
+        inseeCodes: [],
+        diagnostics: [
+          {
+            code: 'epci_membership_incomplete',
+            field: 'epci',
+            message: `EPCI "${incomplete.epciId}" has incomplete membership data`,
+            severity: 'error',
+          },
+        ],
+      };
+    }
+    return {
+      inseeCodes: [...new Set(rows.flatMap((row) => row.memberships.map((membership) => membership.communeId)))].sort(),
+      diagnostics: [],
+    };
   }
 }
 

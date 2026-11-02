@@ -1,6 +1,6 @@
 /** Kinds a visitor can search for. The list is the server-side catalogue: extending it is a
  * server change, and a client renders any kind it receives without a code change. */
-export const SUBJECT_KINDS = ['commune', 'department', 'group'] as const;
+export const SUBJECT_KINDS = ['commune', 'department', 'group', 'epci'] as const;
 
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
 

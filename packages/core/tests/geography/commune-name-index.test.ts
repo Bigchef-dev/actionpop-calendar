@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { normalizeNameForSearch } from '../../src/domain/geographic-identity.js';
 import { buildReferenceIndex, computeChecksum } from '../../src/geography/commune-name-index.js';
 import type { CommuneCsvRow } from '../../src/geography/commune-csv-parser.js';
 
@@ -16,12 +17,18 @@ function row(overrides: Partial<CommuneCsvRow> = {}): CommuneCsvRow {
 }
 
 describe('buildReferenceIndex', () => {
-  it('computes normalized names without touching the raw name', () => {
+  it('computes search keys without touching the raw name', () => {
     const index = buildReferenceIndex([
       row({ name: 'Saint-Étienne', pronounFreeName: 'Saint-Étienne' }),
     ]);
     expect(index.communes[0]?.name).toBe('Saint-Étienne');
-    expect(index.communes[0]?.normalizedName).toBe('saint etienne');
+    expect(index.communes[0]?.normalizedName).toBe('saint etiene');
+  });
+
+  it('stores the same key a query is normalized to, doubled letters included', () => {
+    const index = buildReferenceIndex([row({ name: 'Rennes', pronounFreeName: 'Rennes' })]);
+    expect(index.communes[0]?.normalizedName).toBe(normalizeNameForSearch('Rennes'));
+    expect(index.communes[0]?.normalizedName).toBe('renes');
   });
 
   it('keeps homonyms as separate entries', () => {

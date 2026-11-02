@@ -12,6 +12,8 @@ const OPTIONS = { defaultLayout: 'liste' as const, knownTypes: ['tractage', 'col
 describe('parseRoute', () => {
   it('reads an empty address as the discovery screen', () => {
     expect(parseRoute('', OPTIONS)).toEqual({
+      subjects: [],
+      groups: [],
       subject: null,
       types: [],
       group: [],
@@ -29,6 +31,7 @@ describe('parseRoute', () => {
     expect(state.subject).toEqual({ kind: 'commune', id: '69123' });
     expect(state.types).toEqual(['tractage']);
     expect(state.group).toEqual(['GA Paris 12']);
+    expect(state.groups).toEqual(['GA Paris 12']);
     expect(state.layout).toBe('mois');
     expect(state.eventId).toBe('e1');
   });
@@ -104,6 +107,87 @@ describe('serializeRoute', () => {
         'liste',
       ),
     ).not.toContain('ga=');
+  });
+
+  it('round-trips multiple search items without a period parameter', () => {
+    const search = serializeRoute(
+      {
+        subjects: [
+          { kind: 'commune', id: '69123' },
+          { kind: 'department', id: '69' },
+        ],
+        groups: ['ga-lyon'],
+        types: ['tractage'],
+        layout: 'liste',
+        eventId: null,
+      },
+      'liste',
+    );
+    const params = new URLSearchParams(search.slice(1));
+    expect(params.get('sujets')).toBe('commune:69123,department:69');
+    expect(params.get('groups')).toBe('ga-lyon');
+    expect(search).not.toContain('period');
+    expect(parseRoute(search, OPTIONS).subjects).toEqual([
+      { kind: 'commune', id: '69123' },
+      { kind: 'department', id: '69' },
+    ]);
+  });
+});
+
+describe('EPCI territory address state', () => {
+  it('round-trips an EPCI subject with filters', () => {
+    const search = serializeRoute(
+      {
+        subjects: [{ kind: 'epci', id: '200000001' }],
+        groups: ['ga-lyon'],
+        types: ['tractage'],
+        layout: 'mois',
+        eventId: null,
+      },
+      'liste',
+    );
+    expect(search).toContain('sujets=epci%3A200000001');
+    const state = parseRoute(search, OPTIONS);
+    expect(state.subjects).toEqual([{ kind: 'epci', id: '200000001' }]);
+    expect(state.types).toEqual(['tractage']);
+    expect(state.groups).toEqual(['ga-lyon']);
+  });
+
+  it('keeps the territory when a filter is removed', () => {
+    const cleared = serializeRoute(
+      {
+        subjects: [{ kind: 'epci', id: '200000001' }],
+        groups: [],
+        types: [],
+        layout: 'liste',
+        eventId: null,
+      },
+      'liste',
+    );
+    const state = parseRoute(cleared, OPTIONS);
+    expect(state.subjects).toEqual([{ kind: 'epci', id: '200000001' }]);
+    expect(state.types).toEqual([]);
+    expect(state.groups).toEqual([]);
+  });
+
+  it('keeps an EPCI subject readable alongside existing kinds', () => {
+    const search = serializeRoute(
+      {
+        subjects: [
+          { kind: 'commune', id: '69123' },
+          { kind: 'epci', id: '200000001' },
+        ],
+        types: [],
+        groups: [],
+        layout: 'liste',
+        eventId: null,
+      },
+      'liste',
+    );
+    expect(parseRoute(search, OPTIONS).subjects).toEqual([
+      { kind: 'commune', id: '69123' },
+      { kind: 'epci', id: '200000001' },
+    ]);
   });
 });
 

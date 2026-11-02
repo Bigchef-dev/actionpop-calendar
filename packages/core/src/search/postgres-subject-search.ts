@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { normalizeSubjectQuery } from './subject-ranking.js';
+import { categoryLabel, isEpciKind } from '../geography/epci-reference.js';
 import type {
   SubjectCandidate,
   SubjectKind,
@@ -11,6 +12,7 @@ import type {
 
 /** Upper bound of rows a single kind scan may load before ranking filters them. */
 const GROUP_SCAN_LIMIT = 50_000;
+const EPCI_SCAN_LIMIT = 10_000;
 
 /**
  * Reads search candidates from the data the project already holds: the active geographic
@@ -31,6 +33,8 @@ export class PostgresSubjectSearch implements SubjectSearchReader {
         return await this.readDepartments(query, candidateLimit);
       case 'group':
         return await this.readGroups(query, candidateLimit);
+      case 'epci':
+        return await this.readEpcis(query, candidateLimit);
     }
   }
 
@@ -178,4 +182,59 @@ export class PostgresSubjectSearch implements SubjectSearchReader {
     matches.sort((left, right) => (left.sortKey ?? '').localeCompare(right.sortKey ?? '', 'fr'));
     return { candidates: matches.slice(0, candidateLimit), total: matches.length };
   }
+
+  private async readEpcis(
+    query: SubjectQuery,
+    candidateLimit: number,
+  ): Promise<SubjectReadResult> {
+    const versionId = await this.activeVersion();
+    if (versionId === undefined) return { candidates: [], total: 0 };
+    const normalizedQuery = query.normalized;
+    const where = {
+      versionId,
+      active: true,
+      OR: [
+        { normalizedName: { startsWith: normalizedQuery } },
+        { normalizedName: { contains: normalizedQuery } },
+        { epciId: query.raw },
+      ],
+    };
+    // Ordered in memory: an alphabetical window would keep every territoire whose name
+    // begins with "CC…" and drop a well-known one such as "Rennes Métropole" before ranking.
+    const rows = await this.prisma.epciReference.findMany({
+      where,
+      take: EPCI_SCAN_LIMIT,
+      select: { epciId: true, name: true, normalizedName: true, kind: true, departmentCodes: true },
+    });
+
+    const matches = rows
+      .filter((row) => isEpciKind(row.kind))
+      .filter((row) => row.normalizedName.includes(normalizedQuery) || row.epciId === query.raw)
+      .sort(
+        (left, right) =>
+          prefixRank(left.normalizedName, normalizedQuery) -
+            prefixRank(right.normalizedName, normalizedQuery) ||
+          left.name.length - right.name.length ||
+          left.name.localeCompare(right.name, 'fr') ||
+          left.epciId.localeCompare(right.epciId),
+      );
+
+    const candidates: SubjectCandidate[] = matches.slice(0, candidateLimit).map((row) => ({
+      kind: 'epci',
+      id: row.epciId,
+      label: row.name,
+      qualifier: `${categoryLabel(row.kind as Parameters<typeof categoryLabel>[0])}${
+        row.departmentCodes.length === 0 ? '' : ` · ${row.departmentCodes.join(', ')}`
+      }`,
+      calendar: { path: '/calendar.ics', params: { epci: row.epciId } },
+      sortKey: `${row.name}:${row.epciId}`,
+    }));
+
+    return { candidates, total: matches.length };
+  }
+}
+
+/** 0 when the name starts with the query, so a prefix match is offered before a stray one. */
+function prefixRank(normalizedName: string, normalizedQuery: string): number {
+  return normalizedName.startsWith(normalizedQuery) ? 0 : 1;
 }

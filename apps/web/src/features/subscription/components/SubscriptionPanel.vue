@@ -1,25 +1,18 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import CopyButton from '../../../shared/components/CopyButton.vue';
 import type { SearchSubject } from '../../../types';
 import { buildCalendarLink } from '../utils/calendar-link-builder';
-import LinkFormatChoice from './LinkFormatChoice.vue';
 
 const props = defineProps<{
-  subject: SearchSubject;
+  subjects: readonly SearchSubject[];
   types: readonly string[];
-  period: { from: Date; to: Date } | null;
+  groups: readonly string[];
 }>();
 
-const keepFilters = ref(props.types.length > 0);
-
 const link = computed(() =>
-  buildCalendarLink(props.subject, {
-    keepFilters: keepFilters.value,
-    types: props.types,
-    period: props.period,
-  }),
+  buildCalendarLink(props.subjects, { types: props.types, groups: props.groups }),
 );
 </script>
 
@@ -37,16 +30,9 @@ const link = computed(() =>
         Aucun compte n'est nécessaire ici.
       </p>
 
-      <LinkFormatChoice
-        v-if="types.length > 0"
-        :keep-filters="keepFilters"
-        :filter-count="types.length"
-        @update:keep-filters="keepFilters = $event"
-      />
-
       <div class="mt-4 rounded-xl px-3 py-3" :style="{ backgroundColor: 'var(--ap-surface-muted)' }">
         <p class="break-all font-mono text-xs">{{ link.subscriptionUrl }}</p>
-        <CopyButton class="mt-3" :value="link.subscriptionUrl" label="Copier le lien" />
+        <CopyButton class="mt-3" :value="link.subscriptionUrl" label="Copier le lien final" />
       </div>
 
       <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -79,7 +65,7 @@ const link = computed(() =>
 
     <div v-else class="mt-3">
       <p class="text-sm opacity-80">
-        Ce sujet ne permet pas encore de produire un calendrier dédié. Vous pouvez réessayer, ou
+        Cette sélection ne permet pas encore de produire un calendrier dédié. Vous pouvez réessayer, ou
         garder le calendrier complet.
       </p>
       <a class="ap-primary-text mt-2 inline-block text-sm font-semibold underline" href="#retry">

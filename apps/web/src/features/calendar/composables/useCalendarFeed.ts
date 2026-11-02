@@ -14,7 +14,7 @@ export interface CalendarFeedHandle {
 }
 
 /** Reads the published calendar of one subject, once per subject change. */
-export function useCalendarFeed(subject: Ref<SearchSubject | null>): CalendarFeedHandle {
+export function useCalendarFeed(subjects: Ref<readonly SearchSubject[]>): CalendarFeedHandle {
   const events = ref<CalendarEvent[]>([]);
   const dropped = ref(0);
   const status = ref<FeedStatus>('idle');
@@ -22,8 +22,8 @@ export function useCalendarFeed(subject: Ref<SearchSubject | null>): CalendarFee
   let controller: AbortController | null = null;
 
   function load(): void {
-    const current = subject.value;
-    if (current === null) {
+    const current = subjects.value;
+    if (current.length === 0) {
       events.value = [];
       status.value = 'idle';
       return;
@@ -33,12 +33,13 @@ export function useCalendarFeed(subject: Ref<SearchSubject | null>): CalendarFee
     controller = new AbortController();
     status.value = 'loading';
 
-    fetchCalendarText(current.calendar.params, controller.signal)
-      .then((text) => {
-        const parsed = parseCalendar(text);
-        events.value = parsed.events;
-        dropped.value = parsed.dropped;
-        status.value = parsed.events.length === 0 ? 'empty' : 'ready';
+    Promise.all(current.map((subject) => fetchCalendarText(subject.calendar.params, controller!.signal)))
+      .then((texts) => {
+        const parsed = texts.map(parseCalendar);
+        const unique = new Map(parsed.flatMap((result) => result.events).map((event) => [event.id, event]));
+        events.value = [...unique.values()];
+        dropped.value = parsed.reduce((total, result) => total + result.dropped, 0);
+        status.value = events.value.length === 0 ? 'empty' : 'ready';
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;
@@ -47,7 +48,7 @@ export function useCalendarFeed(subject: Ref<SearchSubject | null>): CalendarFee
       });
   }
 
-  watch(subject, load, { immediate: true });
+  watch(subjects, load, { immediate: true });
 
   return { events, dropped, status, retry: load };
 }

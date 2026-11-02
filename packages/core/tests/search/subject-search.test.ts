@@ -25,6 +25,17 @@ function group(id: string, label: string): SubjectCandidate {
   return { kind: 'group', id, label, calendar: { path: '/calendar.ics', params: { group: id } } };
 }
 
+function epci(id: string, label: string): SubjectCandidate {
+  return {
+    kind: 'epci',
+    id,
+    label,
+    qualifier: 'Métropole · 75',
+    calendar: { path: '/calendar.ics', params: { epci: id } },
+    sortKey: `${label}:${id}`,
+  };
+}
+
 describe('parseSubjectSearchRequest', () => {
   it('rejects a query shorter than two characters', () => {
     expect(parseSubjectSearchRequest({ q: ' l ' })).toMatchObject({
@@ -61,12 +72,49 @@ describe('parseSubjectSearchRequest', () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.request.query).toBe('Lyon');
-    expect(parsed.request.kinds).toEqual(['commune', 'department', 'group']);
+    expect(parsed.request.kinds).toEqual(['commune', 'department', 'group', 'epci']);
     expect(parsed.request.limit).toBe(18);
   });
 });
 
 describe('searchSubjects', () => {
+  it('returns EPCI subjects with stable calendar parameters and deterministic ordering', async () => {
+    const reader = new FakeReader({
+      epci: {
+        candidates: [
+          epci('200000002', 'Grand Exemple'),
+          epci('200000001', 'Grand Exemple'),
+        ],
+        total: 2,
+      },
+    });
+
+    const parsed = parseSubjectSearchRequest({ q: 'grand', kind: 'epci' });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const answer = await searchSubjects(parsed.request, reader);
+    expect(answer.subjects.map((subject) => subject.id)).toEqual([
+      '200000001',
+      '200000002',
+    ]);
+    expect(answer.subjects[0]?.calendar.params).toEqual({ epci: '200000001' });
+  });
+
+  it('keeps retired EPCI candidates out of the public result', async () => {
+    const reader = new FakeReader({
+      epci: {
+        candidates: [epci('200000001', 'Grand Exemple')],
+        total: 1,
+      },
+    });
+    const parsed = parseSubjectSearchRequest({ q: 'grand', kind: 'epci' });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const answer = await searchSubjects(parsed.request, reader);
+    expect(answer.subjects.every((subject) => subject.id !== '200000099')).toBe(true);
+  });
+
   it('reads every requested kind and reports capped counts', async () => {
     const reader = new FakeReader({
       group: { candidates: [group('npa-lyon', 'NPA Lyon')], total: 250 },

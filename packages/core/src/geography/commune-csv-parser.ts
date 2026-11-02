@@ -6,6 +6,9 @@ export interface CommuneCsvRow {
   departmentCode: string;
   departmentName: string;
   population?: number;
+  /** Official intercommunal membership, present in the published commune dataset. */
+  epciCode?: string;
+  epciName?: string;
 }
 
 export interface CommuneCsvParseResult {
@@ -51,13 +54,14 @@ export function parseCommuneCsvLines(lines: string[]): CommuneCsvParseResult {
       list === -1 ? '' : (record[list] ?? ''),
     );
     const row: CommuneCsvRow = {
-      inseeCode: valueAt(record, header, 'code_insee'),
-      name: valueAt(record, header, 'nom_standard'),
-      pronounFreeName: valueAt(record, header, 'nom_sans_pronom'),
+      inseeCode: at(record, header, 'code_insee'),
+      name: at(record, header, 'nom_standard'),
+      pronounFreeName: at(record, header, 'nom_sans_pronom'),
       postalCodes,
-      departmentCode: valueAt(record, header, 'dep_code'),
-      departmentName: valueAt(record, header, 'dep_nom'),
-      ...parsePopulation(valueAt(record, header, 'population')),
+      departmentCode: at(record, header, 'dep_code'),
+      departmentName: at(record, header, 'dep_nom'),
+      ...parsePopulation(at(record, header, 'population')),
+      ...epciMembership(record, header),
     };
 
     const missing = (
@@ -84,10 +88,21 @@ export function parseCommuneCsvLines(lines: string[]): CommuneCsvParseResult {
   return { rows, errors };
 }
 
-function valueAt(record: string[], header: string[], column: string): string {
+/** Intercommunal membership is optional: an older export without it simply yields none. */
+function epciMembership(
+  record: string[],
+  header: string[],
+): { epciCode?: string; epciName?: string } {
+  const epciCode = at(record, header, 'epci_code');
+  const epciName = at(record, header, 'epci_nom');
+  return epciCode === '' ? {} : { epciCode, ...(epciName === '' ? {} : { epciName }) };
+}
+
+function at(record: string[], header: string[], column: string): string {
   const index = header.indexOf(column);
   return index === -1 ? '' : (record[index] ?? '').trim();
 }
+
 
 function expandPostalCodes(primary: string, list: string): string[] {
   const codes = new Set<string>();

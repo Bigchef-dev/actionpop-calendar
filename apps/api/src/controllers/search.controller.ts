@@ -63,14 +63,14 @@ export class SearchController {
   @ApiOperation({
     summary: 'Resolve a human query to calendar subjects',
     description:
-      'Returns communes, departments and action groups matching the query, each carrying the ' +
+      'Returns communes, departments, action groups and intercommunal territories matching the query, each carrying the ' +
       'calendar filter parameters that produce its calendar. The read is public and read-only.',
   })
   @ApiQuery({ name: 'q', required: true, description: 'Query, 2 to 64 characters' })
   @ApiQuery({
     name: 'kind',
     required: false,
-    description: 'Comma-separated kinds among commune, department, group. Default: all',
+    description: 'Comma-separated kinds among commune, department, group, epci. Default: all',
   })
   @ApiQuery({ name: 'limit', required: false, description: 'Between 1 and 30. Default 18' })
   @ApiOkResponse({ schema: SEARCH_ANSWER_SCHEMA })

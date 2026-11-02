@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue';
 
 import StateMessage from '../../../shared/components/StateMessage.vue';
+import CopyButton from '../../../shared/components/CopyButton.vue';
 import {
   defaultLayoutFor,
   parseRoute,
@@ -10,19 +11,23 @@ import {
 } from '../../../shared/composables/useUrlState';
 import type { CalendarEvent, CalendarLayout, SearchSubject } from '../../../types';
 import SubscriptionPanel from '../../subscription/components/SubscriptionPanel.vue';
+import { buildCalendarLink } from '../../subscription/utils/calendar-link-builder';
 import { ACTION_TYPES } from '../data/event-types';
 import { useCalendarFeed } from '../composables/useCalendarFeed';
 import { GROUP_METADATA, useGroupNames } from '../composables/useGroupNames';
 import { useWeather } from '../composables/useWeather';
-import { availableTypes, feedPeriod, filterByType, formatPeriod } from '../utils/type-filter';
+import { availableTypes, filterByType } from '../utils/type-filter';
 import { groupColorFor, groupColorsFor } from '../utils/group-colors';
 import CalendarView from './CalendarView.vue';
 import EventDetail from './EventDetail.vue';
 import FilterBar from './FilterBar.vue';
 import GroupFilterBar, { type AvailableGroup } from './GroupFilterBar.vue';
 
-const props = defineProps<{ subject: SearchSubject }>();
-const emit = defineEmits<{ (event: 'change-subject'): void }>();
+const props = defineProps<{ subjects: readonly SearchSubject[] }>();
+const emit = defineEmits<{
+  (event: 'add-subject'): void;
+  (event: 'remove-subject', subject: SearchSubject): void;
+}>();
 
 const KNOWN_TYPES = ACTION_TYPES.map((type) => type.slug);
 const defaultLayout: CalendarLayout =
@@ -33,7 +38,7 @@ const {
   events,
   status: feedStatus,
   retry: retryFeed,
-} = useCalendarFeed(computed(() => props.subject));
+} = useCalendarFeed(computed(() => props.subjects));
 const weather = useWeather();
 
 const state = computed(() =>
@@ -53,8 +58,9 @@ const groupIds = computed(() => {
   return ids;
 });
 const groupColors = computed(() => groupColorsFor(groupIds.value));
+const hasEpciSubject = computed(() => props.subjects.some((subject) => subject.kind === 'epci'));
 const groups = computed<AvailableGroup[]>(() => {
-  if (state.value.subject?.kind === 'group') return [];
+  if (props.subjects.some((subject) => subject.kind === 'group')) return [];
   const counts = new Map<string, number>();
   for (const event of events.value) {
     const seen = new Set<string>();
@@ -77,7 +83,7 @@ const groups = computed<AvailableGroup[]>(() => {
 /** Groups that are no longer published by any event of the subject are ignored. */
 const activeGroups = computed(() => {
   const availableIds = new Set(groups.value.map((group) => group.id));
-  return state.value.group.filter((id) => availableIds.has(id));
+  return state.value.groups.filter((id) => availableIds.has(id));
 });
 const shownWithGroup = computed(() => {
   if (activeGroups.value.length === 0) return shown.value;
@@ -87,9 +93,19 @@ const shownWithGroup = computed(() => {
     ),
   );
 });
-const period = computed(() => feedPeriod(shownWithGroup.value));
 const selected = computed(
   () => shownWithGroup.value.find((event) => event.id === state.value.eventId) ?? null,
+);
+const subjectLinks = computed(() =>
+  props.subjects.map((subject) => ({
+    subject,
+    link: buildCalendarLink([subject], {
+      types: state.value.types,
+      groups: activeGroups.value,
+      scope: 'city-only',
+      city: subject,
+    }),
+  })),
 );
 
 watch(
@@ -109,9 +125,9 @@ function write(patch: {
   route.write(
     serializeRoute(
       {
-        subject: state.value.subject,
+        subjects: props.subjects.map((subject) => ({ kind: subject.kind, id: subject.id })),
         types: [...(patch.types ?? state.value.types)],
-        group: patch.group === undefined ? state.value.group : [...patch.group],
+        groups: patch.group === undefined ? state.value.groups : [...patch.group],
         layout: patch.layout ?? state.value.layout,
         eventId: patch.eventId === undefined ? state.value.eventId : patch.eventId,
       },
@@ -141,25 +157,41 @@ function open(target: CalendarEvent): void {
 
 <template>
   <div>
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <p class="text-[11px] font-bold uppercase tracking-widest opacity-60">Calendrier de</p>
-        <h1 class="text-2xl font-bold leading-tight">{{ subject.label }}</h1>
-        <p v-if="period !== null" class="mt-1 text-xs opacity-70">{{ formatPeriod(period) }}</p>
+    <div class="flex flex-col gap-2">
+      <div
+        v-for="{ subject, link } in subjectLinks"
+        :key="`${subject.kind}:${subject.id}`"
+        class="ap-surface flex flex-col gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div class="min-w-0">
+          <p class="text-[11px] font-bold uppercase tracking-widest opacity-60">Calendrier de</p>
+          <h1 class="truncate text-lg font-bold leading-tight">{{ subject.label }}</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <CopyButton
+            v-if="link !== null"
+            :value="link.subscriptionUrl"
+            label="Copier le lien partiel"
+          />
+          <span v-else class="text-xs opacity-60">Lien indisponible</span>
+          <button
+            type="button"
+            class="ap-focusable rounded-xl border px-3 py-2 text-xs font-semibold"
+            :style="{ borderColor: 'var(--ap-border)' }"
+            @click="emit('remove-subject', subject)"
+          >
+            Enlever
+          </button>
+        </div>
       </div>
-      <div class="flex gap-2">
-        <button
-          type="button"
-          class="ap-focusable rounded-xl border px-3 py-2 text-xs font-semibold"
-          :style="{ borderColor: 'var(--ap-border)' }"
-          @click="emit('change-subject')"
-        >
-          Changer de sujet
-        </button>
-        <a class="ap-button ap-focusable rounded-xl px-4 py-2 text-xs" href="#ap-subscription">
-          Copier le lien
-        </a>
-      </div>
+      <button
+        type="button"
+        class="ap-focusable self-start rounded-xl border px-3 py-2 text-xs font-semibold"
+        :style="{ borderColor: 'var(--ap-border)' }"
+        @click="emit('add-subject')"
+      >
+        + Ajouter
+      </button>
     </div>
 
     <p v-for="notice in state.notices" :key="notice" class="mt-3 text-xs ap-secondary-text">
@@ -176,9 +208,13 @@ function open(target: CalendarEvent): void {
     <StateMessage
       v-else-if="feedStatus === 'error'"
       class="mt-4"
-      title="Calendrier indisponible"
-      message="Les actions de ce sujet n'ont pas pu être chargées. Réessayez dans un instant."
-      primary-label="Réessayer"
+      :title="hasEpciSubject ? 'Territoire indisponible' : 'Calendrier indisponible'"
+      :message="
+        hasEpciSubject
+          ? 'Les données de rattachement de cette intercommunalité sont indisponibles ou ont changé. Revenez à la recherche puis réessayez.'
+          : 'Les actions de ce sujet n’ont pas pu être chargées. Réessayez dans un instant.'
+      "
+      :primary-label="hasEpciSubject ? 'Réessayer' : 'Réessayer'"
       @primary="retryFeed()"
     />
 
@@ -258,7 +294,7 @@ function open(target: CalendarEvent): void {
         @open="open"
       />
 
-      <SubscriptionPanel :subject="subject" :types="state.types" :period="period" />
+      <SubscriptionPanel :subjects="props.subjects" :types="state.types" :groups="activeGroups" />
     </template>
 
     <EventDetail

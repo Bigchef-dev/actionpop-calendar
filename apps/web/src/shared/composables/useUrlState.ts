@@ -5,9 +5,11 @@ import type { CalendarLayout } from '../../types';
 export const LAYOUTS: readonly CalendarLayout[] = ['mois', 'semaine', 'jour', 'liste'];
 
 export interface RouteState {
+  subjects: { kind: string; id: string }[];
+  groups: string[];
   subject: { kind: string; id: string } | null;
-  types: string[];
   group: string[];
+  types: string[];
   layout: CalendarLayout;
   eventId: string | null;
   /** Human-readable reports of the values that could not be used as written. */
@@ -15,7 +17,10 @@ export interface RouteState {
 }
 
 /** Callers that never touch the group filter may omit it; it then stays absent from the address. */
-export type RouteStateInput = Omit<RouteState, 'notices' | 'group'> & {
+export type RouteStateInput = Omit<RouteState, 'notices' | 'subjects' | 'groups' | 'subject' | 'group'> & {
+  subjects?: readonly { kind: string; id: string }[];
+  subject?: { kind: string; id: string } | null;
+  groups?: readonly string[];
   group?: readonly string[];
 };
 
@@ -49,10 +54,16 @@ export function parseRoute(search: string, options: ParseOptions): RouteState {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const notices: string[] = [];
 
-  const rawSubject = params.get('sujet');
-  const subject = parseSubjectKey(rawSubject);
-  if (rawSubject !== null && subject === null) {
-    notices.push(`Sujet « ${rawSubject} » illisible : recherche nécessaire.`);
+  const subjects: { kind: string; id: string }[] = [];
+  const rawSubjects = params.get('sujets') ?? params.get('sujet');
+  if (rawSubjects !== null) {
+    for (const rawSubject of rawSubjects.split(',')) {
+      const subject = parseSubjectKey(rawSubject);
+      if (subject === null) notices.push(`Item « ${rawSubject} » illisible : recherche nécessaire.`);
+      else if (!subjects.some((item) => item.kind === subject.kind && item.id === subject.id)) {
+        subjects.push(subject);
+      }
+    }
   }
 
   const rawTypes = params.get('types');
@@ -75,18 +86,20 @@ export function parseRoute(search: string, options: ParseOptions): RouteState {
   }
 
   const rawEvent = params.get('evenement');
-  const rawGroup = params.get('ga');
-  const group: string[] = [];
-  if (rawGroup !== null) {
-    for (const id of rawGroup.split(',').map((value) => value.trim())) {
-      if (id !== '' && !group.includes(id)) group.push(id);
+  const groups: string[] = [];
+  const rawGroups = params.get('groups') ?? params.get('ga');
+  if (rawGroups !== null) {
+    for (const id of rawGroups.split(',').map((value) => value.trim())) {
+      if (id !== '' && !groups.includes(id)) groups.push(id);
     }
   }
 
   return {
-    subject,
+    subjects,
+    groups,
+    subject: subjects[0] ?? null,
+    group: groups,
     types,
-    group,
     layout: layout ?? options.defaultLayout,
     eventId: rawEvent === null || rawEvent.trim() === '' ? null : rawEvent.trim(),
     notices,
@@ -96,11 +109,17 @@ export function parseRoute(search: string, options: ParseOptions): RouteState {
 /** Serializes a route, omitting values that equal the defaults so the address stays short. */
 export function serializeRoute(state: RouteStateInput, defaultLayout: CalendarLayout): string {
   const params = new URLSearchParams();
-  const key = subjectKey(state.subject);
-  if (key !== null) params.set('sujet', key);
+  const subjects = state.subjects ?? (state.subject === null || state.subject === undefined ? [] : [state.subject]);
+  if (subjects.length > 0) {
+    params.set(
+      'sujets',
+      subjects.map((subject) => `${subject.kind}:${subject.id}`).join(','),
+    );
+  }
   if (state.types.length > 0) params.set('types', [...state.types].sort().join(','));
-  if (state.group !== undefined && state.group.length > 0) {
-    params.set('ga', [...new Set(state.group)].sort().join(','));
+  const groups = state.groups ?? state.group ?? [];
+  if (groups.length > 0) {
+    params.set('groups', [...new Set(groups)].sort().join(','));
   }
   if (state.layout !== defaultLayout) params.set('vue', state.layout);
   if (state.eventId !== null) params.set('evenement', state.eventId);
