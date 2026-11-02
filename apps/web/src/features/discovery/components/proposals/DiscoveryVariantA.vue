@@ -1,6 +1,8 @@
 <template>
   <section class="flex flex-col items-center pt-6 text-center sm:pt-16">
-    <span class="text-6xl" role="img" aria-label="Tortue de la campagne">🐢</span>
+    <span class="text-6xl" role="img" aria-label="Tortue de la campagne">
+      <img src="/tortue-hourra.png" alt="Tortue de la campagne" height="96" width="96">
+    </span>
     <h1 class="mt-5 text-3xl font-bold leading-tight sm:text-4xl">
       Toutes les actions près de chez toi,
       <span class="ap-primary-text">dans ton agenda.</span>

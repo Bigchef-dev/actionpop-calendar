@@ -202,14 +202,17 @@ organizer field to the feed — rejected: out of scope for this feature and a co
 
 ## R11 — Client-side filtering and shareable state
 
-**Decision**: Filter by action type in memory over the parsed events. Keep all view state in the
-query string of the page address (`sujet`, `types`, `vue`, `evenement`), written with
+**Decision**: Combine the parsed events from the selected search items, then filter by action type
+and groups in memory. Keep all shareable view state in the query string of the page address
+(`sujets`, `groups`, `types`, `vue`, `evenement`), written with
 `history.replaceState`, and read once at startup. Replace the current hash-based state helper for
 the new screens; the legacy helper stays only where the poll feature still uses it.
 
 **Rationale**: A query string is what other tools and people expect to share, and it survives
-being pasted into a chat application. `replaceState` avoids polluting the back history on each
-keystroke-level change while still making the address copyable at any moment (FR-015, US6).
+being pasted into a chat application. The selected items and filters are the shareable state;
+the feed's native coverage is not copied into a separate period parameter. `replaceState` avoids
+polluting the back history on each keystroke-level change while still making the address copyable
+at any moment (FR-015, US6).
 
 **Alternatives considered**: (a) keeping the hash — rejected: it breaks the expectation of a
 shareable link and collides with in-feed anchor links; (b) `pushState` on every filter change —

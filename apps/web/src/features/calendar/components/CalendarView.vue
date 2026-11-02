@@ -150,9 +150,8 @@ function eventContent(payload: { event: { id: string; title: string }; timeText:
   return {
     html:
       `<span class="ap-event-chip${timeGridClass}" style="background-color:${color};border-left-color:${color};color:${foreground}" title="${label}">` +
-      `<span class="ap-event-emoji" role="img" aria-label="${label}">${emoji}</span>` +
-      time +
-      `<span class="ap-event-name">${escapeHtml(payload.event.title)}</span>` +
+          time +
+        `<span class="ap-event-name">${emoji} ${escapeHtml(payload.event.title)}</span>` +
       `</span>`,
   };
 }

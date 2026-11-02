@@ -7,6 +7,7 @@ const props = defineProps<{
   confirmation?: string;
 }>();
 
+const GET_URL_MAX_LENGTH = 2000;
 const state = ref<'idle' | 'copied' | 'failed'>('idle');
 
 async function copy(): Promise<void> {
@@ -28,6 +29,14 @@ async function copy(): Promise<void> {
     <button type="button" class="ap-button rounded-xl px-5 py-3 text-sm" @click="copy">
       {{ label }}
     </button>
+    <p
+      v-if="value.length > GET_URL_MAX_LENGTH"
+      class="text-xs font-semibold text-amber-700 dark:text-amber-300"
+      role="alert"
+    >
+      Attention : ce lien contient {{ value.length }} caractères, soit plus que la limite
+      recommandée de {{ GET_URL_MAX_LENGTH }} caractères pour une requête GET.
+    </p>
     <p v-if="state === 'copied'" class="text-xs font-semibold ap-primary-text" role="status">
       {{ confirmation ?? 'Lien copié.' }}
     </p>

@@ -85,17 +85,18 @@ back to the neutral emoji; a missing slug never breaks rendering.
 
 | Field                | Type                     | Rule                                                                                           |
 | -------------------- | ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `subject`            | `SearchSubject`          | The selected subject                                                                           |
-| `params`             | `Record<string, string>` | `SubjectCalendar.params` plus `event_type` values when the visitor keeps the displayed filters |
-| `keepsFilters`       | boolean                  | Whether the type filter is part of the link                                                    |
+| `subjects`           | `SearchSubject[]`        | The selected search items, with duplicate `(kind, id)` values removed                         |
+| `params`             | `Record<string, string>` | All selected scope parameters plus retained group and action-type filters                     |
+| `scope`              | `'display' \| 'city-only'` | Whether the link mirrors the full display or one designated city item                       |
 | `subscriptionUrl`    | string                   | Absolute `https` URL of the feed with `params`                                                 |
 | `webcalUrl`          | string                   | Same URL with the `webcal://` scheme                                                           |
 | `downloadUrl`        | string                   | Same URL as `subscriptionUrl`, used with a download intent                                     |
 | `calendarServiceUrl` | string                   | A "add by URL" address of a well-known calendar service, pre-filled                            |
-| `description`        | string                   | One sentence naming subject, filters and period                                                |
+| `description`        | string                   | One sentence naming search items and retained filters                                          |
 
-**Rule**: the period is the server's configured window; the link never carries a period the feed
-does not honour. A link is only offered when `params` contains a value the feed accepts.
+**Rule**: the feed's configured coverage is not a visitor-selected criterion and is not encoded
+as a separate period parameter. A link is only offered when `params` contains values the feed
+accepts. The city-only copy action includes only its designated city item.
 
 ### InterfaceProposal
 
@@ -125,8 +126,9 @@ does not honour. A link is only offered when `params` contains a value the feed 
 
 | Parameter   | Entity field                 | Rule                                                                                                                          |
 | ----------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `sujet`     | `ScopeSelection.subject`     | `kind:id` (for example `commune:69123`). Absent → the discovery screen                                                        |
-| `types`     | `ScopeSelection.types`       | Comma-separated action-type slugs; absent → all types. An unknown slug is reported and ignored                                |
+| `sujets`    | `ScopeSelection.subjects`    | Comma-separated `kind:id` items. Absent → the discovery screen                                                             |
+| `groups`    | `ScopeSelection.groups`      | Comma-separated action-group identifiers; absent → all groups                                                             |
+| `types`     | `ScopeSelection.types`       | Comma-separated action-type slugs; absent → all types. An unknown slug is reported and ignored                             |
 | `vue`       | `ScopeSelection.view`        | `mois` \| `jour` \| `semaine` \| `liste`; default `jour` on a narrow screen, `mois` otherwise. Unknown value falls back to the default |
 | `evenement` | `ScopeSelection.openEventId` | Event `UID`; opens the detail. An unknown id shows the calendar without the detail, not an error                              |
 
@@ -142,14 +144,16 @@ does not honour. A link is only offered when `params` contains a value the feed 
 
 | Field         | Type            | Rule                                                                    |
 | ------------- | --------------- | ----------------------------------------------------------------------- |
-| `subject`     | `SearchSubject` | Resolved from the address; unresolved → discovery screen with a message |
-| `types`       | string[]        | Subset of the subject's action types; empty means all                   |
+| `subjects`    | `SearchSubject[]`   | Resolved from the address; unresolved items are reported and removable  |
+| `groups`      | string[]            | Selected action-group identifiers; empty means all                      |
+| `types`       | string[]            | Selected action-type slugs; empty means all                             |
 | `view`        | string          | Calendar layout                                                         |
 | `openEventId` | string \| null  | Detail overlay                                                          |
 
-**State transitions**: `discovery` → `selected` (a subject is chosen) → `filtered` (types
-changed) → `subscribed` (a link is copied or opened). Returning to `discovery` clears `sujet`,
-`types` and `evenement` but keeps `vue`.
+**State transitions**: `discovery` → `selected` (one search item is chosen) → `composed` (items
+are added or removed) → `filtered` (groups or types changed) → `subscribed` (a link is copied or
+opened). Returning to `discovery` clears `sujets`, `groups`, `types` and `evenement` but keeps
+`vue`.
 
 ---
 

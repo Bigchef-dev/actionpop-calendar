@@ -4,15 +4,16 @@ import { computed, onBeforeUnmount, watch } from 'vue';
 import { REVIEW_PROPOSALS } from '../../../config';
 import type { CalendarEvent, WeatherEntry } from '../../../types';
 import EventDetailActions from './EventDetailActions.vue';
+import EventDetailGroup from './EventDetailGroup.vue';
 import EventDetailHeader from './EventDetailHeader.vue';
 import EventDetailPlace from './EventDetailPlace.vue';
-import MetadataSection from './MetadataSection.vue';
 import DetailVariantA from './proposals/DetailVariantA.vue';
 import DetailVariantB from './proposals/DetailVariantB.vue';
 
 const props = defineProps<{
   event: CalendarEvent | null;
   weather: WeatherEntry | null;
+  groupNames: Readonly<Record<string, string>>;
 }>();
 
 const emit = defineEmits<{ (event: 'close'): void }>();
@@ -67,7 +68,7 @@ const variant = computed(() => {
         <p v-if="event.description !== ''" class="mt-4 whitespace-pre-line text-sm opacity-90">
           {{ event.description }}
         </p>
-        <MetadataSection :entries="event.metadata" />
+        <EventDetailGroup :event="event" :group-names="groupNames" />
         <EventDetailActions :event="event" />
       </component>
     </div>

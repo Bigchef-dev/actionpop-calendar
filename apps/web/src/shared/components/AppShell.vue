@@ -20,7 +20,7 @@ const emit = defineEmits<{ (event: 'home'): void }>();
         class="mt-10 border-t py-6 text-center text-xs font-semibold uppercase tracking-widest opacity-60"
         :style="{ borderColor: 'var(--ap-border)' }"
       >
-        Données Action Populaire · Agenda auto-hébergé · Aucun compte requis
+        Données issues de <a href="https://www.actionpopulaire.fr/" target="_blank" rel="noopener noreferrer" class="ap-primary-text">Action Populaire</a>
       </footer>
     </div>
   </div>

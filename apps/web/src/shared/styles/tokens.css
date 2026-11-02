@@ -3,13 +3,16 @@
  * Light and dark sets both meet WCAG 2.1 AA (FR-030).
  */
 :root {
-  --ap-primary: #4c0297;
-  --ap-secondary: #d1271c;
+
+  --ap-primary: #c9309c;
+  --ap-secondary: #4c0297;
   --ap-paper: #fffcf4;
   --ap-ink: #212320;
   --ap-surface: #ffffff;
   --ap-surface-muted: #f4efe6;
   --ap-border: #d9d2c4;
+  --ap-yellow: #f4c542;
+  --ap-yellow-ink: #231800;
   --ap-on-primary: #fffcf4;
   --ap-focus: #4c0297;
   --ap-shadow: rgba(33, 35, 32, 0.12);
@@ -29,6 +32,19 @@
     --ap-focus: #ff8a7a;
     --ap-shadow: rgba(0, 0, 0, 0.45);
   }
+}
+
+/* Manual dark mode selected from the header. */
+:root.dark {
+  --ap-paper: #16121b;
+  --ap-ink: #f4efe6;
+  --ap-surface: #221b2b;
+  --ap-surface-muted: #1c1623;
+  --ap-border: #3d3348;
+  --ap-secondary: #ff8a7a;
+  --ap-on-primary: #fffcf4;
+  --ap-focus: #ff8a7a;
+  --ap-shadow: rgba(0, 0, 0, 0.45);
 }
 
 .ap-page {
@@ -85,4 +101,8 @@
   .ap-primary-text {
     color: #c7a8ff;
   }
+}
+
+:root.dark .ap-primary-text {
+  color: #c7a8ff;
 }

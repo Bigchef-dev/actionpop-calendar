@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Public Calendar Discovery Experience
+# Specification Quality Checklist: Public Calendar Discovery and Composition Experience
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-11-01
+**Created**: 2026-11-02
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -53,3 +53,7 @@
   scrolling for "Par GA", the day layout and mobile default, layout reset behavior, complete
   start/end duration display, dynamic timed windows, and bold calendar-card readability. Re-
   validated: all items still pass.
+- Iteration 5 (calendar composition refinement): documented adding multiple cities or
+  departments from the plus control, removing one calendar at a time, exact final links for
+  displayed subjects and criteria, the explicitly city-only copy action, and returning to the
+  home search when the selection or result list is empty. Re-validated: all items still pass.

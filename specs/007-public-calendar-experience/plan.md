@@ -1,4 +1,4 @@
-# Implementation Plan: Public Calendar Discovery Experience
+# Implementation Plan: Public Calendar Discovery and Composition Experience
 
 **Branch**: `007-public-calendar-experience` | **Date**: 2026-11-01 | **Spec**: [spec.md](./spec.md)
 
@@ -6,13 +6,14 @@
 
 ## Summary
 
-Rebuild the public web application (`apps/web`) as a discovery experience on top of
-`actionpop-calendar`: a single central search resolves a human query ("ma ville", "mon
-département", "mon groupe d'action") to a calendar subject, the events of that subject are read
-from the project's own `/calendar.ics` feed, filtered by action type in the browser, and the
-visitor leaves with a personal calendar link. Two contained backend capabilities are required by
-the spec: an extensible subject-search read (`GET /search/subjects`) so that city, department and
-group searches share one contract, and a `group` criterion on `/calendar.ics` so that a group
+Rebuild the public web application (`apps/web`) as a discovery and composition experience on top
+of `actionpop-calendar`: a single central search resolves a human query to a selectable search
+item (city, department or action group), the visitor can add multiple city or department items
+from the calendar screen, and the events from the selected scopes are combined and filtered by
+action type in the browser. The final calendar link mirrors exactly the displayed selection;
+the separate city-only copy action is explicit. Two contained backend capabilities are required
+by the spec: an extensible subject-search read (`GET /search/subjects`) so that city, department
+and group searches share one contract, and a `group` criterion on `/calendar.ics` so that a group
 search can produce a calendar at all. Everything else is front-end work: parsing the feed
 (including `X-ACTIONPOP-*`), per-event weather from the event coordinates, map and contact links,
 campaign identity from [docs/design.md](../../docs/design.md), and archival of the legacy
@@ -34,9 +35,9 @@ autocompletion script.
 
 **Performance Goals**: suggestions under 1 s p95 on a public mobile connection; first screen actionable under 3 s; an ICS payload of 1000 events parsed and rendered under 500 ms; no layout shift when suggestions open
 
-**Constraints**: no new runtime service; no new authentication; the `/calendar.ics` contract stays backward compatible (one new optional parameter only); canonical timezone `Europe/Paris`; WCAG AA contrast; `prefers-reduced-motion` honoured; no visitor data stored
+**Constraints**: no new runtime service; no new authentication; the `/calendar.ics` contract stays backward compatible (one new optional parameter only); calendar coverage is supplied by the existing feed and is not a visitor-selected link criterion; canonical timezone `Europe/Paris`; WCAG AA contrast; `prefers-reduced-motion` honoured; no visitor data stored
 
-**Scale/Scope**: ~35k communes, 101 departments, O(10³) action groups; one calendar read per page view; ≤ 1000 events per feed; ~12 new front-end modules, 2 backend modules, 1 filter extension
+**Scale/Scope**: ~35k communes, 101 departments, O(10³) action groups; one feed read per selected scope; ≤ 1000 events per feed; ~12 new front-end modules, 2 backend modules, 1 filter extension
 
 ## Constitution Check
 

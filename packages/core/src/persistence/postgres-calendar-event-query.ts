@@ -6,6 +6,10 @@ import type {
   CalendarQueryResult,
   CalendarWindow,
 } from '../calendar-filters/calendar-event.js';
+import {
+  arrondissementPostalCodes,
+  expandCommuneIds,
+} from '../calendar-filters/commune-scope.js';
 import { readDiagnostics } from './diagnostic-json.js';
 
 const EVENT_SELECT = {
@@ -75,14 +79,21 @@ function buildWhere(
   criteria: CalendarEventCriteria,
   window: CalendarWindow,
 ): Prisma.EventRecordWhereInput {
-  const communeIds = criteria.communeIds ?? [];
+  const communeIds = expandCommuneIds(criteria.communeIds ?? []);
   const eventTypes = criteria.eventTypes ?? [];
   const groupIds = criteria.groupIds ?? [];
 
   return {
     ...(criteria.country === undefined ? {} : { countryCode: criteria.country }),
     ...(criteria.department === undefined ? {} : { departmentCode: criteria.department }),
-    ...(communeIds.length === 0 ? {} : { communeId: { in: [...communeIds] } }),
+    ...(communeIds.length === 0
+      ? {}
+      : {
+          OR: [
+            { communeId: { in: [...communeIds] } },
+            { location: { zip: { in: [...arrondissementPostalCodes(criteria.communeIds ?? [])] } } },
+          ],
+        }),
     ...(eventTypes.length === 0 ? {} : { eventType: { in: [...eventTypes] } }),
     ...(groupIds.length === 0 ? {} : { groupLinks: { some: { scopeId: { in: [...groupIds] } } } }),
     endTime: { gte: window.startUtc },

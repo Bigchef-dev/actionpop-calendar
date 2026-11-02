@@ -91,11 +91,6 @@ function tryExample(example: string): void {
         primary-label="Réessayer"
         @primary="retry"
       />
-      <p v-if="status === 'error'" class="mt-3 text-center text-xs">
-        <a class="ap-primary-text font-semibold underline" :href="fullFeedUrl">
-          Ouvrir directement le calendrier complet
-        </a>
-      </p>
 
       <section v-else-if="status === 'empty'" class="ap-surface rounded-2xl px-5 py-6">
         <h2 class="text-base font-semibold">Rien trouvé pour « {{ query.trim() }} »</h2>

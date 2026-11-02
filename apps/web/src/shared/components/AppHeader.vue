@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useDarkMode } from '../composables/useDarkMode';
+
 defineProps<{ onDiscovery?: boolean }>();
 const emit = defineEmits<{ (event: 'home'): void }>();
+const { isDark, toggle } = useDarkMode();
 </script>
 
 <template>
@@ -12,22 +15,26 @@ const emit = defineEmits<{ (event: 'home'): void }>();
     >
       <span
         class="grid h-10 w-10 place-items-center rounded-full text-lg"
-        :style="{ backgroundColor: 'var(--ap-primary)', color: 'var(--ap-on-primary)' }"
         aria-hidden="true"
       >
-        🐢
+              <img src="/tortue-hourra.png" alt="Tortue de la campagne">
+
       </span>
       <span class="leading-tight">
         <span class="block text-sm font-bold uppercase tracking-widest">Agenda des actions</span>
         <span class="block text-xs opacity-70">Action Populaire</span>
       </span>
     </button>
-    <slot name="actions" />
-    <span
-      v-if="onDiscovery"
-      class="hidden text-xs font-semibold uppercase tracking-widest opacity-60 sm:block"
+    <button
+      type="button"
+      class="ap-focusable rounded-lg border px-3 py-2 text-sm font-semibold"
+      :style="{ borderColor: 'var(--ap-border)' }"
+      :aria-label="isDark ? 'Activer le mode clair' : 'Activer le mode nuit'"
+      :aria-pressed="isDark"
+      @click="toggle"
     >
-      Campagne 2027
-    </span>
+      <span aria-hidden="true">{{ isDark ? '☀️' : '🌙' }}</span>
+      <span class="sr-only">{{ isDark ? 'Mode clair' : 'Mode nuit' }}</span>
+    </button>
   </header>
 </template>

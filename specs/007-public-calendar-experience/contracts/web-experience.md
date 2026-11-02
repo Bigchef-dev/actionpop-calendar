@@ -10,8 +10,8 @@ between the experience and everyone who links to it, tests it, or reviews it.
 | Screen       | Address                               | Purpose                                                                         |
 | ------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
 | Discovery    | `/`                                   | One central search field, the tool's promise in one sentence, rotating examples |
-| Calendar     | `/?sujet=<kind>:<id>`                 | Events of the subject, type filter, subscription entry point                    |
-| Event detail | `/?sujet=<kind>:<id>&evenement=<uid>` | Everything known about one event                                                |
+| Calendar     | `/?sujets=<kind>:<id>,...`                 | Events of the selected search items, filters, subscription entry point        |
+| Event detail | `/?sujets=<kind>:<id>,...&evenement=<uid>` | Everything known about one event                                               |
 
 There is no third route: the four spec states that are not screens (no result, no event,
 unavailable service, outdated address) are **states of these two screens**.
@@ -20,8 +20,9 @@ unavailable service, outdated address) are **states of these two screens**.
 
 | Parameter   | Values                         | Default                            | Behaviour when invalid                                                    |
 | ----------- | ------------------------------ | ---------------------------------- | ------------------------------------------------------------------------- |
-| `sujet`     | `<kind>:<id>`                  | absent (discovery)                 | Unresolvable → discovery screen with an explicit message naming the value |
-| `types`     | comma-separated slugs          | all types                          | Unknown slug ignored and reported; all slugs invalid → all types          |
+| `sujets`    | comma-separated `<kind>:<id>`  | absent (discovery)                 | Unresolvable item → report it and offer removal or a new search            |
+| `groups`    | comma-separated group IDs      | all groups                         | Unknown group ignored and reported                                          |
+| `types`     | comma-separated slugs          | all types                          | Unknown slug ignored and reported; all slugs invalid → all types           |
 | `vue`       | `mois` \| `jour` \| `semaine` \| `liste` | `jour` under 768 px, `mois` above | Falls back to the default                                                 |
 | `evenement` | event `UID`                    | absent                             | Not displayed; the calendar still renders                                 |
 
@@ -42,6 +43,10 @@ unavailable service, outdated address) are **states of these two screens**.
   the corresponding side.
 - The address is the only source of truth for shareability (US6): what a second visitor sees is
   what the address says, not what the first visitor's browser remembered.
+- A small plus control opens the search bar from the calendar screen. Adding an already selected
+  search item is rejected visibly; each selected item has its own removal action.
+- The final link mirrors every selected search item, group and action-type filter. The city-only
+  copy action is explicitly labelled and includes only its designated city item.
 
 ## Required states
 
@@ -49,9 +54,9 @@ unavailable service, outdated address) are **states of these two screens**.
 | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------ |
 | Loading                    | Request in flight                                          | Skeleton of the expected layout, no spinner-only screen                            | —                              |
 | No result                  | Search answered with `total = 0`                           | Statement, two nearby alternative queries, invitation to change the kind of search | Pick an alternative            |
-| No event                   | Subject resolved, feed answered, zero events in the window | Subject name, period covered, statement that nothing is scheduled                  | Subscribe anyway; search again |
+| No event                   | Search items resolved, feed answered, zero events in coverage | Selected item names, statement that nothing is scheduled                         | Subscribe anyway; search again |
 | Unavailable                | Search, feed or weather request failed                     | Plain-language statement naming what is unavailable                                | Retry; link to the direct feed |
-| Outdated / unknown subject | `sujet` does not resolve                                   | Statement plus the searched value                                                  | Search again                   |
+| Outdated / unknown subject | One `sujets` item does not resolve                         | Statement plus the searched value                                                  | Remove it or search again      |
 | Reduced motion             | `prefers-reduced-motion: reduce`                           | Rotating examples static, no decorative animation                                  | —                              |
 
 ## Journey invariants
@@ -61,8 +66,8 @@ unavailable service, outdated address) are **states of these two screens**.
   filter (optional) → copy/open). Filtering is optional and never gates the subscription.
 - **J3** — The subscription entry point is visible on every calendar screen without scrolling on
   a 375 × 667 viewport.
-- **J4** — Every screen states the subject name and the period covered; the period is the one the
-  server enforces, never a value the browser guessed.
+- **J4** — Every screen states the selected search-item names and never presents the feed coverage
+  as a visitor-selected filter.
 - **J5** — No screen depends on a hover, a drag, or a pointer-only gesture.
 
 ## Accessibility invariants

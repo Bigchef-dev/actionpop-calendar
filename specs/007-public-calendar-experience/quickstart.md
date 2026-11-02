@@ -54,12 +54,12 @@ only one that needs the infrastructure above.
 
 **Expected**: examples were typed and erased before focus; suggestions are grouped by kind, each
 showing the name, the kind and the territory; the result count is announced to a screen reader;
-`↓`/`↑` move, `Enter` chooses; the address becomes `/?sujet=commune:<insee>`.
+`↓`/`↑` move, `Enter` chooses; the address becomes `/?sujets=commune:<insee>`.
 
 4. Repeat with `69` and with the beginning of a known group name.
 
-**Expected**: department and group subjects resolve to `/?sujet=department:69` and
-`/?sujet=group:<id>` respectively.
+**Expected**: department and group search items resolve to `/?sujets=department:69` and
+`/?sujets=group:<id>` respectively.
 
 5. Type `zzzzzz`.
 
@@ -83,16 +83,16 @@ that department only.
 
 **Expected**: every event is back, and the address no longer carries `types`.
 
-4. Open a subject with no event in the window.
+4. Open a search item with no event in the feed coverage.
 
-**Expected**: no-event state naming the subject and the period, with a subscription offer.
+**Expected**: no-event state naming the search item, with a subscription offer.
 
 ## Scenario 3 — Take a calendar link (US3)
 
 1. From a filtered calendar, open the subscription panel.
 
-**Expected**: the panel names the subject, whether the displayed filter is included, and the
-period; the subscription (live) form is proposed first, download second, calendar service third.
+**Expected**: the panel names the selected search items and retained filters; the subscription
+(live) form is proposed first, download second, calendar service third.
 
 2. Choose to keep the filter, copy the link.
 3. Paste the copied link into a calendar application, then inspect the imported events.
@@ -102,7 +102,8 @@ when copying.
 
 4. Repeat with the filter not kept.
 
-**Expected**: the imported calendar holds every event of the subject.
+**Expected**: the imported calendar holds exactly the events represented by the displayed
+selection.
 
 5. Repeat the whole scenario with a `group` subject.
 
@@ -130,9 +131,9 @@ event's Action Populaire page.
 
 1. Copy the address of a filtered calendar and open it in a private window.
 
-**Expected**: identical subject, filters and period.
+**Expected**: identical selected search items and filters.
 
-2. Edit the address to `?sujet=commune:99999`.
+2. Edit the address to `?sujets=commune:99999`.
 
 **Expected**: explicit message naming the unresolvable value, and a way back to the search — never
 a blank screen or an unhandled error.

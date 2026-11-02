@@ -4,6 +4,7 @@ import { resolveCommune } from '../../src/geography/commune-resolver.js';
 import { FakeReferenceReader, VERSION, activeVersion, makeCommune } from './fake-reference.js';
 
 const lyon = makeCommune('69123', 'Lyon', '69', ['69000']);
+const lyon3 = makeCommune('69383', 'Lyon 3e arrondissement', '69', ['69003']);
 const paris = makeCommune('75056', 'Paris', '75', ['75000']);
 const marseille = makeCommune('13055', 'Marseille', '13', ['13000']);
 const saintDenis93 = makeCommune('93066', 'Saint-Denis', '93', ['93200']);
@@ -14,7 +15,7 @@ const valence82 = makeCommune('82000', 'Valence', '82', ['82400']);
 function reader(): FakeReferenceReader {
   return new FakeReferenceReader(
     activeVersion(),
-    [lyon, paris, marseille, saintDenis93, saintDenis974, valence, valence82],
+    [lyon, lyon3, paris, marseille, saintDenis93, saintDenis974, valence, valence82],
     [],
   );
 }
@@ -104,6 +105,15 @@ describe('resolveCommune', () => {
   it('attaches Marseille from an arrondissement postal code', async () => {
     const result = await resolveCommune({ city: 'Marseille', zip: '13008' }, reader(), VERSION);
     expect(result.commune?.inseeCode).toBe('13055');
+  });
+
+  it('resolves an arrondissement name through its postal code', async () => {
+    const result = await resolveCommune(
+      { city: 'Lyon 3e', zip: '69003' },
+      reader(),
+      VERSION,
+    );
+    expect(result.commune?.inseeCode).toBe('69383');
   });
 
   it('prefers the commune name over the city name', async () => {

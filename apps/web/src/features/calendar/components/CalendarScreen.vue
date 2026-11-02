@@ -264,6 +264,7 @@ function open(target: CalendarEvent): void {
     <EventDetail
       :event="selected"
       :weather="selected === null ? null : weather.weatherFor(selected)"
+      :group-names="groupNames"
       @close="write({ eventId: null })"
     />
   </div>

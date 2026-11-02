@@ -85,7 +85,7 @@ onUnmounted(() => {
                     color: group.color.foreground,
                   }
                 : {
-                    backgroundColor: group.color.tint,
+                    backgroundColor: `color-mix(in srgb, ${group.color.color} 18%, var(--ap-surface))`,
                     borderColor: group.color.color,
                     color: 'var(--ap-ink)',
                   }
