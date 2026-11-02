@@ -31,8 +31,7 @@ function downloadCopy(): void {
     </a>
     <button
       type="button"
-      class="ap-focusable rounded-xl border px-4 py-3 text-sm font-semibold"
-      :style="{ borderColor: 'var(--ap-border)' }"
+      class="ap-focusable rounded-xl border border-ap-border px-4 py-3 text-sm font-semibold"
       @click="downloadCopy"
     >
       Télécharger l'événement (.ics)

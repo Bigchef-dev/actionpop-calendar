@@ -67,9 +67,11 @@ body {
   gap: 0.25rem;
   overflow: hidden;
   padding: 1px 5px;
-  border-left: 3px solid var(--ap-primary);
+  /* Set inline per event, because the group color is only known at render time. */
+  border-left: 3px solid var(--ap-chip-color, var(--ap-primary));
   border-radius: 0.4rem;
-  background: transparent;
+  background-color: var(--ap-chip-color, transparent);
+  color: var(--ap-chip-ink, inherit);
   box-shadow: 0 1px 0 var(--ap-shadow);
   font-size: 0.76rem;
   font-weight: 800;

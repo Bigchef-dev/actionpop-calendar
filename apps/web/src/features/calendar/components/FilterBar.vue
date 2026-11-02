@@ -16,19 +16,33 @@ const emit = defineEmits<{
   (event: 'clear'): void;
 }>();
 
-function typeOf(slug: string): ReturnType<typeof actionTypeFor> {
-  return actionTypeFor(slug);
+interface TypeRow {
+  slug: string;
+  count: number;
+  label: string;
+  emoji: string;
 }
 
-const isActive = (slug: string): boolean =>
-  props.selected.length === 0 || props.selected.includes(slug);
+/** The catalogue is read once per type, so the template never repeats the lookup. */
+const rows = computed<TypeRow[]>(() =>
+  props.available.map((type) => {
+    const { label, emoji } = actionTypeFor(type.slug);
+    return { slug: type.slug, count: type.count, label, emoji };
+  }),
+);
+
 const hasSelection = computed(() => props.selected.length > 0);
+
+/** An empty selection shows every type, so every pill reads as active. */
+function isActive(slug: string): boolean {
+  return props.selected.length === 0 || props.selected.includes(slug);
+}
 </script>
 
 <template>
   <section aria-label="Filtrer par type d'action">
     <div class="flex items-baseline justify-between gap-3">
-      <h2 class="text-[11px] font-bold uppercase tracking-widest opacity-60">Type d'action</h2>
+      <h2 class="ap-eyebrow">Type d'action</h2>
       <p class="text-xs opacity-70" role="status">
         {{ shown }} sur {{ total }} action{{ total > 1 ? 's' : '' }}
       </p>
@@ -36,25 +50,16 @@ const hasSelection = computed(() => props.selected.length > 0);
 
     <div class="mt-1.5 flex flex-wrap gap-1.5">
       <button
-        v-for="type in available"
-        :key="type.slug"
+        v-for="row in rows"
+        :key="row.slug"
         type="button"
-        class="ap-focusable rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-        :aria-pressed="isActive(type.slug)"
-        :style="
-          isActive(type.slug)
-            ? {
-                backgroundColor: `color-mix(in srgb, var(--ap-primary) 18%, var(--ap-surface))`,
-                borderColor: `var(--ap-primary)`,
-                color: 'var(--ap-ink)',
-              }
-            : { borderColor: 'var(--ap-border)', color: 'var(--ap-ink)' }
-        "
-        @click="emit('toggle', type.slug)"
+        class="ap-pill ap-focusable font-semibold"
+        :aria-pressed="isActive(row.slug)"
+        @click="emit('toggle', row.slug)"
       >
-        <span aria-hidden="true">{{ typeOf(type.slug).emoji }}</span>
-        {{ typeOf(type.slug).label }}
-        <span class="opacity-70">({{ type.count }})</span>
+        <span aria-hidden="true">{{ row.emoji }}</span>
+        {{ row.label }}
+        <span class="opacity-70">({{ row.count }})</span>
       </button>
     </div>
 

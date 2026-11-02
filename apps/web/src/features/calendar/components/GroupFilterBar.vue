@@ -10,7 +10,7 @@ export interface AvailableGroup {
   color: GroupColor;
 }
 
-defineProps<{
+const props = defineProps<{
   available: AvailableGroup[];
   selected: readonly string[];
 }>();
@@ -19,18 +19,59 @@ const emit = defineEmits<{
   (event: 'select', groups: readonly string[]): void;
 }>();
 
+/** Each arrow knows how far it moves the rail, what it announces and how it fades the edge. */
+const DIRECTIONS = [
+  {
+    id: 'left',
+    label: "Faire défiler les groupes d'action vers la gauche",
+    glyph: '←',
+    step: -220,
+    modifier: 'ap-scroll-arrow--start',
+  },
+  {
+    id: 'right',
+    label: "Faire défiler les groupes d'action vers la droite",
+    glyph: '→',
+    step: 220,
+    modifier: 'ap-scroll-arrow--end',
+  },
+] as const;
+
+const SCROLL_HINT_TOLERANCE = 2;
+
 const scrollRail = ref<HTMLElement | null>(null);
-const canScrollLeft = ref(false);
-const canScrollRight = ref(false);
+const canScroll = ref<Record<'left' | 'right', boolean>>({ left: false, right: false });
 
 function updateScrollHint(): void {
   const rail = scrollRail.value;
-  canScrollLeft.value = rail !== null && rail.scrollLeft > 2;
-  canScrollRight.value = rail !== null && rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 2;
+  if (rail === null) {
+    canScroll.value = { left: false, right: false };
+    return;
+  }
+  const hiddenRight = rail.scrollWidth - rail.clientWidth - rail.scrollLeft;
+  canScroll.value = {
+    left: rail.scrollLeft > SCROLL_HINT_TOLERANCE,
+    right: hiddenRight > SCROLL_HINT_TOLERANCE,
+  };
 }
 
-function scrollGroups(direction: 'left' | 'right'): void {
-  scrollRail.value?.scrollBy({ left: direction === 'right' ? 220 : -220, behavior: 'smooth' });
+function scrollGroups(step: number): void {
+  scrollRail.value?.scrollBy({ left: step, behavior: 'smooth' });
+}
+
+/** Selecting a group toggles it: the rail never discards the other selected groups. */
+function toggleGroup(groupId: string): void {
+  emit(
+    'select',
+    props.selected.includes(groupId)
+      ? props.selected.filter((id) => id !== groupId)
+      : [...props.selected, groupId],
+  );
+}
+
+/** The group color reaches the pill as custom properties, so the stylesheet owns both states. */
+function colorVariables(group: AvailableGroup): Record<string, string> {
+  return { '--ap-pill-color': group.color.color, '--ap-pill-ink': group.color.foreground };
 }
 
 onMounted(() => {
@@ -46,7 +87,7 @@ onUnmounted(() => {
 <template>
   <section aria-label="Filtrer par groupe d'action">
     <div class="flex items-center gap-2">
-      <h2 class="shrink-0 text-[11px] font-bold uppercase tracking-widest opacity-60">Par GA</h2>
+      <h2 class="ap-eyebrow shrink-0">Par GA</h2>
       <div class="relative min-w-0 flex-1">
         <div
           ref="scrollRail"
@@ -57,16 +98,8 @@ onUnmounted(() => {
         >
           <button
             type="button"
-            class="ap-focusable shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+            class="ap-pill ap-pill--ink ap-focusable shrink-0 font-bold"
             :aria-pressed="selected.length === 0"
-            :style="
-              selected.length === 0
-                ? {
-                    backgroundColor: 'var(--ap-ink)',
-                    color: 'var(--ap-surface)',
-                  }
-                : { backgroundColor: 'var(--ap-surface-muted)', color: 'var(--ap-ink)' }
-            "
             @click="emit('select', [])"
           >
             Tous
@@ -75,67 +108,27 @@ onUnmounted(() => {
             v-for="group in available"
             :key="group.id"
             type="button"
-            class="ap-focusable max-w-[13rem] shrink-0 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            class="ap-pill ap-pill--group ap-focusable max-w-[13rem] shrink-0 truncate font-semibold"
+            :style="colorVariables(group)"
             :aria-pressed="selected.includes(group.id)"
-            :style="
-              selected.includes(group.id)
-                ? {
-                    backgroundColor: group.color.color,
-                    borderColor: group.color.color,
-                    color: group.color.foreground,
-                  }
-                : {
-                    backgroundColor: `color-mix(in srgb, ${group.color.color} 18%, var(--ap-surface))`,
-                    borderColor: group.color.color,
-                    color: 'var(--ap-ink)',
-                  }
-            "
-            @click="
-              emit(
-                'select',
-                selected.includes(group.id)
-                  ? selected.filter((id) => id !== group.id)
-                  : [...selected, group.id],
-              )
-            "
+            @click="toggleGroup(group.id)"
           >
-            <span aria-hidden="true" :style="{ color: group.color.color }">{{
-              group.color.marker
-            }}</span>
+            <span class="ap-group-marker" aria-hidden="true">{{ group.color.marker }}</span>
             {{ group.label }}
-            (<span class="opacity-60">{{ group.count }}</span
-            >)
+            <span class="opacity-60">({{ group.count }})</span>
           </button>
         </div>
         <button
-          v-if="canScrollLeft"
+          v-for="direction in DIRECTIONS"
+          v-show="canScroll[direction.id]"
+          :key="direction.id"
           type="button"
-          class="ap-focusable pointer-events-auto absolute left-0 top-0.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold"
-          aria-label="Faire défiler les groupes d'action vers la gauche"
-          :style="{
-            backgroundColor: 'var(--ap-surface)',
-            borderColor: 'var(--ap-border)',
-            color: 'var(--ap-ink)',
-            boxShadow: '8px 0 10px var(--ap-surface)',
-          }"
-          @click="scrollGroups('left')"
+          class="ap-scroll-arrow ap-focusable"
+          :class="direction.modifier"
+          :aria-label="direction.label"
+          @click="scrollGroups(direction.step)"
         >
-          ←
-        </button>
-        <button
-          v-if="canScrollRight"
-          type="button"
-          class="ap-focusable pointer-events-auto absolute right-0 top-0.5 flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold"
-          aria-label="Faire défiler les groupes d'action vers la droite"
-          :style="{
-            backgroundColor: 'var(--ap-surface)',
-            borderColor: 'var(--ap-border)',
-            color: 'var(--ap-ink)',
-            boxShadow: '-8px 0 10px var(--ap-surface)',
-          }"
-          @click="scrollGroups('right')"
-        >
-          →
+          {{ direction.glyph }}
         </button>
       </div>
     </div>

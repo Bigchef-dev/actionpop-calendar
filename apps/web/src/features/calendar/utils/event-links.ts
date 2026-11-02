@@ -1,4 +1,7 @@
 import type { CalendarEvent } from '../../../types';
+import { METADATA_EVENT_ID, metadataValue } from './metadata';
+
+const ACTION_POPULAIRE = 'https://actionpopulaire.fr';
 
 function compact(date: Date): string {
   return date.toISOString().replace(/-|:|\.\d{3}/g, '');
@@ -23,9 +26,20 @@ export function mapsUrl(location: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 }
 
-/** Action Populaire page of the event, where the responsible person is reachable. */
+/** Page of one action group. */
+export function groupPageUrl(groupId: string): string {
+  return `${ACTION_POPULAIRE}/groupes/${encodeURIComponent(groupId)}/`;
+}
+
+/**
+ * Action Populaire page of the event, where the responsible person is reachable. The feed
+ * publishes the canonical URL as a property; when it is absent the event identifier is enough
+ * to rebuild it, so the call to action never points at a missing page.
+ */
 export function actionPopulaireUrl(event: CalendarEvent): string | null {
-  return event.sourceUrl !== null && event.sourceUrl !== '' ? event.sourceUrl : null;
+  if (event.sourceUrl !== null && event.sourceUrl !== '') return event.sourceUrl;
+  const eventId = metadataValue(event.metadata, METADATA_EVENT_ID);
+  return eventId === null ? null : `${ACTION_POPULAIRE}/evenements/${encodeURIComponent(eventId)}/`;
 }
 
 function escapeIcsText(value: string): string {

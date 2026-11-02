@@ -15,11 +15,8 @@ const map = computed(() => (props.location === null ? null : mapsUrl(props.locat
 
 <template>
   <section v-if="location !== null" class="mt-4">
-    <h2 class="text-[11px] font-bold uppercase tracking-widest opacity-60">Lieu</h2>
-    <div
-      class="mt-1.5 flex items-start gap-2.5 rounded-xl px-3 py-2.5"
-      :style="{ backgroundColor: 'var(--ap-surface-muted)' }"
-    >
+    <h2 class="ap-eyebrow">Lieu</h2>
+    <div class="mt-1.5 flex items-start gap-2.5 rounded-xl bg-ap-surface-muted px-3 py-2.5">
       <span class="shrink-0" aria-hidden="true">📍</span>
       <p class="min-w-0 flex-1 break-words text-sm">{{ location }}</p>
       <WeatherBadge :entry="weather" />

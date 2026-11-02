@@ -1,8 +1,12 @@
 import type { Component } from 'ical.js';
 
 import type { EventStatus, MetadataEntry } from '../../../types';
-
-export const METADATA_PREFIX = 'X-ACTIONPOP-';
+import {
+  METADATA_EVENT_TYPE,
+  METADATA_PREFIX,
+  METADATA_SOURCE_URL,
+  metadataValue,
+} from './metadata';
 
 interface TextValue {
   toString(): string;
@@ -44,8 +48,9 @@ export function readStatus(component: InstanceType<typeof Component>): EventStat
   return 'CONFIRMED';
 }
 
+/** Action type, as published in the metadata or, at a lower metadata level, as a category. */
 export function readEventType(component: InstanceType<typeof Component>): string | null {
-  const fromMetadata = readMetadataValue(component, 'EVENT-TYPE');
+  const fromMetadata = readPropertyValue(component, METADATA_EVENT_TYPE);
   if (fromMetadata !== null) return fromMetadata;
   const categories = readText(component.getFirstPropertyValue('categories'));
   if (categories === null) return null;
@@ -57,9 +62,8 @@ export function readSourceUrl(
   component: InstanceType<typeof Component>,
   metadata: readonly MetadataEntry[],
 ): string | null {
-  const fromMetadata = metadata.find((entry) => entry.name === `${METADATA_PREFIX}SOURCE-URL`);
-  if (fromMetadata !== undefined && fromMetadata.value !== '') return fromMetadata.value;
-  return readText(component.getFirstPropertyValue('url'));
+  const published = metadataValue(metadata, METADATA_SOURCE_URL);
+  return published ?? readText(component.getFirstPropertyValue('url'));
 }
 
 export function readCoordinates(
@@ -96,11 +100,9 @@ export function readMetadata(component: InstanceType<typeof Component>): Metadat
   return entries;
 }
 
-export function readMetadataValue(
-  component: InstanceType<typeof Component>,
-  attribute: string,
-): string | null {
-  const property = component.getFirstProperty(`${METADATA_PREFIX}${attribute}`);
+/** Value of one published property, read straight from the component before the array is built. */
+function readPropertyValue(component: InstanceType<typeof Component>, name: string): string | null {
+  const property = component.getFirstProperty(name);
   return property === null ? null : readText(property.getFirstValue());
 }
 

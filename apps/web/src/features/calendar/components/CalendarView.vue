@@ -8,6 +8,7 @@ import { computed } from 'vue';
 import type { CalendarEvent, CalendarLayout, WeatherEntry } from '../../../types';
 import { actionTypeFor } from '../data/event-types';
 import { groupColorFor, type GroupColor } from '../utils/group-colors';
+import { groupIds } from '../utils/metadata';
 import EventList from './EventList.vue';
 
 const props = defineProps<{
@@ -91,12 +92,10 @@ const presentationByEvent = computed(() => {
   const entries = new Map<string, CalendarPresentation>();
   for (const event of props.events) {
     const type = actionTypeFor(event.eventType);
-    const groupId = event.metadata
-      .find((entry) => entry.name === 'X-ACTIONPOP-GROUP')
-      ?.value.trim();
+    const groupId = groupIds(event)[0];
     const group =
       props.groupColors.find((candidate) => candidate.id === groupId)?.color ??
-      (groupId === undefined || groupId === '' ? null : groupColorFor(groupId));
+      (groupId === undefined ? undefined : groupColorFor(groupId));
     entries.set(calendarId(event), {
       emoji: type.emoji,
       color: group ?? {
@@ -133,27 +132,41 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function eventContent(payload: { event: { id: string; title: string }; timeText: string }): {
-  html: string;
-} {
+interface EventContentPayload {
+  event: { id: string; title: string };
+  timeText: string;
+}
+
+const isTimeGrid = computed(() => props.layout === 'jour' || props.layout === 'semaine');
+
+/**
+ * FullCalendar renders an HTML string rather than a component, so the group color travels as two
+ * custom properties and the chip styling itself stays in the stylesheet.
+ */
+function chipHtml(payload: EventContentPayload): string {
   const presentation = presentationByEvent.value.get(payload.event.id);
-  const emoji = presentation?.emoji ?? '';
   const color = presentation?.color.color ?? 'var(--ap-primary)';
-  const foreground = presentation?.color.foreground ?? '#FFFFFF';
+  const ink = presentation?.color.foreground ?? 'var(--ap-on-primary)';
   const label = escapeHtml(presentation?.label ?? 'Action');
+  const emoji = presentation?.emoji ?? '';
+  const chipClass = isTimeGrid.value ? 'ap-event-chip ap-event-chip-timegrid' : 'ap-event-chip';
+  const style = `--ap-chip-color:${color};--ap-chip-ink:${ink}`;
   const time =
     payload.timeText === ''
       ? ''
       : `<span class="ap-event-time">${escapeHtml(payload.timeText)}</span>`;
-  const timeGridClass =
-    props.layout === 'jour' || props.layout === 'semaine' ? ' ap-event-chip-timegrid' : '';
-  return {
-    html:
-      `<span class="ap-event-chip${timeGridClass}" style="background-color:${color};border-left-color:${color};color:${foreground}" title="${label}">` +
-          time +
-        `<span class="ap-event-name">${emoji} ${escapeHtml(payload.event.title)}</span>` +
-      `</span>`,
-  };
+  const name = `<span class="ap-event-name">${emoji} ${escapeHtml(payload.event.title)}</span>`;
+
+  return [
+    `<span class="${chipClass}" style="${style}" title="${label}">`,
+    time,
+    name,
+    '</span>',
+  ].join('');
+}
+
+function eventContent(payload: EventContentPayload): { html: string } {
+  return { html: chipHtml(payload) };
 }
 
 function onEventClick(payload: { event: { id: string } }): void {

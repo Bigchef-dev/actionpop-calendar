@@ -9,9 +9,8 @@ const type = computed(() => actionTypeFor(props.slug));
 
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-full font-semibold"
+    class="ap-chip-muted inline-flex items-center gap-1.5 rounded-full font-semibold"
     :class="size === 'md' ? 'px-3 py-1 text-sm' : 'px-2 py-0.5 text-xs'"
-    :style="{ backgroundColor: 'var(--ap-surface-muted)', color: 'var(--ap-ink)' }"
   >
     <span aria-hidden="true">{{ type.emoji }}</span>
     <span>{{ type.label }}</span>

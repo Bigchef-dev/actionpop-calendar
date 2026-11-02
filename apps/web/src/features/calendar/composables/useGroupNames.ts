@@ -2,21 +2,7 @@ import { ref, watch, type Ref } from 'vue';
 
 import { searchSubjects } from '../../../shared/api/client';
 import type { CalendarEvent } from '../../../types';
-
-export const GROUP_METADATA = 'X-ACTIONPOP-GROUP';
-
-/** Identifiers of the action groups published with the events, in first-seen order. */
-export function groupIdsOf(events: readonly CalendarEvent[]): string[] {
-  const ids: string[] = [];
-  for (const event of events) {
-    for (const entry of event.metadata) {
-      if (entry.name !== GROUP_METADATA) continue;
-      const id = entry.value.trim();
-      if (id !== '' && !ids.includes(id)) ids.push(id);
-    }
-  }
-  return ids;
-}
+import { groupIdsOf } from '../utils/metadata';
 
 export interface GroupNamesHandle {
   readonly names: Ref<Record<string, string>>;

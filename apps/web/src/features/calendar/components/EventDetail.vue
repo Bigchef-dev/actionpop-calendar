@@ -7,6 +7,7 @@ import EventDetailActions from './EventDetailActions.vue';
 import EventDetailGroup from './EventDetailGroup.vue';
 import EventDetailHeader from './EventDetailHeader.vue';
 import EventDetailPlace from './EventDetailPlace.vue';
+import MetadataSection from './MetadataSection.vue';
 import DetailVariantA from './proposals/DetailVariantA.vue';
 import DetailVariantB from './proposals/DetailVariantB.vue';
 
@@ -69,6 +70,7 @@ const variant = computed(() => {
           {{ event.description }}
         </p>
         <EventDetailGroup :event="event" :group-names="groupNames" />
+        <MetadataSection :entries="event.metadata" />
         <EventDetailActions :event="event" />
       </component>
     </div>

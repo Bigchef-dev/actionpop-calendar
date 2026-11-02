@@ -29,25 +29,3 @@ export function filterByType(
   const selected = new Set(types);
   return events.filter((event) => event.eventType !== null && selected.has(event.eventType));
 }
-
-/** Human period of the displayed events: one day reads as a single date. */
-export function formatPeriod(period: { from: Date; to: Date } | null): string {
-  if (period === null) return '';
-  const day = (date: Date): string =>
-    date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-  const from = day(period.from);
-  const to = day(period.to);
-  return from === to ? `Le ${from}` : `Du ${from} au ${to}`;
-}
-
-/** First and last start of the displayed events, used to state the covered period. */
-export function feedPeriod(events: readonly CalendarEvent[]): { from: Date; to: Date } | null {
-  if (events.length === 0) return null;
-  let from = events[0]!.start;
-  let to = events[0]!.start;
-  for (const event of events) {
-    if (event.start < from) from = event.start;
-    if (event.start > to) to = event.start;
-  }
-  return { from, to };
-}

@@ -2,8 +2,27 @@
  * Campaign tokens derived from docs/design.md.
  * Light and dark sets both meet WCAG 2.1 AA (FR-030).
  */
-:root {
 
+/*
+ * Publish the campaign variables as Tailwind utilities (`bg-ap-surface-muted`,
+ * `border-ap-border`, `text-ap-ink`, `bg-ap-yellow`, …). Templates then reach the palette
+ * through a class instead of an inline `:style="{ borderColor: 'var(--ap-border)' }"`.
+ * The theme entries stay references, so the dark-mode overrides declared below apply unchanged.
+ */
+@theme {
+  --color-ap-primary: var(--ap-primary);
+  --color-ap-secondary: var(--ap-secondary);
+  --color-ap-paper: var(--ap-paper);
+  --color-ap-ink: var(--ap-ink);
+  --color-ap-surface: var(--ap-surface);
+  --color-ap-surface-muted: var(--ap-surface-muted);
+  --color-ap-border: var(--ap-border);
+  --color-ap-yellow: var(--ap-yellow);
+  --color-ap-yellow-ink: var(--ap-yellow-ink);
+  --color-ap-on-primary: var(--ap-on-primary);
+}
+
+:root {
   --ap-primary: #c9309c;
   --ap-secondary: #4c0297;
   --ap-paper: #fffcf4;
@@ -80,6 +99,22 @@
   min-height: 44px;
 }
 
+/* Yellow call to action: the single door to the action on Action Populaire. */
+.ap-cta-yellow {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  background-color: var(--ap-yellow);
+  color: var(--ap-yellow-ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* Horizontal rail: keeps a long filter row on one line without a visible scrollbar. */
 .ap-scroll-x {
   scrollbar-width: none;
@@ -88,6 +123,134 @@
 
 .ap-scroll-x::-webkit-scrollbar {
   display: none;
+}
+
+/* Small uppercase label introducing a group of controls or a section. */
+.ap-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+/* Chip standing for a neutral fact: type of action, tentative status. */
+.ap-chip-muted {
+  background-color: var(--ap-surface-muted);
+  color: var(--ap-ink);
+}
+
+/* Chip standing for a warning that must attract the eye: a cancelled action. */
+.ap-chip-alert {
+  background-color: var(--ap-secondary);
+  color: var(--ap-on-primary);
+}
+
+/*
+ * Filter pill. The pressed state is carried by `aria-pressed` rather than by a computed style,
+ * so the accessible state and the visual state cannot drift apart.
+ * `--ap-pill-color` / `--ap-pill-ink` are set inline when the pill stands for a group.
+ * Everything the templates must be able to override (display, max width, truncation, font
+ * weight) is deliberately left out: these rules are unlayered and would win over Tailwind.
+ */
+.ap-pill {
+  border-radius: 9999px;
+  border: 1px solid var(--ap-border);
+  background-color: transparent;
+  color: var(--ap-ink);
+  padding: 0.25rem 0.625rem;
+  font-size: 11px;
+}
+
+.ap-pill[aria-pressed='true'] {
+  border-color: var(--ap-pill-color, var(--ap-primary));
+  background-color: color-mix(
+    in srgb,
+    var(--ap-pill-color, var(--ap-primary)) 18%,
+    var(--ap-surface)
+  );
+}
+
+/* "All" pill of a rail: selected means the neutral choice, shown as an inverted chip. */
+.ap-pill--ink {
+  border-width: 0;
+}
+
+.ap-pill--ink[aria-pressed='true'] {
+  background-color: var(--ap-ink);
+  color: var(--ap-surface);
+}
+
+/* Group pill: the group color tints the idle state and fills the selected one. */
+.ap-pill--group {
+  border-color: var(--ap-pill-color, var(--ap-primary));
+  background-color: color-mix(
+    in srgb,
+    var(--ap-pill-color, var(--ap-primary)) 18%,
+    var(--ap-surface)
+  );
+}
+
+.ap-pill--group[aria-pressed='true'] {
+  border-color: var(--ap-pill-color, var(--ap-primary));
+  background-color: var(--ap-pill-color, var(--ap-primary));
+  color: var(--ap-pill-ink, var(--ap-ink));
+}
+
+/* Marker keeping the group color even when the pill itself switches to its foreground color. */
+.ap-group-marker {
+  color: var(--ap-pill-color, inherit);
+}
+
+/* Segmented control: one option per layout, the pressed one reads as a raised tab. */
+.ap-segmented {
+  display: inline-flex;
+  gap: 0.125rem;
+  border-radius: 0.75rem;
+  padding: 0.125rem;
+  background-color: var(--ap-surface-muted);
+}
+
+.ap-segmented-item {
+  border-radius: 10px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--ap-ink);
+}
+
+.ap-segmented-item[aria-pressed='true'] {
+  background-color: var(--ap-surface);
+  color: var(--ap-primary);
+  box-shadow: 0 1px 2px var(--ap-shadow);
+}
+
+/* Arrow revealing that a horizontal rail can scroll; the shadow hints the hidden side. */
+.ap-scroll-arrow {
+  position: absolute;
+  top: 0.125rem;
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid var(--ap-border);
+  background-color: var(--ap-surface);
+  color: var(--ap-ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.ap-scroll-arrow--start {
+  left: 0;
+  box-shadow: 8px 0 10px var(--ap-surface);
+}
+
+.ap-scroll-arrow--end {
+  right: 0;
+  box-shadow: -8px 0 10px var(--ap-surface);
 }
 
 .ap-button:focus-visible,

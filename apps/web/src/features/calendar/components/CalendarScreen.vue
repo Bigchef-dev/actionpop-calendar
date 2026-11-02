@@ -14,8 +14,9 @@ import SubscriptionPanel from '../../subscription/components/SubscriptionPanel.v
 import { buildCalendarLink } from '../../subscription/utils/calendar-link-builder';
 import { ACTION_TYPES } from '../data/event-types';
 import { useCalendarFeed } from '../composables/useCalendarFeed';
-import { GROUP_METADATA, useGroupNames } from '../composables/useGroupNames';
+import { useGroupNames } from '../composables/useGroupNames';
 import { useWeather } from '../composables/useWeather';
+import { groupCountsOf, groupIdsOf, hasAnyGroup } from '../utils/metadata';
 import { availableTypes, filterByType } from '../utils/type-filter';
 import { groupColorFor, groupColorsFor } from '../utils/group-colors';
 import CalendarView from './CalendarView.vue';
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 }>();
 
 const KNOWN_TYPES = ACTION_TYPES.map((type) => type.slug);
+const LAYOUTS = ['liste', 'jour', 'semaine', 'mois'] as const;
 const defaultLayout: CalendarLayout =
   typeof window === 'undefined' ? 'liste' : defaultLayoutFor(window.innerWidth);
 
@@ -47,31 +49,43 @@ const state = computed(() =>
 const available = computed(() => availableTypes(events.value));
 const shown = computed(() => filterByType(events.value, state.value.types));
 const { names: groupNames } = useGroupNames(events);
-const groupIds = computed(() => {
-  const ids: string[] = [];
-  for (const event of events.value) {
-    for (const entry of event.metadata) {
-      const id = entry.name === GROUP_METADATA ? entry.value.trim() : '';
-      if (id !== '' && !ids.includes(id)) ids.push(id);
-    }
-  }
-  return ids;
-});
+const groupIds = computed(() => groupIdsOf(events.value));
 const groupColors = computed(() => groupColorsFor(groupIds.value));
 const hasEpciSubject = computed(() => props.subjects.some((subject) => subject.kind === 'epci'));
+
+/** Wording of the unavailable state: an intermunicipality can be re-resolved, a city cannot. */
+const errorNotice = computed(() =>
+  hasEpciSubject.value
+    ? {
+        title: 'Territoire indisponible',
+        message:
+          'Les données de rattachement de cette intercommunalité sont indisponibles ou ont changé. Revenez à la recherche puis réessayez.',
+      }
+    : {
+        title: 'Calendrier indisponible',
+        message: 'Les actions de ce sujet n’ont pas pu être chargées. Réessayez dans un instant.',
+      },
+);
+
+/** Wording of the empty state: an empty feed invites a subscription, a filtered one a reset. */
+const emptyNotice = computed(() =>
+  feedStatus.value === 'empty'
+    ? {
+        title: 'Aucune action prévue pour le moment',
+        message:
+          'Rien n’est programmé sur la période publiée. Abonnez-vous : les prochaines actions arriveront automatiquement.',
+        primaryLabel: 'Voir mon lien de calendrier',
+      }
+    : {
+        title: 'Aucune action avec ces filtres',
+        message: 'Retirez un filtre pour retrouver les autres actions de ce sujet.',
+        primaryLabel: 'Tout afficher',
+      },
+);
+
 const groups = computed<AvailableGroup[]>(() => {
   if (props.subjects.some((subject) => subject.kind === 'group')) return [];
-  const counts = new Map<string, number>();
-  for (const event of events.value) {
-    const seen = new Set<string>();
-    for (const entry of event.metadata) {
-      const id = entry.value.trim();
-      if (entry.name !== GROUP_METADATA || id === '' || seen.has(id)) continue;
-      seen.add(id);
-      counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()]
+  return [...groupCountsOf(events.value).entries()]
     .map(([id, count]) => ({
       id,
       label: groupNames.value[id] ?? 'Groupe sans nom',
@@ -87,11 +101,7 @@ const activeGroups = computed(() => {
 });
 const shownWithGroup = computed(() => {
   if (activeGroups.value.length === 0) return shown.value;
-  return shown.value.filter((event) =>
-    event.metadata.some(
-      (entry) => entry.name === GROUP_METADATA && activeGroups.value.includes(entry.value.trim()),
-    ),
-  );
+  return shown.value.filter((event) => hasAnyGroup(event, activeGroups.value));
 });
 const selected = computed(
   () => shownWithGroup.value.find((event) => event.id === state.value.eventId) ?? null,
@@ -164,7 +174,7 @@ function open(target: CalendarEvent): void {
         class="ap-surface flex flex-col gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
       >
         <div class="min-w-0">
-          <p class="text-[11px] font-bold uppercase tracking-widest opacity-60">Calendrier de</p>
+          <p class="ap-eyebrow">Calendrier de</p>
           <h1 class="truncate text-lg font-bold leading-tight">{{ subject.label }}</h1>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -176,8 +186,7 @@ function open(target: CalendarEvent): void {
           <span v-else class="text-xs opacity-60">Lien indisponible</span>
           <button
             type="button"
-            class="ap-focusable rounded-xl border px-3 py-2 text-xs font-semibold"
-            :style="{ borderColor: 'var(--ap-border)' }"
+            class="ap-focusable rounded-xl border border-ap-border px-3 py-2 text-xs font-semibold"
             @click="emit('remove-subject', subject)"
           >
             Enlever
@@ -186,8 +195,7 @@ function open(target: CalendarEvent): void {
       </div>
       <button
         type="button"
-        class="ap-focusable self-start rounded-xl border px-3 py-2 text-xs font-semibold"
-        :style="{ borderColor: 'var(--ap-border)' }"
+        class="ap-focusable self-start rounded-xl border border-ap-border px-3 py-2 text-xs font-semibold"
         @click="emit('add-subject')"
       >
         + Ajouter
@@ -208,13 +216,9 @@ function open(target: CalendarEvent): void {
     <StateMessage
       v-else-if="feedStatus === 'error'"
       class="mt-4"
-      :title="hasEpciSubject ? 'Territoire indisponible' : 'Calendrier indisponible'"
-      :message="
-        hasEpciSubject
-          ? 'Les données de rattachement de cette intercommunalité sont indisponibles ou ont changé. Revenez à la recherche puis réessayez.'
-          : 'Les actions de ce sujet n’ont pas pu être chargées. Réessayez dans un instant.'
-      "
-      :primary-label="hasEpciSubject ? 'Réessayer' : 'Réessayer'"
+      :title="errorNotice.title"
+      :message="errorNotice.message"
+      primary-label="Réessayer"
       @primary="retryFeed()"
     />
 
@@ -240,27 +244,13 @@ function open(target: CalendarEvent): void {
         />
       </div>
 
-      <div
-        class="mt-3 inline-flex gap-0.5 rounded-xl p-0.5"
-        role="group"
-        aria-label="Affichage"
-        :style="{ backgroundColor: 'var(--ap-surface-muted)' }"
-      >
+      <div class="ap-segmented mt-3" role="group" aria-label="Affichage">
         <button
-          v-for="layout in ['liste', 'jour', 'semaine', 'mois'] as const"
+          v-for="layout in LAYOUTS"
           :key="layout"
           type="button"
-          class="ap-focusable rounded-[10px] px-3 py-1.5 text-xs font-semibold capitalize"
+          class="ap-segmented-item ap-focusable"
           :aria-pressed="state.layout === layout"
-          :style="
-            state.layout === layout
-              ? {
-                  backgroundColor: 'var(--ap-surface)',
-                  color: 'var(--ap-primary)',
-                  boxShadow: '0 1px 2px var(--ap-shadow)',
-                }
-              : { color: 'var(--ap-ink)' }
-          "
           @click="write({ layout })"
         >
           {{ layout }}
@@ -270,17 +260,9 @@ function open(target: CalendarEvent): void {
       <StateMessage
         v-if="feedStatus === 'empty' || shownWithGroup.length === 0"
         class="mt-4"
-        :title="
-          feedStatus === 'empty'
-            ? 'Aucune action prévue pour le moment'
-            : 'Aucune action avec ces filtres'
-        "
-        :message="
-          feedStatus === 'empty'
-            ? 'Rien n’est programmé sur la période publiée. Abonnez-vous : les prochaines actions arriveront automatiquement.'
-            : 'Retirez un filtre pour retrouver les autres actions de ce sujet.'
-        "
-        :primary-label="feedStatus === 'empty' ? 'Voir mon lien de calendrier' : 'Tout afficher'"
+        :title="emptyNotice.title"
+        :message="emptyNotice.message"
+        :primary-label="emptyNotice.primaryLabel"
         @primary="write({ types: [], group: [] })"
       />
 
