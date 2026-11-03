@@ -11,6 +11,17 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      # One image failing must not hide the state of the other two.
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: infra/docker/Dockerfile.api
+          - name: worker
+            dockerfile: infra/docker/Dockerfile.worker
+          - name: web
+            dockerfile: infra/docker/Dockerfile.web
     steps:
       - uses: actions/checkout@v7
       - uses: docker/login-action@v4
@@ -22,15 +33,14 @@ jobs:
         id: image
         shell: bash
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v7
+      # `latest` follows main so a host can pull without pinning a commit, while the immutable
+      # `<sha>` tag keeps every build addressable for a rollback.
+      - name: Build and push actionpop-${{ matrix.name }}
+        uses: docker/build-push-action@v7
         with:
           context: .
-          file: infra/docker/Dockerfile.api
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/${{ steps.image.outputs.owner }}/actionpop-api:${{ github.sha }}
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: infra/docker/Dockerfile.worker
-          push: true
-          tags: ghcr.io/${{ steps.image.outputs.owner }}/actionpop-worker:${{ github.sha }}
+          tags: |
+            ghcr.io/${{ steps.image.outputs.owner }}/actionpop-${{ matrix.name }}:${{ github.sha }}
+            ghcr.io/${{ steps.image.outputs.owner }}/actionpop-${{ matrix.name }}:latest

@@ -34,6 +34,21 @@ local-only port override. Production traffic goes through the HTTPS edge.
 Set `API_IMAGE` and `WORKER_IMAGE` when the services should use registry images
 instead of the local default tags.
 
+`.github/workflows/publish-images.yml` publishes the three runtime images on every push to
+`main`, each build under its commit SHA and under `latest`. A host can pull what it validated
+and keep a reproducible tag:
+
+```bash
+API_IMAGE=ghcr.io/bigchef-dev/actionpop-api:<sha> \
+WEB_IMAGE=ghcr.io/bigchef-dev/actionpop-web:<sha> \
+WORKER_IMAGE=ghcr.io/bigchef-dev/actionpop-worker:<sha> \
+docker compose -f infra/compose/docker-compose.yml pull
+```
+
+From a checkout that also holds the sources, those services declare a `build:` section, so a
+plain `pull` tries to fetch them too and a tag that was never published fails the command. Add
+`--ignore-buildable` to fetch only the third-party images and build the rest.
+
 Build the independent runtime targets from the repository root:
 
 ```bash
