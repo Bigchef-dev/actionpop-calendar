@@ -348,3 +348,29 @@ Worker operations use a 15-minute dispatcher period by default. Retry limits and
 backoff are configured with `QUEUE_ATTEMPTS` and `QUEUE_BACKOFF_MS`; inspect queue
 depth, exhausted jobs, upstream failures, and Redis readiness through the monitoring
 configuration under `infra/monitoring/`.
+
+### Observability and security before publication
+
+The application publishes its own metrics on two private ports and never on the internet:
+`api:3000/internal/metrics` and `worker:8081/metrics`. Both are reachable only over the `monitoring`
+Docker network, which the Prometheus and Grafana already running on the server join. The edge
+never routes `/internal/*`, and the API reference (`/reference`, `/openapi.json`) is closed unless
+`API_REFERENCE=true` is set explicitly.
+
+What is measured, with the exact label sets and bucket boundaries, is specified once in
+[`specs/009-release-hardening-observability/contracts/metrics-exposition.md`](specs/009-release-hardening-observability/contracts/metrics-exposition.md).
+Three rules hold everywhere:
+
+- a label value is always one of a closed enumeration; anything else becomes `other`, `none` or
+  `indeterminate` rather than a new series;
+- no query string, search term, visitor-derived territory identifier or client address is ever
+  recorded in a metric or a log line;
+- the client request-volume band lives in process memory only and is re-keyed every day, so it
+  distinguishes abusive traffic without identifying anyone.
+
+Install the dashboards and alerts by following
+[`infra/monitoring/README.md`](infra/monitoring/README.md). The security review has a register at
+[`docs/security/findings.md`](docs/security/findings.md) and a repeatable procedure at
+[`docs/security/pre-publication-checklist.md`](docs/security/pre-publication-checklist.md). An
+automated baseline scan runs on every pull request touching the application or `infra/`, and fails
+the build on a high-severity finding.

@@ -123,7 +123,7 @@ export async function processCalendarIngestion(
     );
     deps.metrics.setGauge(
       'actionpop_ingestion_last_success_timestamp',
-      {},
+      { source: 'calendar' },
       Math.floor(Date.now() / 1000),
     );
     deps.logger.info('ingestion completed', {

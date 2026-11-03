@@ -12,6 +12,7 @@ import {
   loadEnvFile,
   PostgresCalendarDatasetRepository,
   PostgresCycleMetrics,
+  PostgresEventCoverage,
   PostgresEventTypeRepository,
   PostgresGeographicReferenceRepository,
   PostgresGeographicReferenceWriter,
@@ -213,6 +214,9 @@ export function createWorkerRuntime(
         registry,
         eventScopes: { countEventScopes: () => countEventScopes(postgres) },
         mapObservations: { countObservations: () => countObservations(postgres) },
+        coverage: {
+          countUnattributed: () => new PostgresEventCoverage(postgres).countUnattributed(),
+        },
         cycleMetrics,
         metrics: observability.metrics,
         logger: observability.logger,
@@ -323,6 +327,14 @@ export function createWorkerRuntime(
             (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0),
           );
           observability.metrics.setGauge('actionpop_redis_ready', {}, (await readiness()) ? 1 : 0);
+          observability.metrics.setGauge(
+            'actionpop_build_info',
+            {
+              deployment: config.observability.deployment,
+              version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
+            },
+            1,
+          );
           response.statusCode = 200;
           response.setHeader('content-type', 'text/plain; version=0.0.4');
           response.end(observability.metrics.prometheus());

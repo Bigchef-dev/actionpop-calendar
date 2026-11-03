@@ -99,7 +99,14 @@ export async function startApi(): Promise<void> {
       disabledFamilies: config.calendar.disabledFamilies,
       maxGroupsPerEvent: config.calendar.maxGroupsPerEvent,
     },
-    apiReference: process.env.API_REFERENCE !== 'false',
+    // Off unless explicitly enabled: an exploratory console and a raw schema have no reason to
+    // be reachable from the internet on a service that only serves a calendar.
+    apiReference: process.env.API_REFERENCE === 'true',
+    volumeBandSalt: config.observability.bandSalt,
+    buildInfo: {
+      deployment: config.observability.deployment,
+      version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
+    },
     health: {
       redis: async () => {
         await redis.ping();

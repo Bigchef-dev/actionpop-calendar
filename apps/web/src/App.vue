@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import CalendarScreen from './features/calendar/components/CalendarScreen.vue';
+import { useJourneyEmission } from './features/calendar/composables/useJourneyEmission';
 import SearchHero from './features/discovery/components/SearchHero.vue';
 import { resolveSubject } from './shared/api/client';
 import AppShell from './shared/components/AppShell.vue';
@@ -16,6 +17,7 @@ import type { SearchSubject } from './types';
 
 type Resolution = 'idle' | 'loading' | 'ready' | 'unknown' | 'error';
 
+const journey = useJourneyEmission();
 const route = useRoute();
 const defaultLayout = typeof window === 'undefined' ? 'liste' : defaultLayoutFor(window.innerWidth);
 
@@ -65,6 +67,10 @@ function select(target: SearchSubject): void {
   adding.value = false;
   subjects.value = [target];
   resolution.value = 'ready';
+  // Accepting a suggestion is also selecting a territory: the two are counted separately so a
+  // visit that arrives by address still registers as a territory selection.
+  journey.trackSuggestion(target);
+  journey.trackSelection([target]);
 }
 
 function handleSubjectSelect(target: SearchSubject): void {
@@ -87,6 +93,7 @@ function addSubject(target: SearchSubject): void {
     return;
   }
   subjects.value = [...subjects.value, target];
+  journey.trackSelection([target]);
   route.write(
     serializeRoute(
       {
@@ -146,7 +153,11 @@ function retryResolution(): void {
       {{ notice }}
     </p>
 
-    <SearchHero v-if="subjects.length === 0 || adding" @select="handleSubjectSelect" />
+    <SearchHero
+      v-if="subjects.length === 0 || adding"
+      @select="handleSubjectSelect"
+      @searched="journey.track($event === 'empty' ? 'search_empty' : 'search')"
+    />
 
     <div
       v-else-if="resolution === 'loading'"

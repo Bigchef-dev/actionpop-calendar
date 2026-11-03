@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { API_BASE_URL, REVIEW_PROPOSALS } from '../../../config';
+import { absoluteApiUrl, REVIEW_PROPOSALS } from '../../../config';
 import type { SearchSubject } from '../../../types';
 import { useRecentSubject } from '../composables/useRecentSubject';
 import { useSearchSuggestions } from '../composables/useSearchSuggestions';
@@ -12,13 +12,18 @@ import DiscoveryVariantC from './proposals/DiscoveryVariantC.vue';
 import SearchField from './SearchField.vue';
 import StateMessage from '../../../shared/components/StateMessage.vue';
 
-const emit = defineEmits<{ (event: 'select', subject: SearchSubject): void }>();
+const emit = defineEmits<{
+  (event: 'select', subject: SearchSubject): void;
+  (event: 'searched', outcome: 'fruitful' | 'empty'): void;
+}>();
 
 const EXAMPLES = ['Lyon', '69', 'GA Strasbourg SUD', 'Marseille', 'Groupe local Rennes', '31'];
 const PROPOSALS = { a: DiscoveryVariantA, b: DiscoveryVariantB, c: DiscoveryVariantC } as const;
 
 const query = ref('');
-const { answer, status, retry } = useSearchSuggestions(query);
+const { answer, status, retry } = useSearchSuggestions(query, {
+  onSettled: (outcome) => emit('searched', outcome),
+});
 const { recent } = useRecentSubject();
 
 const proposal = computed(() => {
@@ -27,7 +32,7 @@ const proposal = computed(() => {
   return flag === 'b' ? PROPOSALS.b : flag === 'c' ? PROPOSALS.c : PROPOSALS.a;
 });
 
-const fullFeedUrl = `${API_BASE_URL}/calendar.ics`;
+const fullFeedUrl = absoluteApiUrl('/calendar.ics');
 
 const groups = computed(() => (answer.value === null ? [] : shapeSuggestions(answer.value)));
 function pick(subject: SearchSubject): void {

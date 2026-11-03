@@ -72,3 +72,15 @@ ingestion:
   mapFreshnessHorizonMs: 3600000
   # INGESTION_MAP_RECONCILIATION_INTERVAL_MS — re-read an unchanged resolved event after this delay (>= 1)
   mapReconciliationIntervalMs: 604800000
+
+observability:
+  # OBSERVABILITY_DEPLOYMENT — short instance identifier used as the `deployment` metric label
+  #   (a-z0-9_- , max 32 characters). Anything else is normalized to `unknown`, so a stray
+  #   hostname can never explode the metric cardinality. Defaults to the sanitized hostname.
+  deployment: production
+  # TELEMETRY_ENABLED — allow the published site to report journey steps (boolean)
+  #   Turned off, the calendar keeps working and the journey counters simply stop moving.
+  telemetryEnabled: true
+  # OBSERVABILITY_BAND_SALT is deliberately absent: it is an environment-only secret used to
+  # re-key the in-memory client volume band every day.
+

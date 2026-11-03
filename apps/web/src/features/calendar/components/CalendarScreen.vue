@@ -14,6 +14,7 @@ import SubscriptionPanel from '../../subscription/components/SubscriptionPanel.v
 import { buildCalendarLink } from '../../subscription/utils/calendar-link-builder';
 import { ACTION_TYPES } from '../data/event-types';
 import { useCalendarFeed } from '../composables/useCalendarFeed';
+import { journey } from '../../../shared/telemetry/reporter';
 import { useGroupNames } from '../composables/useGroupNames';
 import { useWeather } from '../composables/useWeather';
 import { groupCountsOf, groupIdsOf, hasAnyGroup } from '../utils/metadata';
@@ -40,7 +41,12 @@ const {
   events,
   status: feedStatus,
   retry: retryFeed,
-} = useCalendarFeed(computed(() => props.subjects));
+} = useCalendarFeed(computed(() => props.subjects), {
+  // A calendar with at least one event is the point where the visitor got something usable.
+  onDisplayed: (eventCount) => {
+    if (eventCount > 0) journey.track('calendar_shown', subjectKindOf(props.subjects[0]?.kind));
+  },
+});
 const weather = useWeather();
 
 const state = computed(() =>
@@ -146,7 +152,14 @@ function write(patch: {
   );
 }
 
+function subjectKindOf(kind: string | undefined): 'commune' | 'department' | 'group' | 'epci' | 'none' {
+  return kind === 'commune' || kind === 'department' || kind === 'group' || kind === 'epci'
+    ? kind
+    : 'none';
+}
+
 function toggleType(slug: string): void {
+  journey.track('type_filter', subjectKindOf(props.subjects[0]?.kind));
   const availableSlugs = available.value.map((type) => type.slug);
   const selected = state.value.types.length === 0 ? availableSlugs : state.value.types;
   const next = selected.includes(slug)
@@ -160,7 +173,13 @@ function toggleType(slug: string): void {
   });
 }
 
+function selectGroup(group: readonly string[]): void {
+  if (group.length > 0) journey.track('group_filter', subjectKindOf(props.subjects[0]?.kind));
+  write({ group });
+}
+
 function open(target: CalendarEvent): void {
+  journey.track('detail_opened', subjectKindOf(props.subjects[0]?.kind));
   write({ eventId: target.id });
 }
 </script>
@@ -231,7 +250,7 @@ function open(target: CalendarEvent): void {
           v-if="groups.length > 0"
           :available="groups"
           :selected="activeGroups"
-          @select="write({ group: $event })"
+          @select="selectGroup($event)"
         />
         <FilterBar
           v-if="available.length > 1"

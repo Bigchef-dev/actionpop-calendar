@@ -1,0 +1,15 @@
+# Mounts the two dashboards from disk. `foldersFromFilesStructure: false` keeps them in one folder
+# so an operator finds them together.
+apiVersion: 1
+
+providers:
+  - name: actionpop
+    orgId: 1
+    folder: ActionPop
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/actionpop-dashboards
+      foldersFromFilesStructure: false

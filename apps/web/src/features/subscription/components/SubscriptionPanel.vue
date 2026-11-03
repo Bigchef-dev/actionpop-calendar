@@ -4,6 +4,10 @@ import { computed } from 'vue';
 import CopyButton from '../../../shared/components/CopyButton.vue';
 import type { SearchSubject } from '../../../types';
 import { buildCalendarLink } from '../utils/calendar-link-builder';
+import { journey } from '../../../shared/telemetry/reporter';
+import { JOURNEY_SUBJECT_KINDS } from '../../../shared/telemetry/journey';
+
+const KNOWN_KINDS = new Set<string>(JOURNEY_SUBJECT_KINDS);
 
 const props = defineProps<{
   subjects: readonly SearchSubject[];
@@ -14,6 +18,24 @@ const props = defineProps<{
 const link = computed(() =>
   buildCalendarLink(props.subjects, { types: props.types, groups: props.groups }),
 );
+
+/**
+ * Subscription intent, counted separately from the deliveries that follow: opening an agenda
+ * application and downloading a copy are different actions and must never be conflated.
+ */
+function kindOf(kind: string | undefined): (typeof JOURNEY_SUBJECT_KINDS)[number] {
+  return kind !== undefined && KNOWN_KINDS.has(kind)
+    ? (kind as (typeof JOURNEY_SUBJECT_KINDS)[number])
+    : 'none';
+}
+
+function trackSubscribe(): void {
+  journey.track('subscribe', kindOf(props.subjects[0]?.kind));
+}
+
+function trackExport(): void {
+  journey.track('export', kindOf(props.subjects[0]?.kind));
+}
 </script>
 
 <template>
@@ -39,6 +61,7 @@ const link = computed(() =>
         <a
           class="ap-button-secondary ap-focusable rounded-xl px-4 py-3 text-center text-sm"
           :href="link.webcalUrl"
+          @click="trackSubscribe"
         >
           Ouvrir dans mon application (iPhone / Mac)
         </a>
@@ -48,6 +71,7 @@ const link = computed(() =>
           :href="link.calendarServiceUrl"
           target="_blank"
           rel="noopener noreferrer"
+          @click="trackSubscribe"
         >
           Ajouter à Outlook
         </a>
@@ -56,6 +80,7 @@ const link = computed(() =>
           :style="{ borderColor: 'var(--ap-border)' }"
           :href="link.downloadUrl"
           download
+          @click="trackExport"
         >
           Télécharger une copie
         </a>

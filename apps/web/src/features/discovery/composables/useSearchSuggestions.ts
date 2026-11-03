@@ -14,8 +14,16 @@ export interface SearchSuggestionsHandle {
   readonly retry: () => void;
 }
 
+export interface SearchSuggestionOptions {
+  /** Called once per completed search, so the caller can count a fruitful or empty query. */
+  readonly onSettled?: (outcome: 'fruitful' | 'empty') => void;
+}
+
 /** Debounced, abortable suggestion search driven by the typed query. */
-export function useSearchSuggestions(query: Ref<string>): SearchSuggestionsHandle {
+export function useSearchSuggestions(
+  query: Ref<string>,
+  options: SearchSuggestionOptions = {},
+): SearchSuggestionsHandle {
   const answer = ref<SearchAnswer | null>(null);
   const status = ref<SuggestionStatus>('idle');
 
@@ -38,6 +46,7 @@ export function useSearchSuggestions(query: Ref<string>): SearchSuggestionsHandl
       .then((result) => {
         answer.value = result;
         status.value = result.subjects.length === 0 ? 'empty' : 'ready';
+        options.onSettled?.(result.subjects.length === 0 ? 'empty' : 'fruitful');
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;

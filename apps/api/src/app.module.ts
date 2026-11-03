@@ -12,11 +12,17 @@ import { CalendarIcsController } from './controllers/calendar-ics.controller.js'
 import { EventsController } from './controllers/events.controller.js';
 import { InternalController, SERVER_OPTIONS } from './internal/internal.controller.js';
 import { SearchController } from './controllers/search.controller.js';
+import { TelemetryController } from './observability/telemetry.controller.js';
 import type { ServerOptions } from './server.js';
 import { CalendarService } from './services/calendar.service.js';
 
 export function createAppModule(options: ServerOptions) {
-  const controllers: Type[] = [CalendarController, EventsController, InternalController];
+  const controllers: Type[] = [
+    CalendarController,
+    EventsController,
+    InternalController,
+    TelemetryController,
+  ];
   // The filtered calendar is registered only when its read path is wired, so a
   // deployment without a calendar query never exposes a route that cannot answer.
   if (options.calendarService !== undefined) controllers.push(CalendarIcsController);

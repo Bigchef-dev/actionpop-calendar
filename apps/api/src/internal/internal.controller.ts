@@ -3,6 +3,7 @@ import type { FastifyReply } from 'fastify';
 import { runHealthCheck, type HealthResult, MetricsRegistry } from '@actionpop/core';
 import type { ServerOptions } from '../server.js'; // À adapter
 import { SERVER_OPTIONS } from '../constants.js';
+import { buildInfo, buildInfoLabels } from '../observability/build-info.js';
 
 export { SERVER_OPTIONS };
 
@@ -32,6 +33,11 @@ export class InternalController {
     }
 
     metrics.setGauge('actionpop_redis_ready', {}, redisReady);
+    metrics.setGauge(
+      'actionpop_build_info',
+      buildInfoLabels(this.options.buildInfo ?? buildInfo()),
+      1,
+    );
 
     return reply.type('text/plain; version=0.0.4').send(Buffer.from(metrics.prometheus()));
   }

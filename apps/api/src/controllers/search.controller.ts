@@ -15,7 +15,8 @@ import {
   type SubjectSearchReader,
 } from '@actionpop/core';
 
-import { SUBJECT_SEARCH } from '../constants.js';
+import { SERVER_OPTIONS, SUBJECT_SEARCH } from '../constants.js';
+import type { ServerOptions } from '../server.js';
 
 const SEARCH_ANSWER_SCHEMA = {
   type: 'object',
@@ -56,7 +57,23 @@ const SEARCH_ANSWER_SCHEMA = {
 @ApiTags('search')
 @Controller('search')
 export class SearchController {
-  public constructor(@Inject(SUBJECT_SEARCH) private readonly reader: SubjectSearchReader) {}
+  public constructor(
+    @Inject(SUBJECT_SEARCH) private readonly reader: SubjectSearchReader,
+    @Inject(SERVER_OPTIONS) private readonly options: ServerOptions,
+  ) {}
+
+  /**
+   * Records the outcome and the requested family only: the query text is never recorded, because
+   * a search term is exactly the kind of value that would single out a visitor.
+   */
+  private observe(outcome: 'fruitful' | 'unfruitful' | 'rejected', kind: string): void {
+    this.options.metrics?.increment('actionpop_search_requests_total', { outcome, kind });
+  }
+
+  private kindOf(request: { kinds?: readonly string[] }): string {
+    const kinds = request.kinds ?? [];
+    return kinds.length === 1 ? (kinds[0] ?? 'other') : 'all';
+  }
 
   @Get('subjects')
   @Header('Cache-Control', 'public, max-age=300')
@@ -77,6 +94,7 @@ export class SearchController {
   public async search(@Query() query: Record<string, string | undefined>): Promise<SearchAnswer> {
     const parsed = parseSubjectSearchRequest(query);
     if (!parsed.ok) {
+      this.observe('rejected', 'other');
       throw new BadRequestException({
         error: 'invalid search request',
         diagnostics: parsed.diagnostics,
@@ -84,8 +102,11 @@ export class SearchController {
     }
 
     try {
-      return await searchSubjects(parsed.request, this.reader);
+      const answer = await searchSubjects(parsed.request, this.reader);
+      this.observe(answer.total === 0 ? 'unfruitful' : 'fruitful', this.kindOf(parsed.request));
+      return answer;
     } catch {
+      this.observe('rejected', 'other');
       throw new ServiceUnavailableException({ error: 'search unavailable' });
     }
   }

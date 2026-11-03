@@ -1,0 +1,77 @@
+groups:
+  - name: actionpop-launch
+    rules:
+      # Health: a missing series is an alert, never a silent zero.
+      - alert: ActionPopUnreachable
+        expr: up{job="actionpop"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ActionPop target {{ $labels.instance }} is down"
+          description: 'Prometheus cannot scrape {{ $labels.service }}. Usage data is not being collected.'
+
+      - alert: ActionPopMetricsMissing
+        expr: absent(actionpop_http_requests_total)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'No ActionPop metric is exposed'
+          description: 'The exposition endpoint answered but no request family is present.'
+
+      - alert: ActionPopDependencyDown
+        expr: actionpop_redis_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'ActionPop dependency unavailable'
+          description: 'The application reports its Redis dependency as not ready.'
+
+      # Ingestion: the calendar is only as fresh as the last successful run, per source.
+      - alert: ActionPopIngestionStale
+        expr: time() - actionpop_ingestion_last_success_timestamp > 3600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Ingestion stale for source {{ $labels.source }}'
+          description: 'No successful ingestion for more than an hour; subscribers see an ageing calendar.'
+
+      # Traffic: abuse is measured, not blocked, so a burst is a decision point.
+      - alert: ActionPopRejectedBurst
+        expr: sum(rate(actionpop_http_failures_total{failure_kind="client_rejected"}[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Burst of rejected requests'
+          description: 'More than 5 rejected requests per second for ten minutes: a scanner, a broken client, or a bad link.'
+
+      - alert: ActionPopCalendarUnavailable
+        expr: sum(rate(actionpop_calendar_requests_total{delivery="unavailable"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Calendar scope unavailable'
+          description: 'Subscribers are receiving an error instead of a calendar.'
+
+      - alert: ActionPopQueueGrowing
+        expr: actionpop_queue_depth > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Ingestion queue is growing'
+          description: 'The queue has exceeded 100 pending jobs for fifteen minutes.'
+
+      - alert: ActionPopTruncation
+        expr: increase(actionpop_calendar_truncated_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Calendar cut by a ceiling'
+          description: 'A calendar was truncated; subscribers do not see every matching event.'

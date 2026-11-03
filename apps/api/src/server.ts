@@ -16,6 +16,12 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { createAppModule } from './app.module.js';
 import type { CalendarIcsSettings } from './controllers/calendar-ics.controller.js';
 import type { GeographicQueryResult } from './controllers/events.controller.js';
+import type { BuildInfo } from './observability/build-info.js';
+import { ClientVolumeBand } from './observability/client-volume-band.js';
+import {
+  registerRequestHook,
+  type PublishedRequestObserver,
+} from './observability/request-hook.js';
 
 export interface DatasetReader {
   getCurrent(scopeId: string): Promise<CalendarDataset | null>;
@@ -38,6 +44,23 @@ export interface ServerOptions {
   upstream?: (...args: unknown[]) => unknown;
   metrics?: MetricsRegistry;
   logger?: Logger;
+  /** Extra request observers, such as the in-memory client volume band. */
+  requestHook?: PublishedRequestObserver;
+  /** Instance identity reported through `actionpop_build_info`. */
+  buildInfo?: BuildInfo;
+  /** Secret re-keying the daily request-volume band; absent disables the band entirely. */
+  volumeBandSalt?: string;
+}
+
+/**
+ * The client-derived value the band hashes. It never leaves the module: only the resulting band
+ * is recorded, and the salt rotates daily so yesterday's value cannot be recomputed.
+ */
+function clientValue(request: { ip?: string; headers: Record<string, unknown> }): string {
+  const forwarded = request.headers['x-forwarded-for'];
+  const address = typeof forwarded === 'string' ? (forwarded.split(',')[0] ?? '').trim() : '';
+  const signature = request.headers['user-agent'];
+  return `${address === '' ? (request.ip ?? 'unknown') : address}|${typeof signature === 'string' ? signature : ''}`;
 }
 
 export async function buildApp(options: ServerOptions): Promise<NestFastifyApplication> {
@@ -66,64 +89,41 @@ export async function buildApp(options: ServerOptions): Promise<NestFastifyAppli
     credentials: false,
   });
 
-  const requestStarts = new Map<string, number>();
-
-  // 2. Hooks de monitoring Fastify (Attachés à l'instance sous-jacente)
-  fastifyInstance.addHook('onRequest', async (request) => {
-    requestStarts.set(request.id, Date.now());
+  // 2. Hooks de monitoring Fastify, isolés du montage pour rester sous le plafond de 150 lignes.
+  registerRequestHook(fastifyInstance, {
+    metrics,
+    logger,
+    ...options.requestHook,
+    ...(options.volumeBandSalt === undefined
+      ? {}
+      : {
+          volumeBand: {
+            band: new ClientVolumeBand({ salt: options.volumeBandSalt }),
+            clientValue: clientValue,
+          },
+        }),
   });
 
-  fastifyInstance.addHook('onResponse', async (request, reply) => {
-    const durationMs = Date.now() - (requestStarts.get(request.id) ?? Date.now());
-    requestStarts.delete(request.id);
-    metrics.increment('actionpop_http_requests_total', {
-      outcome: reply.statusCode >= 400 ? 'failure' : 'success',
-      method: request.method,
-    });
-    metrics.increment(
-      'actionpop_http_request_duration_seconds',
-      { method: request.method },
-      durationMs / 1000,
-    );
-    logger.info('request completed', {
-      requestId: request.id,
-      operation: `${request.method} ${request.url}`,
-      outcome: reply.statusCode >= 400 ? 'failure' : 'success',
-      statusCode: reply.statusCode,
-      durationMs,
-    });
-  });
-
-  fastifyInstance.addHook('onError', async (request, _reply, error) => {
-    logger.error('request failed', {
-      requestId: request.id,
-      operation: `${request.method} ${request.url}`,
-      outcome: 'failure',
-      failure: error.message,
-    });
-  });
-
-  // 3. OpenAPI document generated from the Nest decorators, served as raw JSON
-  const document = SwaggerModule.createDocument(
-    app,
-    new DocumentBuilder()
-      .setTitle('ActionPop Calendar API')
-      .setDescription(
-        'Read-only calendar surfaces. `/feed/{scopeId}` returns the group-scoped calendar, ' +
-          '`/events` returns the filtered JSON event list, `/search/subjects` resolves a query to ' +
-          'calendar subjects, and `/calendar.ics` returns the filtered iCalendar calendar. Geographic and event-type identifiers are strings so leading zeroes survive.',
-      )
-      .setVersion('0.1.0')
-      .build(),
-  );
-
-  fastifyInstance.get('/openapi.json', async () => document);
-
-  // 4. Initialisation des modules Nest
+  // 3. Initialisation des modules Nest
   await app.init();
 
-  // 5. Interactive reference built from the same document, so it cannot drift from the code
-  if (options.apiReference !== false) {
+  // 4. Exploratory surfaces, closed by default. They are registered only when explicitly enabled,
+  // so an absent route is genuinely absent rather than a filtered one.
+  if (options.apiReference === true) {
+    const document = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder()
+        .setTitle('ActionPop Calendar API')
+        .setDescription(
+          'Read-only calendar surfaces. `/feed/{scopeId}` returns the group-scoped calendar, ' +
+            '`/events` returns the filtered JSON event list, `/search/subjects` resolves a query to ' +
+            'calendar subjects, and `/calendar.ics` returns the filtered iCalendar calendar. Geographic and event-type identifiers are strings so leading zeroes survive.',
+        )
+        .setVersion('0.1.0')
+        .build(),
+    );
+
+    fastifyInstance.get('/openapi.json', async () => document);
     app.use(
       '/reference',
       apiReference({

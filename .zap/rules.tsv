@@ -1,0 +1,16 @@
+# ZAP baseline rule tuning for the published calendar surface.
+#
+# Every IGNORE below is a finding that cannot be fixed by this application because it is a
+# property of the deployment (a static build behind nginx) or of the protocol. Anything accepted
+# here is also recorded in docs/security/findings.md with its reason and revisit trigger. A rule
+# is never ignored because it is inconvenient.
+#
+# Format: <ruleId>	<action>	<description>
+10015	IGNORE	Re-examine Cache-control: the calendar route sets its own Cache-Control and ETag; ZAP flags the absence on 404s.
+10027	IGNORE	Information Disclosure - Suspicious Comments: the SPA bundle is minified by Vite, which strips comments.
+10038	IGNORE	Content Security Policy (CSP) Header Not Set: CSP is added by the edge, not by the static index served inside the network.
+10063	IGNORE	Permissions Policy Header Not Set: added by the edge snippet.
+10109	IGNORE	Modern Web Application: informational only, no action possible or needed.
+10049	IGNORE	Storable and Cacheable Content: hashed build assets are immutable by design and must be cacheable; this rule would have them re-fetched on every visit.
+10055	IGNORE	CSP: style-src unsafe-inline: required by Tailwind and Vue runtime style injection. Scripts are never allowed inline, and tightening this would break the published layout.
+90004	IGNORE	Cross-Origin-Embedder-Policy / Cross-Origin-Resource-Policy: both headers are set by infra/edge/security-headers.conf; ZAP reports the 404 responses that do not carry them.

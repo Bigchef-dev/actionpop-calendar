@@ -13,8 +13,16 @@ export interface CalendarFeedHandle {
   readonly retry: () => void;
 }
 
+export interface CalendarFeedOptions {
+  /** Called when a load settles, with the number of events actually displayed. */
+  readonly onDisplayed?: (eventCount: number) => void;
+}
+
 /** Reads the published calendar of one subject, once per subject change. */
-export function useCalendarFeed(subjects: Ref<readonly SearchSubject[]>): CalendarFeedHandle {
+export function useCalendarFeed(
+  subjects: Ref<readonly SearchSubject[]>,
+  options: CalendarFeedOptions = {},
+): CalendarFeedHandle {
   const events = ref<CalendarEvent[]>([]);
   const dropped = ref(0);
   const status = ref<FeedStatus>('idle');
@@ -40,6 +48,7 @@ export function useCalendarFeed(subjects: Ref<readonly SearchSubject[]>): Calend
         events.value = [...unique.values()];
         dropped.value = parsed.reduce((total, result) => total + result.dropped, 0);
         status.value = events.value.length === 0 ? 'empty' : 'ready';
+        options.onDisplayed?.(events.value.length);
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;

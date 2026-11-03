@@ -45,6 +45,7 @@ export * from './persistence/geographic-reference-repository.js';
 export * from './persistence/geographic-reference-writer.js';
 export * from './persistence/postgres-calendar-repository.js';
 export * from './persistence/postgres-event-query.js';
+export * from './persistence/postgres-event-coverage.js';
 export * from './persistence/postgres-calendar-event-query.js';
 export * from './persistence/postgres-event-type-repository.js';
 export * from './persistence/postgres-group-registry.js';

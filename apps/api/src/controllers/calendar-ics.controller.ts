@@ -18,6 +18,7 @@ import {
 import type { FastifyReply } from 'fastify';
 
 import { CALENDAR_SERVICE, CALENDAR_SETTINGS, SERVER_OPTIONS } from '../constants.js';
+import { recordCalendarRequest } from '../observability/calendar-metrics.js';
 import { ApiCalendarIcs } from './calendar-ics-contract.js';
 import type { ServerOptions } from '../server.js';
 import type {
@@ -46,6 +47,7 @@ export class CalendarIcsController {
     }
 
     const result = await this.calendarService.build(query).catch(() => {
+      this.observe(query, 503, reply);
       throw new ServiceUnavailableException({ error: 'event storage unavailable' });
     });
 
@@ -54,6 +56,7 @@ export class CalendarIcsController {
         diagnostic.code === 'epci_unavailable' ||
         diagnostic.code === 'epci_membership_incomplete',
       );
+      this.observe(query, availabilityFailure ? 503 : 400, reply);
       if (availabilityFailure) {
         throw new ServiceUnavailableException({
           error: 'calendar scope unavailable',
@@ -76,6 +79,8 @@ export class CalendarIcsController {
       typeof reply.request.headers['if-none-match'] === 'string'
         ? reply.request.headers['if-none-match']
         : undefined;
+    this.observe(query, ifNoneMatch === etag ? 304 : 200, reply, result);
+
     if (ifNoneMatch === etag) {
       return reply.code(304).send();
     }
@@ -104,6 +109,28 @@ export class CalendarIcsController {
   @Delete('calendar.ics')
   public rejectDelete(): never {
     return this.rejectWrite();
+  }
+
+  /**
+   * Records one delivery with bounded labels: territory family, delivery kind, client class and
+   * ceiling. The territory identifier and the filter values are never recorded.
+   */
+  private observe(
+    query: Record<string, string | undefined>,
+    statusCode: number,
+    reply: FastifyReply,
+    result?: { truncated: boolean; groupsTruncated: boolean },
+  ): void {
+    const metrics = this.options.metrics;
+    if (metrics === undefined) return;
+    recordCalendarRequest(metrics, {
+      query,
+      signature: reply.request.headers['user-agent'],
+      statusCode,
+      ...(result === undefined
+        ? {}
+        : { truncated: result.truncated, groupsTruncated: result.groupsTruncated }),
+    });
   }
 
   /**

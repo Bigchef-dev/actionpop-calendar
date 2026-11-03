@@ -1,0 +1,6 @@
+# The calendar is a single-page application: there is no crawlable tree of pages.
+# Journey reporting is a write endpoint and must never be crawled.
+User-agent: *
+Disallow: /telemetry/
+Disallow: /internal/
+Disallow: /calendar.ics

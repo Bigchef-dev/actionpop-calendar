@@ -18,9 +18,10 @@ import { ApiTags, ApiOperation, ApiParam, ApiHeader, ApiResponse } from '@nestjs
 import type { FastifyReply } from 'fastify';
 
 // Remplacez par le bon chemin vers votre token et type
-import { DATASET_REPOSITORY } from '../constants.js';
+import { DATASET_REPOSITORY, SERVER_OPTIONS } from '../constants.js';
 import { logger } from '../logger.js';
-import type { DatasetReader } from '../server.js';
+import { recordCalendarRequest } from '../observability/calendar-metrics.js';
+import type { DatasetReader, ServerOptions } from '../server.js';
 import {
   CalendarService,
   DataUnavailableError,
@@ -37,6 +38,8 @@ export class CalendarController {
     // On injecte le repository directement au lieu de le lire dans request.server
     @Inject(DATASET_REPOSITORY)
     private readonly datasetRepository: DatasetReader,
+    @Inject(SERVER_OPTIONS)
+    private readonly options: ServerOptions,
   ) {}
 
   @Get(':scopeId')
@@ -70,7 +73,10 @@ export class CalendarController {
       reply.header('ETag', `"${feed.revision}"`);
       reply.header('Cache-Control', 'public, max-age=900');
 
-      if (ifNoneMatch === `"${feed.revision}"`) {
+      const notModified = ifNoneMatch === `"${feed.revision}"`;
+      this.observe(scopeId, notModified ? 304 : 200, reply);
+
+      if (notModified) {
         return reply.code(304).send();
       }
 
@@ -80,17 +86,31 @@ export class CalendarController {
 
       // Dans NestJS, on lance des HttpExceptions qui sont interceptées et formatées automatiquement
       if (error instanceof ScopeValidationError) {
+        this.observe(scopeId, 400, reply);
         throw new BadRequestException({ error: 'invalid scope identifier' });
       }
       if (error instanceof ScopeNotFoundError) {
+        this.observe(scopeId, 404, reply);
         throw new NotFoundException({ error: 'scope not found' });
       }
       if (error instanceof DataUnavailableError) {
+        this.observe(scopeId, 503, reply);
         throw new ServiceUnavailableException({ error: 'calendar data unavailable' });
       }
 
       throw error;
     }
+  }
+
+  /** A group-scoped feed is always counted under the `group` territory family. */
+  private observe(scopeId: string, statusCode: number, reply: FastifyReply): void {
+    const metrics = this.options.metrics;
+    if (metrics === undefined) return;
+    recordCalendarRequest(metrics, {
+      query: { group: scopeId },
+      signature: reply.request.headers['user-agent'],
+      statusCode,
+    });
   }
 
   @Post(':scopeId')

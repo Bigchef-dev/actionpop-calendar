@@ -5,6 +5,7 @@ import {
   CalendarConfig,
   IngestionScopeConfig,
   LogLevel,
+  ObservabilityScopeConfig,
   QueueScopeConfig,
   RedisScopeConfig,
   RootConfig,
@@ -17,6 +18,8 @@ import {
   DEFAULT_MAP_DISCOVERY_ENABLED,
   DEFAULT_MAP_FRESHNESS_HORIZON_MS,
   DEFAULT_MAP_RECONCILIATION_INTERVAL_MS,
+  DEFAULT_OBSERVABILITY_DEPLOYMENT,
+  DEFAULT_TELEMETRY_ENABLED,
 } from './defaults.config.js';
 import { findWorkspaceRoot } from './load-env.js';
 
@@ -192,10 +195,43 @@ export function loadConfiguration(
     redis: parseRedisConfig(env),
     queue: parseQueueConfig(env, parsed.queue),
     ingestion: parseIngestionConfig(env, parsed.ingestion),
+    observability: parseObservabilityConfig(env, parsed.observability),
     upstream: parseUpstreamConfig(env),
   };
 
   return { config, warning, path };
+}
+
+const DEPLOYMENT_PATTERN = /^[a-z0-9_-]{1,32}$/;
+
+/**
+ * Normalizes the instance identifier to a bounded, log-safe value. An unusable value becomes
+ * `unknown`, which is itself a bounded label value, so a stray hostname can never explode the
+ * metric cardinality.
+ */
+export function parseDeployment(value: string | undefined): string {
+  const candidate = (value ?? '').trim().toLowerCase();
+  if (candidate === '') {
+    const hostname = (process.env.HOSTNAME ?? '').trim().toLowerCase();
+    return DEPLOYMENT_PATTERN.test(hostname) ? hostname : DEFAULT_OBSERVABILITY_DEPLOYMENT;
+  }
+  return DEPLOYMENT_PATTERN.test(candidate) ? candidate : DEFAULT_OBSERVABILITY_DEPLOYMENT;
+}
+
+export function parseObservabilityConfig(
+  env: Record<string, string | undefined>,
+  document: { deployment?: string | undefined; telemetryEnabled?: boolean | undefined } = {},
+): ObservabilityScopeConfig {
+  return {
+    deployment: parseDeployment(document.deployment ?? env.OBSERVABILITY_DEPLOYMENT),
+    // Environment-only: the salt must never be committed to the shared configuration document.
+    bandSalt: (env.OBSERVABILITY_BAND_SALT ?? '').trim(),
+    telemetryEnabled: parseBoolean(
+      env.TELEMETRY_ENABLED,
+      'TELEMETRY_ENABLED',
+      document.telemetryEnabled ?? DEFAULT_TELEMETRY_ENABLED,
+    ),
+  };
 }
 
 export function parseRuntimeConfig(

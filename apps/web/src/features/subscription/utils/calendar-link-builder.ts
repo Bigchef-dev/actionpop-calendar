@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../../../config';
+import { absoluteApiUrl } from '../../../config';
 import type { CalendarLink, SearchSubject } from '../../../types';
 
 export interface LinkOptions {
@@ -44,7 +44,7 @@ export function buildCalendarLink(
   const path = selected[0].calendar.path.startsWith('/')
     ? selected[0].calendar.path
     : `/${selected[0].calendar.path}`;
-  const subscriptionUrl = `${API_BASE_URL}${path}?${params.toString()}`;
+  const subscriptionUrl = `${absoluteApiUrl(path)}?${params.toString()}`;
   const labels = selected.map((subject) => subject.label).join(' + ');
   const suffix = options.scope === 'city-only' ? ' (ville uniquement)' : '';
   return {
