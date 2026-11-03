@@ -15,6 +15,9 @@ const oneEvent: GeographicEventItem = {
 
 function buildTestApp(received: unknown[] = []) {
   return buildApp({
+    // The exploratory surfaces are closed by default (FR-007); this suite documents them, so it
+    // opts in explicitly instead of relying on a default that must not exist.
+    apiReference: true,
     datasetRepository: {
       getCurrent: async () => ({
         scopeId: 'group-1',
@@ -162,6 +165,7 @@ describe('API reference', () => {
         'commune_name',
         'country',
         'department',
+        'epci',
         'event_type',
         'insee_commune',
       ]);

@@ -44,6 +44,7 @@ export interface CommuneReferenceRecord {
   pronounFreeNormalizedName: string;
   postalCodes: string[];
   departmentCode: string;
+  population?: number;
 }
 
 export interface DepartmentReferenceRecord {

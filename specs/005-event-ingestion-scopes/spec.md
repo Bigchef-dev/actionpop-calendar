@@ -145,7 +145,7 @@ classDiagram
   EventScope "1" --> "1" Event : refreshes
 ```
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - A group-less event stays accurate until it ends (Priority: P1)
 
@@ -231,8 +231,11 @@ As a maintainer, I want each cycle to report how many event ingestions were crea
 - A group-less event is discovered twice in the same cycle through pagination boundaries.
 - An event ingestion is waiting for the ceiling when its event ends.
 - An event's end time changes to a later date after its ingestion was created.
+- A detail request returns `404` for an event that remains in another group's listing.
+- A source listing is valid but truncated before the previously observed event.
+- The worker is stopped after a successful publication and before the next dispatch cycle.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -250,8 +253,12 @@ As a maintainer, I want each cycle to report how many event ingestions were crea
 - **FR-012**: The public calendar contract MUST remain unchanged: no new endpoint, no new or removed property, and each event still appears exactly once.
 - **FR-013**: An event that names no group, has already ended and is observed by a group ingestion MUST still be published and marked as stating no group; only the dedicated ingestion is omitted.
 - **FR-014**: Creating or retiring an event ingestion MUST NOT modify the directory status or retrieval state of any group, and MUST NOT change which groups are retrieved.
+- **FR-015**: A single successful detail request for an already-known event MUST be sufficient to establish its current source state. An explicit `404 Not Found` from that detail resource MUST mark the event as cancelled; timeouts, throttling, transport errors, server errors, invalid payloads and identifier mismatches MUST never mark it cancelled.
+- **FR-016**: Marking an event cancelled MUST preserve its stable source identifier, last known content, attributions, observations and ingestion history indefinitely. Cancellation is a historical state, not deletion.
+- **FR-017**: A complete successful listing MAY establish that an event disappeared only when the listing is explicitly complete and covers the event's entire previously observed source scope. A partial, truncated or failed listing MUST NOT cancel an event.
+- **FR-018**: An event observed through more than one source scope MUST be cancelled only after every reliable source observation has established its disappearance or the event detail request has returned an explicit `404`; disappearance from one group MUST first remove only that source attribution.
 
-### Key Entities *(include if data involved)*
+### Key Entities _(include if data involved)_
 
 - **Ingestion scope**: a unit the dispatcher retrieves at most once per cycle. It has a kind — group or event — an identifier, a lifecycle state, and the moments it was first and last observed.
 - **Event ingestion**: the activity of observing one event through the source's detail resource. It is carried by exactly one **event scope** — the stored unit the dispatcher retrieves at most once per cycle, from the moment a group ingestion discovers it until it ends, gains a group, or is reported unknown — and an event scope is never an organizer.
@@ -260,7 +267,7 @@ As a maintainer, I want each cycle to report how many event ingestions were crea
 - **Attribution**: the link between an event and a group, established by any complete observation, unioned across observations and never replaced by a later one.
 - **Cycle report**: the per-cycle counts of event ingestions created, waiting, active, retired and failed, next to the existing group and attribution counters.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

@@ -7,6 +7,7 @@ import {
   type GroupRegistryCounts,
   type Logger,
   type MetricsRegistry,
+  type UnattributedCounts,
 } from '@actionpop/core';
 
 import type { DispatcherCycle } from './dispatcher.js';
@@ -17,6 +18,8 @@ export interface CycleReportDependencies {
   readonly eventScopes: { countEventScopes(): Promise<EventScopeCounts> };
   /** Size of the map discovery ledger; absent in runtimes without map discovery. */
   readonly mapObservations?: { countObservations(): Promise<number> };
+  /** Events nobody can reach from a territory calendar; a data gap worth seeing. */
+  readonly coverage?: { countUnattributed(): Promise<UnattributedCounts> };
   readonly cycleMetrics: {
     latestBefore(periodToken: string): Promise<CycleMetricReading | undefined>;
     increment(periodToken: string, samples: readonly CycleMetricSample[]): Promise<void>;
@@ -50,6 +53,13 @@ export async function reportDispatcherCycle(
       {},
       await deps.mapObservations.countObservations(),
     );
+  }
+
+  if (deps.coverage !== undefined) {
+    const unattributed = await deps.coverage.countUnattributed();
+    for (const [status, value] of Object.entries(unattributed)) {
+      deps.metrics.setGauge('actionpop_events_without_territory', { status }, value);
+    }
   }
 
   if (cycle.promoted.length > 0) {

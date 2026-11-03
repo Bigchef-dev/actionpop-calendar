@@ -55,6 +55,12 @@ export function ApiCalendarIcs(): MethodDecorator {
       description: 'Comma-separated event-type labels',
       schema: { type: 'string', example: 'tractage' },
     }),
+    ApiQuery({
+      name: 'epci',
+      required: false,
+      description: 'Comma-separated official EPCI identifiers resolved to current member communes',
+      schema: { type: 'string', example: '200054781' },
+    }),
     ApiResponse({
       status: 200,
       description: 'Events satisfying every criterion, each returned once, in iCalendar format',

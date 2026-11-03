@@ -9,6 +9,7 @@ export interface CommuneNameResolution {
 
 export interface CalendarCommuneResolver {
   resolve(names: readonly string[], department: string | undefined): Promise<CommuneNameResolution>;
+  resolveEpcis?(ids: readonly string[]): Promise<CommuneNameResolution>;
 }
 
 export type CriteriaResolution =
@@ -27,8 +28,42 @@ export async function resolveCalendarCriteria(
 ): Promise<CriteriaResolution> {
   const names = parsed.communeNames ?? [];
   const explicitCodes = parsed.communeIds ?? [];
+  const epciIds = parsed.epciIds ?? [];
 
   let resolvedCodes: readonly string[] = [];
+  if (epciIds.length > 0) {
+    if (resolver?.resolveEpcis === undefined) {
+      return {
+        ok: false,
+        diagnostics: [
+          {
+            code: 'epci_unavailable',
+            field: 'epci',
+            message: 'epci cannot be resolved without an active EPCI reference',
+            severity: 'error',
+          },
+        ],
+      };
+    }
+    const epciResolution = await resolver.resolveEpcis(epciIds);
+    if (epciResolution.diagnostics.length > 0) {
+      return { ok: false, diagnostics: epciResolution.diagnostics };
+    }
+    if (epciResolution.inseeCodes.length === 0) {
+      return {
+        ok: false,
+        diagnostics: [
+          {
+            code: 'epci_membership_incomplete',
+            field: 'epci',
+            message: 'epci has no usable commune membership',
+            severity: 'error',
+          },
+        ],
+      };
+    }
+    resolvedCodes = epciResolution.inseeCodes;
+  }
   if (names.length > 0) {
     if (resolver === undefined) {
       return {
@@ -47,7 +82,7 @@ export async function resolveCalendarCriteria(
     if (resolution.diagnostics.length > 0) {
       return { ok: false, diagnostics: resolution.diagnostics };
     }
-    resolvedCodes = resolution.inseeCodes;
+    resolvedCodes = [...resolvedCodes, ...resolution.inseeCodes];
   }
 
   const communeIds = [...new Set([...resolvedCodes, ...explicitCodes])].sort();
@@ -59,6 +94,8 @@ export async function resolveCalendarCriteria(
       ...(parsed.department === undefined ? {} : { department: parsed.department }),
       ...(communeIds.length === 0 ? {} : { communeIds }),
       ...(parsed.eventTypes === undefined ? {} : { eventTypes: parsed.eventTypes }),
+      ...(parsed.groupIds === undefined ? {} : { groupIds: parsed.groupIds }),
+      ...(parsed.epciIds === undefined ? {} : { epciIds: parsed.epciIds }),
     },
   };
 }

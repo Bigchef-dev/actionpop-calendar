@@ -1,4 +1,4 @@
-import { normalizeDepartmentCode, normalizeGeographicName } from '../domain/geographic-identity.js';
+import { normalizeDepartmentCode, normalizeNameForSearch } from '../domain/geographic-identity.js';
 import type { GeographicReferenceReader } from './geographic-reference-reader.js';
 import { departmentFromPostalCode } from './postal-department.js';
 import type { CommuneReferenceRecord, Diagnostic, RawLocationFields } from './reference-types.js';
@@ -38,10 +38,12 @@ export async function resolveCommune(
 
   const candidates = await reader.findCommunesByNormalizedName(
     version,
-    normalizeGeographicName(name),
+    normalizeNameForSearch(name),
   );
 
   if (candidates.length === 0) {
+    const arrondissement = await resolveArrondissementByPostalCode(input.zip, reader, version);
+    if (arrondissement !== undefined) return { commune: arrondissement, diagnostics: [] };
     return {
       diagnostics: [warning('commune_unknown', field, `no commune matches "${name}"`)],
     };
@@ -67,6 +69,16 @@ export async function resolveCommune(
       ),
     ],
   };
+}
+
+async function resolveArrondissementByPostalCode(
+  postalCode: string | undefined,
+  reader: GeographicReferenceReader,
+  version: string,
+): Promise<CommuneReferenceRecord | undefined> {
+  if (postalCode === undefined || !/^(?:13|69|75)\d{3}$/.test(postalCode)) return undefined;
+  const candidates = await reader.findCommunesByPostalCode(version, postalCode);
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 function departmentHint(input: RawLocationFields): string | undefined {

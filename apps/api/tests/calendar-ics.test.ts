@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CalendarBuildResult, CalendarEventCriteria, CalendarWindow } from '@actionpop/core';
+import {
+  FilteredCalendarService,
+  type CalendarBuildResult,
+  type CalendarEventCriteria,
+  type CalendarWindow,
+} from '@actionpop/core';
 
 import { buildApp } from '../src/server.js';
 import type { CalendarIcsSettings } from '../src/controllers/calendar-ics.controller.js';
@@ -341,14 +346,140 @@ describe('filter diagnostics over HTTP', () => {
 
   it.each([
     ['region=84', 'filter_parameter_unsupported'],
-    ['epci=200046977', 'filter_parameter_unsupported'],
+    ['epci=200046977', 'epci_unavailable'],
     ['lat=45.7', 'filter_parameter_unsupported'],
     ['page=2', 'filter_parameter_unknown'],
     ['country=France', 'filter_value_invalid'],
   ])('rejects %s with %s', async (query, code) => {
     const response = await inject(query);
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(code === 'epci_unavailable' ? 503 : 400);
     expect(JSON.parse(response.body).diagnostics[0]).toMatchObject({ code });
+  });
+});
+
+describe('GET /calendar.ics with an EPCI territory', () => {
+  async function buildEpciApp(options: {
+    inseeCodes?: readonly string[];
+    diagnostics?: readonly { code: string; field: string; message: string; severity: 'error' }[];
+    events?: readonly string[];
+  } = {}) {
+    const seen: CalendarEventCriteria[] = [];
+    const service = new FilteredCalendarService(
+      {
+        listCalendarEvents: async (criteria) => {
+          seen.push(criteria);
+          return {
+            events: (options.events ?? []).map((id) => ({
+              sourceEventId: id,
+              summary: id,
+              description: null,
+              startTime: '2026-11-05T18:00:00.000Z',
+              endTime: '2026-11-05T20:00:00.000Z',
+              sequence: 1,
+              status: 'ACTIVE' as const,
+              updatedAt: '2026-11-01T00:00:00.000Z',
+              lastSeenPeriod: '2026-11-01',
+              eventType: 'tractage',
+              sourceUrl: null,
+              geography: null,
+              location: null,
+              coordinates: null,
+              groupIds: [],
+            })),
+            truncated: false,
+          };
+        },
+      },
+      { lookbackDays: 30, lookaheadDays: 90, maxEntries: 1000 },
+      {
+        resolve: async () => ({ inseeCodes: [], diagnostics: [] }),
+        resolveEpcis: async () => ({
+          inseeCodes: options.inseeCodes ?? [],
+          diagnostics: options.diagnostics ?? [],
+        }),
+      },
+    );
+    const server = await buildTestApp({ build: (query) => service.build(query) });
+    return { server, seen };
+  }
+
+  it('resolves a territory to its member communes and answers a calendar document', async () => {
+    const { server, seen } = await buildEpciApp({
+      inseeCodes: ['01001', '01002'],
+      events: ['event-1', 'event-2'],
+    });
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/calendar.ics?epci=200000001',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain('UID:event-1@actionpop-calendar');
+      expect(seen[0]?.communeIds).toEqual(['01001', '01002']);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('answers a valid empty feed when the territory has no event', async () => {
+    const { server } = await buildEpciApp({ inseeCodes: ['01001'] });
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/calendar.ics?epci=200000001',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain('BEGIN:VCALENDAR');
+      expect(response.body).not.toContain('BEGIN:VEVENT');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each([
+    ['epci_invalid', 400],
+    ['epci_membership_incomplete', 503],
+    ['epci_unavailable', 503],
+  ] as const)('answers %s with %i and no unrelated events', async (code, status) => {
+    const { server, seen } = await buildEpciApp({
+      diagnostics: [{ code, field: 'epci', message: 'unavailable', severity: 'error' }],
+    });
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/calendar.ics?epci=299999999',
+      });
+
+      expect(response.statusCode).toBe(status);
+      expect(JSON.parse(response.body).diagnostics[0]).toMatchObject({ code });
+      expect(seen).toHaveLength(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('keeps the ETag and 304 behavior for a filtered territory link', async () => {
+    const { server } = await buildEpciApp({ inseeCodes: ['01001'], events: ['event-1'] });
+    try {
+      const first = await server.inject({
+        method: 'GET',
+        url: '/calendar.ics?epci=200000001&event_type=tractage&group=group-1',
+      });
+      expect(first.statusCode).toBe(200);
+      const etag = first.headers.etag;
+      expect(etag).toBeDefined();
+
+      const second = await server.inject({
+        method: 'GET',
+        url: '/calendar.ics?epci=200000001&event_type=tractage&group=group-1',
+        headers: { 'if-none-match': String(etag) },
+      });
+      expect(second.statusCode).toBe(304);
+    } finally {
+      await server.close();
+    }
   });
 });

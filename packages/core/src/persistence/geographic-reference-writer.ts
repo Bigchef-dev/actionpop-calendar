@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import type { IndexedReference } from '../geography/commune-name-index.js';
 import type { Diagnostic } from '../geography/reference-types.js';
+import type { EpciMembershipRecord, EpciReferenceRecord } from '../geography/epci-reference.js';
 
 export interface StageReferenceInput {
   version: string;
@@ -9,6 +10,8 @@ export interface StageReferenceInput {
   publicationDate: string;
   license: string;
   index: IndexedReference;
+  epcis?: readonly EpciReferenceRecord[];
+  epciMemberships?: readonly EpciMembershipRecord[];
 }
 
 export type ActivationResult =
@@ -67,6 +70,31 @@ export class PostgresGeographicReferenceWriter {
             pronounFreeNormalizedName: commune.pronounFreeNormalizedName,
             postalCodes: commune.postalCodes,
             departmentCode: commune.departmentCode,
+            ...(commune.population === undefined ? {} : { population: commune.population }),
+          })),
+        });
+      }
+
+      if (input.epcis !== undefined && input.epcis.length > 0) {
+        await transaction.epciReference.createMany({
+          data: input.epcis.map((epci) => ({
+            versionId: input.version,
+            epciId: epci.id,
+            name: epci.name,
+            normalizedName: epci.normalizedName,
+            kind: epci.kind,
+            departmentCodes: [...epci.departmentCodes],
+            active: epci.active,
+          })),
+        });
+      }
+      if (input.epciMemberships !== undefined && input.epciMemberships.length > 0) {
+        await transaction.epciMembership.createMany({
+          data: input.epciMemberships.map((membership) => ({
+            versionId: input.version,
+            epciId: membership.epciId,
+            communeId: membership.communeId,
+            quality: membership.quality,
           })),
         });
       }

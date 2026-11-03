@@ -49,11 +49,27 @@ export interface UpstreamScopeConfig {
   readonly token?: string | undefined;
 }
 
+export interface ObservabilityScopeConfig {
+  /**
+   * Short identifier of the running instance, emitted as the `deployment` metric label so two
+   * instances running at once stay distinguishable. Normalized to `unknown` when unusable.
+   */
+  readonly deployment: string;
+  /**
+   * Secret used to re-key the daily client volume band. It never leaves the process and is never
+   * logged; an empty value means a per-process random key is generated at startup.
+   */
+  readonly bandSalt: string;
+  /** Whether the published site may report journey steps to this API. */
+  readonly telemetryEnabled: boolean;
+}
+
 export interface RootConfig {
   readonly app: AppScopeConfig;
   readonly calendar: CalendarConfig;
   readonly redis: RedisScopeConfig;
   readonly queue: QueueScopeConfig;
   readonly ingestion: IngestionScopeConfig;
+  readonly observability: ObservabilityScopeConfig;
   readonly upstream: UpstreamScopeConfig | undefined;
 }

@@ -25,7 +25,10 @@
     "data/**",
     "**/prisma/migrations/**",
     ".specify/**",
-    ".git/**"
+    ".git/**",
+    "zap-report/**",
+    "test-results/**",
+    "playwright-report/**"
   ],
   "import": ["@cspell/dict-fr-fr/cspell-ext.json"]
 }

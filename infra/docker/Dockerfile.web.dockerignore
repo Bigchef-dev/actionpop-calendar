@@ -1,0 +1,35 @@
+# Build context for the published site only.
+#
+# The shared `.dockerignore` excludes `apps/web/` because the API and worker images must not ship a
+# static front. This Dockerfile is the exception, so it carries its own ignore file: Docker uses
+# `<Dockerfile>.dockerignore` when it exists, which keeps both intents without a negation hack.
+
+# Everything a static build does not need.
+.git/
+node_modules/
+**/node_modules/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+*.log*
+.env*
+Dockerfile*
+.dockerignore
+.github/
+.specify/
+docs/
+specs/
+tests/
+data/README.md
+
+# Kept: the workspace manifests, `apps/web`, `packages/core` and the shared `data` reference.
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!tsconfig.json
+!apps/web/
+!packages/
+!data/
+# Only the static server config is read from infra/; the rest stays out of the context.
+!infra/edge/web.conf

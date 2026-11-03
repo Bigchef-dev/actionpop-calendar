@@ -1,4 +1,5 @@
 export * from './commune-csv-parser.js';
+export * from './commune-epci-index.js';
 export * from './commune-name-index.js';
 export * from './commune-resolver.js';
 export * from './commune-name-resolver.js';
@@ -12,3 +13,5 @@ export * from './geographic-reference-reader.js';
 export * from './postal-department.js';
 export * from './reference-types.js';
 export * from './reference-validation.js';
+export * from './epci-reference.js';
+export * from './epci-reference-validation.js';

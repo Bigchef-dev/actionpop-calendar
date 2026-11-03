@@ -13,6 +13,13 @@ describe('calendar filter', () => {
     expect(result).toEqual({ ok: true, criteria: { eventTypes: ['tractage'] } });
   });
 
+  it('parses EPCI identifiers as a list', () => {
+    expect(parseCalendarFilter({ epci: '200000001,200000002' })).toEqual({
+      ok: true,
+      criteria: { epciIds: ['200000001', '200000002'] },
+    });
+  });
+
   it('combines comma-separated event types with OR semantics', () => {
     const result = parseCalendarFilter({ event_type: 'tractage, boitage' });
     expect(result).toEqual({ ok: true, criteria: { eventTypes: ['tractage', 'boitage'] } });

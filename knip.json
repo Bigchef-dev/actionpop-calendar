@@ -1,12 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreWorkspaces": [
+    "apps/web"
+  ],
   "rules": {
     "exports": "off",
     "types": "off"
   },
   "workspaces": {
     "apps/api": {
-      "ignoreDependencies": ["pino-pretty", "ajv", "ajv-formats"]
+      "ignoreDependencies": [
+        "pino-pretty",
+        "ajv",
+        "ajv-formats"
+      ]
     }
-  }
+  },
+  "ignore": [
+    "docs/archive/**"
+  ]
 }

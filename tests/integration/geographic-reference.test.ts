@@ -74,7 +74,7 @@ describe('geographic reference staging and activation', () => {
     await writer.activate('communes-v2');
 
     expect(await reader.findCommunesByNormalizedName('communes-v1', 'lyon')).toHaveLength(1);
-    expect(await reader.findCommunesByNormalizedName('communes-v2', 'villeurbanne')).toHaveLength(
+    expect(await reader.findCommunesByNormalizedName('communes-v2', 'vileurbane')).toHaveLength(
       1,
     );
   });

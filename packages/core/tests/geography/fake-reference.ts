@@ -1,4 +1,4 @@
-import { normalizeGeographicName } from '../../src/domain/geographic-identity.js';
+import { normalizeNameForSearch } from '../../src/domain/geographic-identity.js';
 import type { GeographicReferenceReader } from '../../src/geography/geographic-reference-reader.js';
 import type {
   CommuneReferenceRecord,
@@ -25,8 +25,8 @@ export function makeCommune(
   return {
     inseeCode,
     name,
-    normalizedName: normalizeGeographicName(name),
-    pronounFreeNormalizedName: normalizeGeographicName(alias),
+    normalizedName: normalizeNameForSearch(name),
+    pronounFreeNormalizedName: normalizeNameForSearch(alias),
     postalCodes,
     departmentCode,
   };

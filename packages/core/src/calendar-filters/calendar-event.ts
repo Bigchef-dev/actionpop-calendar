@@ -38,6 +38,7 @@ export interface CalendarEvent {
   readonly startTime: Date;
   readonly endTime: Date;
   readonly sequence: number;
+  readonly status?: 'ACTIVE' | 'CANCELLED';
   readonly updatedAt: Date;
   readonly lastSeenPeriod: string | null;
   readonly eventType: string | null;
@@ -53,6 +54,8 @@ export interface CalendarEventCriteria {
   readonly department?: string | undefined;
   readonly communeIds?: readonly string[] | undefined;
   readonly eventTypes?: readonly string[] | undefined;
+  readonly groupIds?: readonly string[] | undefined;
+  readonly epciIds?: readonly string[] | undefined;
 }
 
 export interface CalendarWindow {

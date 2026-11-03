@@ -59,6 +59,7 @@ export interface CalendarIngestionDependencies {
       snapshot: PublishedGroupSnapshot,
       events: PublishedEvent[],
     ): Promise<PublicationSummary>;
+    markEventCancelled?: (sourceEventId: string) => Promise<boolean>;
   };
   readonly groups: {
     markStoppedUnknown(scopeId: string, reason: string, at: Date): Promise<boolean>;
@@ -122,7 +123,7 @@ export async function processCalendarIngestion(
     );
     deps.metrics.setGauge(
       'actionpop_ingestion_last_success_timestamp',
-      {},
+      { source: 'calendar' },
       Math.floor(Date.now() / 1000),
     );
     deps.logger.info('ingestion completed', {

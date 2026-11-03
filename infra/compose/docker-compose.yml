@@ -52,6 +52,26 @@ services:
       - private
     restart: 'no'
 
+  # The published site. It is served by the edge, which owns headers and routing, so a visitor
+  # gets one origin and no cross-origin requests are needed.
+  web:
+    image: ${WEB_IMAGE:-actionpop-web:latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+      args:
+        VITE_BASE_PATH: /
+    networks:
+      - private
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
   api:
     image: ${API_IMAGE:-actionpop-api:latest}
     build:
@@ -63,10 +83,15 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       TIMEZONE: ${TIMEZONE:-Europe/Paris}
       PORT: "3000"
-      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+      # Origins allowed to read the public JSON routes; list the published site origin.
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-}
+      # Empty means "search the usual paths". Naming a file makes it mandatory, and
+      # config/actionpop.yaml is git-ignored, so a hard-coded default would stop the API
+      # from starting on a fresh clone or in CI.
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-}
     volumes:
-      # The whole document directory is mounted read-only, so the image still
-      # starts from the shipped example when config/actionpop.yaml is absent.
+      # The whole document directory is mounted read-only: the runtime picks
+      # config/actionpop.yaml when the operator ships one, and falls back to the example.
       - ../../config:/app/config:ro
     depends_on:
       migrate:
@@ -77,12 +102,18 @@ services:
         condition: service_healthy
     networks:
       - private
+      # Reaches the monitor's Prometheus without publishing a port on the host.
+      - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://api:3000/internal/live']
+      # Loopback, like every other probe: a service name would make the check depend on Docker
+      # DNS instead of answering "is this container serving?".
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/internal/live']
       interval: 10s
       timeout: 3s
       retries: 5
+      # A cold start on a loaded machine must not consume the retries before the server listens.
+      start_period: 20s
 
   worker:
     image: ${WORKER_IMAGE:-actionpop-worker:latest}
@@ -97,7 +128,8 @@ services:
       UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:-}
       UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
       WORKER_HEALTH_PORT: "8081"
-      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+      # Same rule as the API: an empty value lets the runtime fall back to the example.
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-}
     volumes:
       - ../../config:/app/config:ro
     depends_on:
@@ -109,12 +141,14 @@ services:
         condition: service_healthy
     networks:
       - private
+      - monitoring
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8081/health/ready').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   edge:
     image: nginx:1.27-alpine
@@ -124,17 +158,28 @@ services:
       - "443:443"
     volumes:
       - ../edge/https.conf:/etc/nginx/conf.d/default.conf:ro
+      # Shared header snippet: the same file the CI scan serves over plain HTTP.
+      - ../edge/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
       - ./tls:/etc/nginx/tls:ro
     depends_on:
       api:
         condition: service_healthy
+      web:
+        condition: service_healthy
     networks:
       - private
+      - monitoring
     restart: unless-stopped
 
 networks:
   private:
     internal: true
+
+  # Owned by the monitoring Compose project. Declared external so this stack never creates or
+  # destroys it: `docker network create monitoring` once on the host, then both projects join it.
+  monitoring:
+    external: true
+    name: ${MONITORING_NETWORK:-monitoring}
 
 volumes:
   redis-data:

@@ -20,6 +20,8 @@ import {
   DEFAULT_CALENDAR_MAX_GROUPS_PER_EVENT,
   DEFAULT_CALENDAR_METADATA_LEVEL,
   DEFAULT_CALENDAR_REVALIDATION_SECONDS,
+  DEFAULT_OBSERVABILITY_DEPLOYMENT,
+  DEFAULT_TELEMETRY_ENABLED,
 } from './defaults.config.js';
 
 export interface EnvironmentMapping {
@@ -89,12 +91,24 @@ const queueSchema = z
   })
   .strict();
 
+const observabilitySchema = z
+  .object({
+    deployment: z
+      .string()
+      .trim()
+      .regex(/^[a-z0-9_-]{1,32}$/)
+      .default(DEFAULT_OBSERVABILITY_DEPLOYMENT),
+    telemetryEnabled: z.boolean().default(DEFAULT_TELEMETRY_ENABLED),
+  })
+  .strict();
+
 const documentSchema = z
   .object({
     app: appSchema.optional(),
     calendar: calendarSchema.optional(),
     queue: queueSchema.optional(),
     ingestion: ingestionSchema.optional(),
+    observability: observabilitySchema.optional(),
   })
   .strict();
 
@@ -127,6 +141,10 @@ export interface ParsedConfigurationDocument {
     readonly mapFreshnessHorizonMs: number;
     readonly mapReconciliationIntervalMs: number;
   };
+  readonly observability: {
+    readonly deployment: string;
+    readonly telemetryEnabled: boolean;
+  };
 }
 
 export function parseConfigurationDocument(
@@ -143,6 +161,7 @@ export function parseConfigurationDocument(
     calendar: result.data.calendar ?? calendarSchema.parse({}),
     queue: result.data.queue ?? {},
     ingestion: result.data.ingestion ?? ingestionSchema.parse({}),
+    observability: result.data.observability ?? observabilitySchema.parse({}),
   };
 }
 

@@ -6,6 +6,9 @@ deployment secrets through the environment rather than committing them. Set
 does not require authentication.
 
 ```bash
+# `api`, `worker` and `web` join the external `monitoring` network, which Compose never
+# creates: provide it once on the host (see "Monitoring" below).
+docker network create monitoring
 docker compose -f infra/compose/docker-compose.yml up -d
 docker compose -f infra/compose/docker-compose.yml ps
 ```
@@ -42,3 +45,37 @@ Redis, worker, and internal health endpoints remain on the private network. Publ
 HTTPS termination belongs at the deployment edge. Provide certificates under
 `infra/compose/tls/` and start the edge explicitly with
 `docker compose --profile edge -f infra/compose/docker-compose.yml up -d`.
+
+## Published site
+
+The `web` service builds `apps/web` and serves it as static files; the edge proxies `/` and
+`/assets/` to it, so a visitor gets one origin and the calendar paths are same-origin. Set
+`WEB_IMAGE` to use a registry image instead of the local default tag.
+
+## Monitoring
+
+`api` and `worker` also join the external `monitoring` network so the Prometheus already running
+on the server can scrape them without a published port. Because Compose never creates an external
+network, it must exist before the first `up`; the Deploy commands above create it, and on an
+existing host it is already there:
+
+```bash
+docker network create monitoring
+```
+
+Rename it with `MONITORING_NETWORK` if your monitoring project uses another name; the variable
+renames the network Compose joins, so create it under the same name. The dashboards and alert
+rules live in `infra/monitoring/`; see its README for the mounts.
+
+## Exploitation scan
+
+`.github/workflows/security.yml` starts the stack with an extra overlay that publishes a
+plain-HTTP twin of the edge on `127.0.0.1:8080`, then runs an OWASP ZAP baseline scan against it:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.security.yml up -d --build
+```
+
+The scan attacks the real allowlist and the real header snippet, so what it validates is what
+production serves. `scripts/zap-gate.mjs` fails the run on any high-severity alert.

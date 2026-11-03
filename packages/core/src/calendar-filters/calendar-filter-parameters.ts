@@ -11,11 +11,12 @@ export const SUPPORTED_PARAMETERS = new Set([
   'commune_name',
   'insee_commune',
   'event_type',
+  'group',
+  'epci',
 ]);
 
 export const UNSUPPORTED_PARAMETERS = new Set([
   'region',
-  'epci',
   'constituency',
   'lat',
   'lon',

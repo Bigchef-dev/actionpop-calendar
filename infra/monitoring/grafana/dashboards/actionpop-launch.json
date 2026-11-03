@@ -1,0 +1,507 @@
+{
+  "uid": "actionpop-launch",
+  "title": "ActionPop \u2014 Launch review",
+  "tags": [
+    "actionpop",
+    "launch"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Visits and outcomes",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Visits",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(actionpop_journey_steps_total{step=\"arrival\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Visits reaching a usable calendar",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(actionpop_journey_steps_total{step=\"calendar_shown\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Share reaching a usable calendar",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(actionpop_journey_steps_total{step=\"calendar_shown\"}[$__range])) / clamp_min(sum(increase(actionpop_journey_steps_total{step=\"arrival\"}[$__range])), 1)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Events without a territory",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(actionpop_events_without_territory) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Funnel",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Journey steps",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (step) (increase(actionpop_journey_steps_total[$__range])) or vector(0)",
+          "legendFormat": "{{step}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Searches: fruitful vs unfruitful",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (increase(actionpop_search_requests_total[$__range])) or vector(0)",
+          "legendFormat": "{{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Territory families visited",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (subject_kind) (increase(actionpop_journey_steps_total{step=\"subject_selected\"}[$__range])) or vector(0)",
+          "legendFormat": "{{subject_kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Subscriptions",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Calendar deliveries by kind",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (delivery) (increase(actionpop_calendar_requests_total[$__range])) or vector(0)",
+          "legendFormat": "{{delivery}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "New subscriptions and renewals, by territory family",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (subject_kind) (increase(actionpop_calendar_requests_total{delivery=\"first\",client_kind=\"agenda\"}[$__range])) or vector(0)",
+          "legendFormat": "new {{subject_kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (subject_kind) (increase(actionpop_calendar_requests_total{delivery=\"revalidated\",client_kind=\"agenda\"}[$__range])) or vector(0)",
+          "legendFormat": "renewed {{subject_kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Exports and explicit subscribe intents",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(actionpop_calendar_requests_total{delivery=\"first\",client_kind=\"browser\"}[$__range])) or vector(0)",
+          "legendFormat": "downloads",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(actionpop_journey_steps_total{step=\"subscribe\"}[$__range])) or vector(0)",
+          "legendFormat": "subscribe intent",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum(increase(actionpop_journey_steps_total{step=\"export\"}[$__range])) or vector(0)",
+          "legendFormat": "export click",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Filters",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Filter cardinality",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "actionpop-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (filter, cardinality) (increase(actionpop_calendar_filters_total[$__range])) or vector(0)",
+          "legendFormat": "{{filter}} / {{cardinality}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "actionpop-prometheus"
+          }
+        }
+      ]
+    }
+  ]
+}

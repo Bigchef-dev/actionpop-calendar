@@ -11,6 +11,10 @@ config({ path: resolve(process.cwd(), '.env.local'), override: true, quiet: true
 // test, and `prisma validate` is part of static review.
 const OFFLINE_COMMANDS = new Set(['generate', 'validate', 'format', 'version']);
 
+// Prisma 7 reads the schema location from `prisma.config.ts` for these commands and
+// rejects the legacy `--schema` flag.
+const CONFIGURED_SCHEMA_COMMANDS = new Set(['studio']);
+
 function describeTarget(url) {
   try {
     const parsed = new URL(url);
@@ -46,7 +50,8 @@ if (needsDatabase) {
 }
 
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-const child = spawn(pnpm, ['exec', 'prisma', command, ...args, '--schema=prisma/schema.prisma'], {
+const schemaArgs = CONFIGURED_SCHEMA_COMMANDS.has(command) ? [] : ['--schema=prisma/schema.prisma'];
+const child = spawn(pnpm, ['exec', 'prisma', command, ...args, ...schemaArgs], {
   stdio: 'inherit',
   env: process.env,
 });

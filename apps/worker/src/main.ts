@@ -12,6 +12,7 @@ import {
   loadEnvFile,
   PostgresCalendarDatasetRepository,
   PostgresCycleMetrics,
+  PostgresEventCoverage,
   PostgresEventTypeRepository,
   PostgresGeographicReferenceRepository,
   PostgresGeographicReferenceWriter,
@@ -80,7 +81,7 @@ export interface WorkerRuntime {
 export interface RefreshGeographicReferenceResultSummary {
   version: string;
   status: 'staged' | 'active' | 'rejected';
-  counts: { communes: number; departments: number };
+  counts: { communes: number; departments: number; epcis: number; memberships: number };
   diagnosticCount: number;
 }
 
@@ -213,6 +214,9 @@ export function createWorkerRuntime(
         registry,
         eventScopes: { countEventScopes: () => countEventScopes(postgres) },
         mapObservations: { countObservations: () => countObservations(postgres) },
+        coverage: {
+          countUnattributed: () => new PostgresEventCoverage(postgres).countUnattributed(),
+        },
         cycleMetrics,
         metrics: observability.metrics,
         logger: observability.logger,
@@ -251,6 +255,8 @@ export function createWorkerRuntime(
         source: input.source,
         communes: result.counts.communes,
         departments: result.counts.departments,
+        epcis: result.counts.epcis,
+        epciMemberships: result.counts.memberships,
         validationErrors: result.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')
           .length,
         durationMs: Date.now() - startedAt,
@@ -258,6 +264,16 @@ export function createWorkerRuntime(
       observability.metrics.increment('actionpop_geographic_refresh_total', {
         outcome: result.status,
       });
+      observability.metrics.setGauge(
+        'actionpop_geographic_reference_epci_count',
+        {},
+        result.counts.epcis,
+      );
+      observability.metrics.setGauge(
+        'actionpop_geographic_reference_epci_membership_count',
+        {},
+        result.counts.memberships,
+      );
 
       if (result.status === 'active' && previous !== null) {
         const reEnrichment = await reEnrichEvents(postgres, geographicReference, previous.version);
@@ -311,6 +327,14 @@ export function createWorkerRuntime(
             (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0),
           );
           observability.metrics.setGauge('actionpop_redis_ready', {}, (await readiness()) ? 1 : 0);
+          observability.metrics.setGauge(
+            'actionpop_build_info',
+            {
+              deployment: config.observability.deployment,
+              version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
+            },
+            1,
+          );
           response.statusCode = 200;
           response.setHeader('content-type', 'text/plain; version=0.0.4');
           response.end(observability.metrics.prometheus());

@@ -32,7 +32,7 @@
 - Q: How is an event's revision exposed when its content hash is unavailable? → A: Through the event's last update timestamp together with its stable identifier and its last processing period token, so the identity family needs no hash.
 - Q: Should standard calendar properties also be emitted? → A: Yes: `LOCATION`, `URL`, `CATEGORIES` and `GEO` are emitted from the event's own data, so calendar clients display entries natively while the `X-` properties carry the machine-readable metadata.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Subscribe to a filtered calendar (Priority: P1)
 
@@ -166,7 +166,7 @@ As an integrator or operator, I want each calendar entry to carry the event's st
 - The geographic reference version changes between two calendar requests.
 - The calendar is requested with an unsupported parameter such as `region`, `epci` or coordinates.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -182,6 +182,9 @@ As an integrator or operator, I want each calendar entry to carry the event's st
 - **FR-010**: Each calendar entry MUST carry a title, a start, an end, a modification timestamp and a sequence value.
 - **FR-043**: Each calendar entry MUST carry the event venue as one line in the standard location property, formatted as the place name followed by the postal address, MUST NOT repeat a locality the street line already states, MUST fall back to the short address, then to the flattened full address, then to the place name alone, and MUST omit the property when the source states no location.
 - **FR-044**: The system MUST persist the event location stated by the source, including its coordinates, under a stable event-scoped key, MUST update that record when the address changes, and MUST remove it when the source stops stating a location.
+- **FR-045**: The calendar read path MUST serve the latest complete published event state matching the criteria even when the ingestion worker is stopped, delayed or has no currently successful cycle. A worker state, queue state or freshness timeout MUST NOT turn already-published matching events into an empty calendar.
+- **FR-046**: An event marked cancelled MUST remain available to the read path while it overlaps the configured calendar window, and MUST be emitted with an explicit cancelled status. Once outside the window it MUST remain queryable in historical storage without being emitted by the public calendar.
+- **FR-047**: A failed or incomplete ingestion observation MUST leave the latest complete published state unchanged; it MUST NOT remove an event or replace it with an empty snapshot.
 - **FR-011**: The system MUST represent event times in the canonical project timezone and MUST serialize them in UTC so that calendar clients in any timezone see the same instant.
 - **FR-012**: The system MUST escape text values and fold long lines as required by RFC 5545, and MUST use CRLF line endings, so that entries with punctuation, line breaks or non-ASCII content remain importable.
 - **FR-013**: The system MUST emit a valid calendar with zero entries, and a successful response, when a well-formed filter matches no event.
@@ -219,38 +222,38 @@ As an integrator or operator, I want each calendar entry to carry the event's st
 
 Experimental properties are additive: a client that does not know them ignores them, so they never change how an entry is displayed. Every value is escaped calendar text; absent values are omitted. Multi-valued families repeat the property once per value.
 
-| Property | Level | Meaning | Permitted values |
-|----------|-------|---------|------------------|
-| `X-ACTIONPOP-EVENT-ID` | identity | Stable source identity of the event, identical to the entry identity | Opaque source identifier |
-| `X-ACTIONPOP-UPDATED-AT` | identity | Last update timestamp of the event, in UTC | Calendar UTC timestamp |
-| `X-ACTIONPOP-PERIOD` | identity | Last processing period in which the event was observed | Period token |
-| `X-ACTIONPOP-EVENT-TYPE` | standard | Event type label published by the source | Event type label |
-| `X-ACTIONPOP-SOURCE-URL` | standard | Canonical source page of the event | Absolute URL |
-| `X-ACTIONPOP-GROUP` | standard | Group contributing the event, repeated once per group | Group identifier |
-| `X-ACTIONPOP-GEO-STATUS` | full | Outcome of geographic enrichment | `resolved`, `national`, `international`, `incomplete`, `invalid`, `unavailable` |
-| `X-ACTIONPOP-COUNTRY` | full | Country retained or deduced by enrichment | Two-letter country code |
-| `X-ACTIONPOP-DEPARTMENT` | full | Department linked to the event | Department code as text, including leading zeroes and `2A`/`2B` |
-| `X-ACTIONPOP-INSEE-COMMUNE` | full | Commune linked to the event | INSEE code as text |
-| `X-ACTIONPOP-GEO-REFERENCE` | full | Reference version used for the attachment | Reference version identifier |
-| `X-ACTIONPOP-GEO-DIAGNOSTIC-COUNT` | full | Number of enrichment diagnostics for the event | Non-negative integer |
-| `X-ACTIONPOP-GEO-DIAGNOSTIC` | full | One enrichment diagnostic, repeated once per diagnostic; the code, field and severity travel as property parameters and the human-readable message as the property value | Diagnostic code, field, severity and message |
-| `X-ACTIONPOP-RAW-DEPARTMENT` | full | Department code exactly as stated by the source | Raw source value |
-| `X-ACTIONPOP-RAW-COMMUNE` | full | Commune name exactly as stated by the source | Raw source value |
+| Property                           | Level    | Meaning                                                                                                                                                                  | Permitted values                                                                |
+| ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `X-ACTIONPOP-EVENT-ID`             | identity | Stable source identity of the event, identical to the entry identity                                                                                                     | Opaque source identifier                                                        |
+| `X-ACTIONPOP-UPDATED-AT`           | identity | Last update timestamp of the event, in UTC                                                                                                                               | Calendar UTC timestamp                                                          |
+| `X-ACTIONPOP-PERIOD`               | identity | Last processing period in which the event was observed                                                                                                                   | Period token                                                                    |
+| `X-ACTIONPOP-EVENT-TYPE`           | standard | Event type label published by the source                                                                                                                                 | Event type label                                                                |
+| `X-ACTIONPOP-SOURCE-URL`           | standard | Canonical source page of the event                                                                                                                                       | Absolute URL                                                                    |
+| `X-ACTIONPOP-GROUP`                | standard | Group contributing the event, repeated once per group                                                                                                                    | Group identifier                                                                |
+| `X-ACTIONPOP-GEO-STATUS`           | full     | Outcome of geographic enrichment                                                                                                                                         | `resolved`, `national`, `international`, `incomplete`, `invalid`, `unavailable` |
+| `X-ACTIONPOP-COUNTRY`              | full     | Country retained or deduced by enrichment                                                                                                                                | Two-letter country code                                                         |
+| `X-ACTIONPOP-DEPARTMENT`           | full     | Department linked to the event                                                                                                                                           | Department code as text, including leading zeroes and `2A`/`2B`                 |
+| `X-ACTIONPOP-INSEE-COMMUNE`        | full     | Commune linked to the event                                                                                                                                              | INSEE code as text                                                              |
+| `X-ACTIONPOP-GEO-REFERENCE`        | full     | Reference version used for the attachment                                                                                                                                | Reference version identifier                                                    |
+| `X-ACTIONPOP-GEO-DIAGNOSTIC-COUNT` | full     | Number of enrichment diagnostics for the event                                                                                                                           | Non-negative integer                                                            |
+| `X-ACTIONPOP-GEO-DIAGNOSTIC`       | full     | One enrichment diagnostic, repeated once per diagnostic; the code, field and severity travel as property parameters and the human-readable message as the property value | Diagnostic code, field, severity and message                                    |
+| `X-ACTIONPOP-RAW-DEPARTMENT`       | full     | Department code exactly as stated by the source                                                                                                                          | Raw source value                                                                |
+| `X-ACTIONPOP-RAW-COMMUNE`          | full     | Commune name exactly as stated by the source                                                                                                                             | Raw source value                                                                |
 
 Standard properties are emitted in addition to the experimental ones, independently of the metadata level:
 
-| Property | Meaning | Omitted when |
-|----------|---------|--------------|
-| `LOCATION` | Postal address of the event, preferring the full address, then the short address, then the city with its postal code | The event states no address |
-| `URL` | Canonical source page of the event | The event states no source page |
-| `CATEGORIES` | Event type label | The event states no event type |
-| `GEO` | Latitude and longitude of the event | The event states no coordinates |
+| Property     | Meaning                                                                                                              | Omitted when                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `LOCATION`   | Postal address of the event, preferring the full address, then the short address, then the city with its postal code | The event states no address     |
+| `URL`        | Canonical source page of the event                                                                                   | The event states no source page |
+| `CATEGORIES` | Event type label                                                                                                     | The event states no event type  |
+| `GEO`        | Latitude and longitude of the event                                                                                  | The event states no coordinates |
 
 A diagnostic therefore looks like `X-ACTIONPOP-GEO-DIAGNOSTIC;CODE=commune_ambiguous;FIELD=location.commune.name;SEVERITY=warning:several communes match "Sainte-Colombe"`. Only the message is free text, so any message content stays safely escaped.
 
 Properties are additive and optional; the calendar payload is valid at every level, including when no metadata is exposed.
 
-### Key Entities *(include if data involved)*
+### Key Entities _(include if data involved)_
 
 - **Calendar Event**: A published event eligible for subscription, identified by its stable source identity, with title, description, start and end instants, sequence, timezone, event type, geographic attachment and optional source address.
 - **Calendar Feed**: The RFC 5545 document produced for one request, with the selected events and the metadata needed by calendar clients to revalidate or update it.
@@ -261,7 +264,7 @@ Properties are additive and optional; the calendar payload is valid at every lev
 - **Configuration File**: The single YAML document that holds the application settings, including every calendar setting, together with the environment overrides applied on top of it and the validation outcome for the merged result.
 - **Metadata Property**: An experimental entry property, prefixed for the project, that carries one piece of reconciliation, classification, provenance or diagnostic information, with a defined value domain, metadata level and stability guarantee.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

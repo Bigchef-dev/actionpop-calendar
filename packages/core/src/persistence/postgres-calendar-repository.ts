@@ -51,6 +51,14 @@ export interface PublicationSummary {
 export class PostgresCalendarDatasetRepository {
   public constructor(private readonly prisma: PrismaClient) {}
 
+  public async markEventCancelled(sourceEventId: string): Promise<boolean> {
+    const result = await this.prisma.eventRecord.updateMany({
+      where: { sourceEventId, status: { not: 'CANCELLED' } },
+      data: { status: 'CANCELLED', sequence: { increment: 1 } },
+    });
+    return result.count > 0;
+  }
+
   public async getCurrent(scopeId: string): Promise<CalendarDataset | null> {
     const snapshot = await this.prisma.calendarSnapshot.findFirst({
       where: { scopeId, status: 'complete' },

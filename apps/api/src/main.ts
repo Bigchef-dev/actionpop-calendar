@@ -12,11 +12,12 @@ import {
   PostgresCalendarEventQuery,
   PostgresGeographicReferenceRepository,
   PostgresEventQuery,
+  PostgresSubjectSearch,
   probeRedis,
   runPreflight,
 } from '@actionpop/core';
 import { buildApp } from './server.js';
-import { loadApiConfiguration } from './config.js';
+import { loadApiConfiguration, loadCorsOrigins } from './config.js';
 import { logger } from './logger.js';
 
 process.on('uncaughtException', (error: Error) => {
@@ -72,6 +73,8 @@ export async function startApi(): Promise<void> {
   const app = await buildApp({
     datasetRepository: new PostgresCalendarDatasetRepository(postgres),
     eventQuery: new PostgresEventQuery(postgres),
+    subjectSearch: new PostgresSubjectSearch(postgres),
+    corsOrigins: loadCorsOrigins(),
     calendarService: new FilteredCalendarService(
       new PostgresCalendarEventQuery(postgres),
       {
@@ -96,7 +99,14 @@ export async function startApi(): Promise<void> {
       disabledFamilies: config.calendar.disabledFamilies,
       maxGroupsPerEvent: config.calendar.maxGroupsPerEvent,
     },
-    apiReference: process.env.API_REFERENCE !== 'false',
+    // Off unless explicitly enabled: an exploratory console and a raw schema have no reason to
+    // be reachable from the internet on a service that only serves a calendar.
+    apiReference: process.env.API_REFERENCE === 'true',
+    volumeBandSalt: config.observability.bandSalt,
+    buildInfo: {
+      deployment: config.observability.deployment,
+      version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
+    },
     health: {
       redis: async () => {
         await redis.ping();

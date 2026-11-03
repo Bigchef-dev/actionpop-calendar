@@ -1,0 +1,31 @@
+# The published site: a static build served by nginx, behind the application edge.
+FROM node:26-alpine AS build
+WORKDIR /app
+RUN npm install --global pnpm@12.8.1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+COPY packages packages
+COPY apps/web apps/web
+COPY data data
+# Only the web workspace is installed: the API, the worker, `@actionpop/core` and the Prisma client
+# have no business in a static site image. The site reads its action-type catalogue from `data/` at
+# build time, not from the shared package.
+# `--ignore-scripts` skips the root `prepare` hook, which generates the Prisma client.
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @actionpop/web...
+# Served from the root of the application edge; the GitHub Pages fallback passes its own value.
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+RUN pnpm --filter @actionpop/web build
+
+FROM nginx:1.27-alpine AS runtime
+RUN addgroup -S actionpop && adduser -S actionpop -G actionpop \
+    && chown -R actionpop:actionpop /var/cache/nginx /usr/share/nginx/html \
+    # nginx must not run as root, so its pid file moves out of /run where only root may write.
+    && sed -i 's#^pid .*#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf \
+    # The entrypoint scripts rewrite conf.d, which is pointless on a read-only root filesystem.
+    && rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY infra/edge/web.conf /etc/nginx/conf.d/default.conf
+USER actionpop
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]

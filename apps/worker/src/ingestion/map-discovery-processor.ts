@@ -83,7 +83,7 @@ export async function processMapDiscovery(
     );
     deps.metrics.setGauge(
       'actionpop_ingestion_last_success_timestamp',
-      {},
+      { source: 'map' },
       Math.floor(Date.now() / 1000),
     );
     await deps.cycleMetrics.increment(job.periodToken, mapDiscoveryCycleSamples(counters));

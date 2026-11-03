@@ -24,6 +24,7 @@ export async function upsertEventRecord(
       endTime: new Date(event.endTime),
       contentHash: event.contentHash,
       sequence: event.sequence,
+      status: event.status ?? 'ACTIVE',
       timezone: 'Europe/Paris',
       ...geographyColumns(event),
     },
@@ -35,6 +36,7 @@ export async function upsertEventRecord(
       endTime: new Date(event.endTime),
       contentHash: event.contentHash,
       sequence: event.sequence,
+      status: event.status ?? 'ACTIVE',
       ...geographyColumns(event),
     },
   });

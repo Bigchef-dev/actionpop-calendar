@@ -1,0 +1,113 @@
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Header,
+  Inject,
+  Query,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  parseSubjectSearchRequest,
+  searchSubjects,
+  type SearchAnswer,
+  type SubjectSearchReader,
+} from '@actionpop/core';
+
+import { SERVER_OPTIONS, SUBJECT_SEARCH } from '../constants.js';
+import type { ServerOptions } from '../server.js';
+
+const SEARCH_ANSWER_SCHEMA = {
+  type: 'object',
+  required: ['query', 'subjects', 'total', 'kindCounts'],
+  properties: {
+    query: { type: 'string', example: 'lyon' },
+    total: { type: 'integer', example: 3 },
+    kindCounts: {
+      type: 'object',
+      additionalProperties: { type: 'integer' },
+      example: { commune: 1, department: 1, group: 1 },
+    },
+    subjects: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['kind', 'id', 'label', 'calendar'],
+        properties: {
+          kind: { type: 'string', example: 'commune' },
+          id: { type: 'string', example: '69123' },
+          label: { type: 'string', example: 'Lyon' },
+          qualifier: { type: 'string', example: 'Rhône' },
+          parent: { type: 'string', example: 'Rhône' },
+          population: { type: 'integer', example: 522228 },
+          calendar: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', example: '/calendar.ics' },
+              params: { type: 'object', additionalProperties: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+@ApiTags('search')
+@Controller('search')
+export class SearchController {
+  public constructor(
+    @Inject(SUBJECT_SEARCH) private readonly reader: SubjectSearchReader,
+    @Inject(SERVER_OPTIONS) private readonly options: ServerOptions,
+  ) {}
+
+  /**
+   * Records the outcome and the requested family only: the query text is never recorded, because
+   * a search term is exactly the kind of value that would single out a visitor.
+   */
+  private observe(outcome: 'fruitful' | 'unfruitful' | 'rejected', kind: string): void {
+    this.options.metrics?.increment('actionpop_search_requests_total', { outcome, kind });
+  }
+
+  private kindOf(request: { kinds?: readonly string[] }): string {
+    const kinds = request.kinds ?? [];
+    return kinds.length === 1 ? (kinds[0] ?? 'other') : 'all';
+  }
+
+  @Get('subjects')
+  @Header('Cache-Control', 'public, max-age=300')
+  @ApiOperation({
+    summary: 'Resolve a human query to calendar subjects',
+    description:
+      'Returns communes, departments, action groups and intercommunal territories matching the query, each carrying the ' +
+      'calendar filter parameters that produce its calendar. The read is public and read-only.',
+  })
+  @ApiQuery({ name: 'q', required: true, description: 'Query, 2 to 64 characters' })
+  @ApiQuery({
+    name: 'kind',
+    required: false,
+    description: 'Comma-separated kinds among commune, department, group, epci. Default: all',
+  })
+  @ApiQuery({ name: 'limit', required: false, description: 'Between 1 and 30. Default 18' })
+  @ApiOkResponse({ schema: SEARCH_ANSWER_SCHEMA })
+  public async search(@Query() query: Record<string, string | undefined>): Promise<SearchAnswer> {
+    const parsed = parseSubjectSearchRequest(query);
+    if (!parsed.ok) {
+      this.observe('rejected', 'other');
+      throw new BadRequestException({
+        error: 'invalid search request',
+        diagnostics: parsed.diagnostics,
+      });
+    }
+
+    try {
+      const answer = await searchSubjects(parsed.request, this.reader);
+      this.observe(answer.total === 0 ? 'unfruitful' : 'fruitful', this.kindOf(parsed.request));
+      return answer;
+    } catch {
+      this.observe('rejected', 'other');
+      throw new ServiceUnavailableException({ error: 'search unavailable' });
+    }
+  }
+}

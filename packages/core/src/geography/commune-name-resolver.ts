@@ -1,4 +1,4 @@
-import { normalizeGeographicName } from '../domain/geographic-identity.js';
+import { normalizeNameForSearch } from '../domain/geographic-identity.js';
 import type { CalendarFilterDiagnostic } from '../calendar-filters/calendar-filter.js';
 import type { GeographicReferenceReader } from './geographic-reference-reader.js';
 import type { CommuneReferenceRecord } from './reference-types.js';
@@ -43,7 +43,7 @@ export class CommuneNameResolver {
     for (const name of names) {
       const candidates = await this.reader.findCommunesByNormalizedName(
         version.version,
-        normalizeGeographicName(name),
+        normalizeNameForSearch(name),
       );
 
       if (candidates.length === 0) continue;
@@ -63,6 +63,18 @@ export class CommuneNameResolver {
     }
 
     return { inseeCodes: [...codes].sort(), diagnostics };
+  }
+
+  public async resolveEpcis(ids: readonly string[]): Promise<ResolvedCommuneNames> {
+    if (this.reader.resolveEpcis === undefined) {
+      return {
+        inseeCodes: [],
+        diagnostics: [
+          error('epci_unavailable', 'epci', 'EPCI references are not available'),
+        ],
+      };
+    }
+    return await this.reader.resolveEpcis(ids);
   }
 }
 
