@@ -6,6 +6,9 @@ deployment secrets through the environment rather than committing them. Set
 does not require authentication.
 
 ```bash
+# `api`, `worker` and `web` join the external `monitoring` network, which Compose never
+# creates: provide it once on the host (see "Monitoring" below).
+docker network create monitoring
 docker compose -f infra/compose/docker-compose.yml up -d
 docker compose -f infra/compose/docker-compose.yml ps
 ```
@@ -52,14 +55,17 @@ The `web` service builds `apps/web` and serves it as static files; the edge prox
 ## Monitoring
 
 `api` and `worker` also join the external `monitoring` network so the Prometheus already running
-on the server can scrape them without a published port. Create the network once:
+on the server can scrape them without a published port. Because Compose never creates an external
+network, it must exist before the first `up`; the Deploy commands above create it, and on an
+existing host it is already there:
 
 ```bash
 docker network create monitoring
 ```
 
-Rename it with `MONITORING_NETWORK` if your monitoring project uses another name. The dashboards
-and alert rules live in `infra/monitoring/`; see its README for the mounts.
+Rename it with `MONITORING_NETWORK` if your monitoring project uses another name; the variable
+renames the network Compose joins, so create it under the same name. The dashboards and alert
+rules live in `infra/monitoring/`; see its README for the mounts.
 
 ## Exploitation scan
 

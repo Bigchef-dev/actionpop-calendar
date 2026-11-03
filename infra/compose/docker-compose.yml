@@ -70,6 +70,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   api:
     image: ${API_IMAGE:-actionpop-api:latest}
@@ -84,10 +85,13 @@ services:
       PORT: "3000"
       # Origins allowed to read the public JSON routes; list the published site origin.
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-}
-      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+      # Empty means "search the usual paths". Naming a file makes it mandatory, and
+      # config/actionpop.yaml is git-ignored, so a hard-coded default would stop the API
+      # from starting on a fresh clone or in CI.
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-}
     volumes:
-      # The whole document directory is mounted read-only, so the image still
-      # starts from the shipped example when config/actionpop.yaml is absent.
+      # The whole document directory is mounted read-only: the runtime picks
+      # config/actionpop.yaml when the operator ships one, and falls back to the example.
       - ../../config:/app/config:ro
     depends_on:
       migrate:
@@ -102,10 +106,14 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://api:3000/internal/live']
+      # Loopback, like every other probe: a service name would make the check depend on Docker
+      # DNS instead of answering "is this container serving?".
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/internal/live']
       interval: 10s
       timeout: 3s
       retries: 5
+      # A cold start on a loaded machine must not consume the retries before the server listens.
+      start_period: 20s
 
   worker:
     image: ${WORKER_IMAGE:-actionpop-worker:latest}
@@ -120,7 +128,8 @@ services:
       UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:-}
       UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
       WORKER_HEALTH_PORT: "8081"
-      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-/app/config/actionpop.yaml}
+      # Same rule as the API: an empty value lets the runtime fall back to the example.
+      APP_CONFIG_FILE: ${APP_CONFIG_FILE:-}
     volumes:
       - ../../config:/app/config:ro
     depends_on:
@@ -139,6 +148,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   edge:
     image: nginx:1.27-alpine
