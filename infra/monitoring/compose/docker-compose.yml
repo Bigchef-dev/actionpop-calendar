@@ -1,0 +1,80 @@
+# The shared monitoring stack: a self-contained Prometheus + Grafana provisioned from the package
+# in `infra/monitoring/`.
+#
+#   docker compose -f infra/monitoring/compose/docker-compose.yml up -d
+#
+# It is a separate Compose project on purpose. It owns the `monitoring` network, and the
+# application stack declares that same network as external, which is how the API and the worker
+# become scannable without publishing a single port on the host.
+#
+# Both UIs bind to 127.0.0.1: a monitoring console has no business being reachable from the
+# internet, and reaching it from a laptop goes through an SSH tunnel.
+name: actionpop-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.9.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      # Required by the reload step documented in the parent README, and by any future SIGHUP-free
+      # rule change.
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # The same rules file an existing Prometheus would mount, so the two cannot diverge.
+      - ../prometheus/alert-rules.yml:/etc/prometheus/actionpop-alert-rules.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:9090/-/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  grafana:
+    image: grafana/grafana:12.4.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      # Grafana refuses to start with the default password; `.env.example` shows how to set one.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      # Anonymous dashboards behind a loopback port would still leak usage data to anything that can
+      # reach the port, so viewing requires the account above.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/actionpop-dashboards/actionpop-launch.json
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/etc/grafana/actionpop-dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/api/health']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+networks:
+  # Declared with an explicit name so Compose creates `monitoring` rather than
+  # `actionpop-monitoring_monitoring`. The application stack joins it as an external network, so the
+  # name is the contract between the two projects.
+  monitoring:
+    name: ${MONITORING_NETWORK:-monitoring}
+
+volumes:
+  prometheus-data:
+  grafana-data:

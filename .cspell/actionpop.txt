@@ -205,3 +205,4 @@ thunderbird
 unconfigured
 untriaged
 COEP
+PGDATA

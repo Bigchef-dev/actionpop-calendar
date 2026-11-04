@@ -28,6 +28,19 @@ TypeScript is held at 6.0.x on purpose: `typescript-eslint` declares `typescript
 > =4.8.4 <6.1.0`, so TypeScript 7 would silently disable type-aware linting. Dependabot
 > ignores that major; raising it needs the linter's support first.
 
+Runtime images are pinned to a current major in `infra/compose/docker-compose.yml`, and
+`.github/workflows/integration.yml` runs the same tags, asserted by
+`tests/integration/images.test.ts`. Two rules follow from datastore persistence:
+
+- **A datastore major may only move forward.** Redis refuses to load a data directory
+  written by a newer major, and PostgreSQL refuses to start on data from a newer major,
+  so a downgrade is a data-loss decision, not an image change.
+- **A datastore major bump recreates its volume.** The named volumes carry the format of
+  the major that wrote them. Recreating them is deliberate:
+  `docker compose -f infra/compose/docker-compose.yml down -v`, then `up -d`. That drops
+  the queue and the database; the dispatcher re-schedules group work on the next cycle,
+  so nothing is lost that PostgreSQL does not already hold.
+
 Run the complete repository quality pipeline:
 
 ```bash

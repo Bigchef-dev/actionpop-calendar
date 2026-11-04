@@ -1,0 +1,47 @@
+# Prometheus configuration for the shared monitoring stack.
+#
+# The `actionpop` job below is the same definition shipped in
+# `infra/monitoring/prometheus/scrape-snippet.yml`, so this stack and an existing Prometheus scrape
+# the application identically. `tests/integration/monitoring-package.test.ts` asserts the two stay
+# in sync.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    stack: actionpop-monitoring
+
+rule_files:
+  - /etc/prometheus/actionpop-alert-rules.yml
+
+scrape_configs:
+  # Monitoring the monitor: `up{job="prometheus"}` catches a configuration that loaded but cannot
+  # scrape anything, which is otherwise indistinguishable from a quiet network.
+  - job_name: prometheus
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+
+  - job_name: actionpop
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      # The two services expose their metrics on different paths, so the path follows the service.
+      # An absent target is a genuine signal: it means the application stack is not running.
+      - targets: ['api:3000']
+        labels:
+          service: api
+      - targets: ['worker:8081']
+        labels:
+          service: worker
+    relabel_configs:
+      - source_labels: [service]
+        regex: api
+        target_label: __metrics_path__
+        replacement: /internal/metrics
+      - source_labels: [service]
+        regex: worker
+        target_label: __metrics_path__
+        replacement: /metrics
+      # Prometheus already fills `instance` from the target; the application's own `deployment`
+      # label is what distinguishes two instances at cutover.
+      - source_labels: [__address__]
+        target_label: instance

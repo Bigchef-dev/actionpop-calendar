@@ -16,6 +16,7 @@ import {
 } from '@actionpop/core';
 
 import { SERVER_OPTIONS, SUBJECT_SEARCH } from '../constants.js';
+import { logger } from '../logger.js';
 import type { ServerOptions } from '../server.js';
 
 const SEARCH_ANSWER_SCHEMA = {
@@ -105,7 +106,10 @@ export class SearchController {
       const answer = await searchSubjects(parsed.request, this.reader);
       this.observe(answer.total === 0 ? 'unfruitful' : 'fruitful', this.kindOf(parsed.request));
       return answer;
-    } catch {
+    } catch (error) {
+      // The visitor gets a stable 503; the cause belongs in the log, otherwise an unreachable
+      // database looks exactly like a bug in the search. The query itself stays out of it.
+      logger.error({ err: error }, 'Search failed');
       this.observe('rejected', 'other');
       throw new ServiceUnavailableException({ error: 'search unavailable' });
     }

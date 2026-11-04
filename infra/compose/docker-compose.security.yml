@@ -8,7 +8,7 @@
 # service itself is not declared here: the workflow runs the official image with host networking.
 services:
   edge-scan:
-    image: nginx:1.27-alpine
+    image: nginx:1.29-alpine
     networks:
       - private
       # Docker cannot publish a port from a network declared `internal: true`, so the scanner

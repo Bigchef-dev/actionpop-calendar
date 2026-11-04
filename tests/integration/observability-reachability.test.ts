@@ -51,7 +51,6 @@ describe('observability reachability', () => {
 
   it('keeps the private surfaces off the edge and on the shared network', () => {
     expect(EDGE).not.toMatch(/location[^{]*\/internal/);
-    expect(COMPOSE).toContain('${MONITORING_NETWORK:-monitoring}');
     expect(COMPOSE).toContain('external: true');
     // Both metrics producers join the monitor's network; neither publishes a port.
     const apiBlock = /api:([\s\S]*?)worker:/.exec(COMPOSE)?.[1] ?? '';

@@ -15,6 +15,36 @@ from the monitor only.
 
 ## Installation
 
+Two paths, depending on whether a monitoring stack already runs on the host.
+
+### A. Nothing runs yet — use the shipped common stack
+
+`infra/monitoring/compose/` is a separate Compose project that runs a provisioned Prometheus and
+Grafana and creates the shared network. It is the shortest route to a working dashboard, and it is
+what `quickstart.md` scenarios 5 to 7 assume.
+
+```bash
+cd infra/monitoring/compose
+cp .env.example .env      # then set GRAFANA_ADMIN_PASSWORD
+docker compose up -d
+```
+
+See [compose/README.md](compose/README.md) for ports, retention, and how to tear it down.
+
+Then start the application stack; it joins the network the common stack just created:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml up -d
+```
+
+Grafana is at <http://127.0.0.1:3001> and Prometheus at <http://127.0.0.1:9090>, both bound to the
+loopback interface.
+
+### B. A Grafana already runs with other services — apply the package to it
+
+Do not start the common stack, or you will have two Grafana instances. Keep yours and follow the steps
+below.
+
 1. **Create the shared network once** on the host, outside both Compose projects:
 
    ```bash
@@ -30,7 +60,10 @@ from the monitor only.
    docker compose -f infra/compose/docker-compose.yml up -d
    ```
 
-3. **Merge the scrape job** into the monitor's Prometheus configuration:
+### Steps shared by both paths
+
+3. **Merge the scrape job** into the monitor's Prometheus configuration (already done in the
+   shipped common stack):
 
    ```bash
    cat infra/monitoring/prometheus/scrape-snippet.yml
@@ -96,7 +129,8 @@ API nor the worker ever publishes a port, which is what keeps usage data off the
 
 ## Proving the alerts
 
-Each rule can be provoked on a copy of the stack:
+Each rule can be provoked on a copy of the stack. With the common stack, the application runs
+under its own project name, so `docker compose stop` is issued from `infra/compose/`:
 
 | Alert | Provoke with |
 |---|---|

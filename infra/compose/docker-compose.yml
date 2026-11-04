@@ -2,7 +2,10 @@ name: actionpop
 
 services:
   redis:
-    image: redis:7-alpine
+    # Pinned to the current major. Redis refuses to load a data directory written by a newer
+    # version (an 8.x volume is RDB format 15, unreadable by 7.x), so this tag must only ever move
+    # forward, or the named volume must be recreated.
+    image: redis:8-alpine
     command: ['redis-server', '/usr/local/etc/redis/redis.conf']
     volumes:
       - redis-data:/data
@@ -16,13 +19,15 @@ services:
       retries: 10
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-actionpop}
       POSTGRES_USER: ${POSTGRES_USER:-actionpop}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-actionpop}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18 keeps PGDATA in a versioned subdirectory, so the volume mounts the parent.
+      # Mounting `/var/lib/postgresql/data` makes the 18 image refuse to start.
+      - postgres-data:/var/lib/postgresql
     networks:
       - private
     restart: unless-stopped
@@ -151,7 +156,7 @@ services:
       start_period: 20s
 
   edge:
-    image: nginx:1.27-alpine
+    image: nginx:1.29-alpine
     profiles: ['edge']
     ports:
       - "80:80"
@@ -169,6 +174,7 @@ services:
     networks:
       - private
       - monitoring
+      - caddy_network
     restart: unless-stopped
 
 networks:
@@ -179,7 +185,11 @@ networks:
   # destroys it: `docker network create monitoring` once on the host, then both projects join it.
   monitoring:
     external: true
-    name: ${MONITORING_NETWORK:-monitoring}
+    name: monitoring
+
+  caddy_network:
+    external: true
+    name: caddy_network
 
 volumes:
   redis-data:

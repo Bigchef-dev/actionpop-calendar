@@ -12,6 +12,10 @@ docker compose -f infra/compose/docker-compose.yml restart redis
 docker compose -f infra/compose/docker-compose.yml exec redis redis-cli BGREWRITEAOF
 ```
 
+A data directory written by a newer Redis major cannot be read by an older one: Redis
+aborts on load and the container exits. Moving the `redis` image tag backwards therefore
+requires recreating the `redis-data` volume, never downgrading in place.
+
 Back up the AOF and configuration to external storage according to the deployment
 platform policy. Restoring requires stopping Redis, restoring the backup into the
 volume, checking ownership, and starting Redis again. This procedure does not claim
