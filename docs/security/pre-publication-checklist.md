@@ -33,7 +33,7 @@ docker compose -f infra/compose/docker-compose.yml \
 |---|---|---|---|---|
 | 1 | Only the documented routes answer | `for p in / /calendar.ics /search/subjects /events /feed/x /telemetry/journey /internal/metrics /reference /openapi.json /nope; do curl -s -o /dev/null -w "$p %{http_code}\n" http://127.0.0.1:8080$p; done` | `200`/`405` for allowlisted paths, `404` for `/internal/metrics`, `/reference`, `/openapi.json`, `/nope` | |
 | 2 | Security headers present | `curl -sI http://127.0.0.1:8080/ \| grep -Ei 'content-security-policy\|x-frame-options\|referrer-policy\|permissions-policy\|x-content-type-options'` | all six present | |
-| 3 | Secure transport enforced | `curl -sI http:///<host>/` against the HTTPS edge | `301` to `https`, and `Strict-Transport-Security` on the HTTPS response | |
+| 3 | Secure transport enforced | `curl -sI http:///<host>/` | Caddy answers `301` to `https`, and `Strict-Transport-Security` is present on the HTTPS response | |
 | 4 | Private surfaces reachable by the monitor only | From the `monitoring` network: `curl -s api:3000/internal/metrics \| head -1` | `200` with `# HELP` lines | |
 | 5 | Metrics carry types | `curl -s http://127.0.0.1:8080/... ` is not applicable; read the same body as item 4 | every family has `# TYPE`; `actionpop_http_request_duration_seconds` is a `histogram` | |
 | 6 | No personal data in a series | `curl -s api:3000/internal/metrics \| grep -Ei 'insee\|commune=\|q=\|user_agent'` | no output | |
@@ -69,7 +69,7 @@ stack started with `infra/compose/docker-compose.security.yml`.
 |---|---|---|
 | 1 | `/` 200, `/tortue-hourra.png` 200, `/calendar.ics` 200, `/search/subjects` 400 without `q`, `/events` 200, `/feed/x` 404, `/telemetry/journey` GET 405 / POST 204, `/internal/*` 404, `/reference` 404, `/openapi.json` 404, `/nope` 404 | pass |
 | 2 | all six headers present | pass |
-| 3 | `301` on port 80 and `Strict-Transport-Security` on HTTPS — verified by configuration only; the local stack runs the plain-HTTP twin | n/a locally, to re-verify on the host |
+| 3 | `301` on port 80 (served by Caddy) and `Strict-Transport-Security` on HTTPS — verified by configuration only; the local stack runs the plain-HTTP twin | n/a locally, to re-verify on the host |
 | 4 | `api:3000/internal/metrics` answered `200` from inside the private network and `404` from the edge | pass |
 | 5 | every family carries `# TYPE`; duration is a `histogram` | pass |
 | 6 | no `insee`, `q=`, `commune=` or `user_agent` in the exposition | pass |

@@ -76,10 +76,16 @@ describe('published edge surface', () => {
     expect(HEADERS).toContain('Cross-Origin-Opener-Policy');
   });
 
-  it('redirects insecure transport and instructs browsers to stay secure', () => {
-    expect(HTTPS).toMatch(/listen 80;/);
-    expect(HTTPS).toContain('return 301 https://$host$request_uri;');
+  it('defers TLS to the host terminator and instructs browsers to stay secure', () => {
+    // Caddy owns ports 80/443, the certificates and the HTTP -> HTTPS redirect; this config must
+    // stay a plain-HTTP virtual host reachable only over the caddy_network.
+    expect(HTTPS).toContain('listen 8080;');
+    expect(HTTPS).not.toMatch(/listen\s+443/);
+    expect(HTTPS).not.toContain('ssl_certificate');
+    expect(HTTPS).not.toContain('return 301');
     expect(HTTPS).toContain('Strict-Transport-Security');
+    expect(HTTPS).toContain('proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;');
+    expect(HTTPS).toContain('proxy_set_header X-Forwarded-Proto https;');
   });
 
   it('limits the write surface to the journey endpoint and caps its body', () => {

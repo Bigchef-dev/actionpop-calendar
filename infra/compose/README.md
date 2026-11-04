@@ -3,7 +3,9 @@
 Copy `.env.example` to `.env`, replace the registry image names, and provide
 deployment secrets through the environment rather than committing them. Set
 `UPSTREAM_BASE_URL` for the worker; `UPSTREAM_TOKEN` is optional when the source
-does not require authentication.
+does not require authentication. `SOCK_PROXY` is optional: when set
+(`socks5://host:1080` or `http(s)://host:3128`), the worker reaches the source
+through that proxy instead of connecting directly.
 
 ```bash
 # `api`, `worker` and `web` join the external `monitoring` network, which Compose never
@@ -56,10 +58,24 @@ docker build -t actionpop-api:test -f infra/docker/Dockerfile.api .
 docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 ```
 
-Redis, worker, and internal health endpoints remain on the private network. Public
-HTTPS termination belongs at the deployment edge. Provide certificates under
-`infra/compose/tls/` and start the edge explicitly with
-`docker compose --profile edge -f infra/compose/docker-compose.yml up -d`.
+Redis, worker, and internal health endpoints remain on the private network. TLS terminates at the
+host-wide Caddy reverse proxy, which owns ports 80/443 for the whole server. The edge is a
+plain-HTTP virtual host reachable only as `edge:8080` over the external `caddy_network`, and is started
+explicitly with `docker compose --profile edge -f infra/compose/docker-compose.yml up -d`.
+
+A minimal Caddy site for it:
+
+```caddyfile
+calendar.example {
+	reverse_proxy edge:8080
+}
+```
+
+Create the shared network once on the host (Compose never creates external networks):
+
+```bash
+docker network create caddy_network
+```
 
 ## Published site
 

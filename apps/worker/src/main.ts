@@ -34,6 +34,7 @@ import { Job, Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 import { ActionPopulaireClient } from './adapters/action-populaire-client.js';
+import { createUpstreamFetcher } from './adapters/upstream-fetcher.js';
 import { PostgresGroupCatalogueRepository } from './catalogue/group-catalogue.js';
 import { synchronizeDirectory } from './catalogue/directory-sync.js';
 import { loadWorkerConfiguration } from './config.js';
@@ -106,6 +107,7 @@ export function createWorkerRuntime(
   const client = new ActionPopulaireClient({
     baseUrl: config.upstream!.baseUrl,
     ...(config.upstreamToken === undefined ? {} : { token: config.upstreamToken }),
+    fetcher: createUpstreamFetcher(config.sockProxy),
   });
   const publisher = new PostgresSnapshotPublisher(new PostgresCalendarDatasetRepository(postgres));
   const revisions = new SnapshotPublisher();

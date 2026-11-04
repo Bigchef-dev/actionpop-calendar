@@ -8,7 +8,9 @@
 #
 # Credentials are deliberately absent: DATABASE_URL, REDIS_URL, UPSTREAM_TOKEN
 # and UPSTREAM_BASE_URL stay environment-only so this document can be reviewed
-# and versioned safely.
+# and versioned safely. SOCK_PROXY is environment-only too: it names the proxy
+# (socks5:// or http(s)://) the worker reaches the source through, and usually
+# carries credentials.
 
 app:
   # NODE_ENV — development | production | test

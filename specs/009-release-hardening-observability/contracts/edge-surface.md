@@ -22,8 +22,15 @@ answers `404` at the edge.
 
 ## Redirects and transport
 
-- Port 80 answers `301` to the same host and path on `https`.
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains` on HTTPS responses.
+TLS terminates at the host-wide Caddy reverse proxy, which owns ports `80` and `443` for every
+service on the server and forwards this virtual host to `edge:8080` over the `caddy_network`. The nginx
+edge therefore speaks plain HTTP, is never published, and declares no certificate.
+
+- Caddy answers port 80 with `301` to the same host and path on `https`.
+- Caddy sets `X-Forwarded-For`/`X-Forwarded-Proto`; the edge forwards the chain unchanged so the
+  API still sees the browser address first.
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` on HTTPS responses; the edge
+  emits it and Caddy passes it through.
 
 ## Response headers
 

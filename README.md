@@ -199,6 +199,44 @@ reference version, events are still published with their stated country and a
 `geographic_status` of `unavailable`. PostgreSQL integration tests read `TEST_DATABASE_URL` (falling
 back to `DATABASE_URL`) and isolate each test file in its own schema.
 
+In production the database is only reachable from the Compose network, so run the refresh
+from the repository root inside a one-off worker container. The worker image does not embed
+`data/` (the commune export is 20 MB) or `scripts/`, so bind-mount them read-only and reuse
+the service environment, which already declares `DATABASE_URL`:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml run --rm --no-deps \
+  -v "$PWD/data:/app/data:ro" \
+  -v "$PWD/scripts:/app/scripts:ro" \
+  -e GEOGRAPHIC_PUBLICATION_DATE=2026-01-01 \
+  -e GEOGRAPHIC_EPCI_GROUPEMENTS_PATH=/app/data/liste-des-groupements.csv \
+  --entrypoint node \
+  worker /app/scripts/geographic-refresh.mjs
+```
+
+Omit `GEOGRAPHIC_EPCI_GROUPEMENTS_PATH` to derive the intercommunal reference from the
+commune dataset instead of the authoritative "liste des groupements" export. The command
+prints the staged/active version and its counts; the version is content-addressed, so
+repeating an identical refresh is a no-op, and a rejected refresh leaves the previous
+active version untouched. Check the result with:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml exec postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+   -c "select version, status, publication_date, commune_count, department_count
+       from geographic_reference_version where status = \$\$active\$\$;"'
+```
+
+Event types are seeded the same way, without the data mount:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml run --rm --no-deps \
+  -v "$PWD/scripts:/app/scripts:ro" \
+  -e EVENT_TYPES="tractage,boitage,diffusion-tracts" \
+  --entrypoint node \
+  worker /app/scripts/event-types-sync.mjs
+```
+
 Prisma Studio provides a local visual interface for the persisted Postgres data and
 `pnpm dev:tools` additionally starts RedisInsight and Bull Board:
 
@@ -334,6 +372,9 @@ created from the commented reference `config/actionpop.example.yaml`. The API an
 read the same document, every value has a documented default, and an environment variable
 overrides the matching key without editing the file. Secrets and credential-bearing endpoints
 (`DATABASE_URL`, `REDIS_URL`, `UPSTREAM_BASE_URL`, `UPSTREAM_TOKEN`) stay environment-only.
+`SOCK_PROXY` is environment-only as well: when set, the worker sends every upstream request
+through that proxy (`socks5://host:1080` or `http(s)://host:3128`), which lets the deployment
+choose its own egress address. Left unset, the worker connects directly.
 
 ```bash
 cp config/actionpop.example.yaml config/actionpop.yaml
@@ -351,7 +392,9 @@ from the running service: `GET /openapi.json` and the `/reference` page
 (`http://127.0.0.1:3000/reference` in development). Set `API_REFERENCE=false` to stop
 serving the page. Redis, BullMQ,
 worker responsibilities, and internal health routes stay on the private network.
-Production traffic must terminate HTTPS at the deployment edge.
+Production traffic must terminate HTTPS before it reaches the containers: the host-wide Caddy
+reverse proxy owns ports 80/443 and forwards `calendar.example` to the nginx edge over the
+`caddy_network` (see [infra/compose/README.md](infra/compose/README.md)).
 
 GitHub Actions runs install, typecheck, lint, tests, integration checks, builds, and
 both Docker targets. Pushes to `main` publish immutable API and worker images to
