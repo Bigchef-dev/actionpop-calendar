@@ -15,6 +15,13 @@ interface DispatcherQueue {
 /** A bare identifier is a group scope; the kind-aware form carries both kinds. */
 type ScopeTarget = string | ActiveScope;
 
+/**
+ * The pool behind Prisma holds ten connections by default. Scheduling every scope in one
+ * `Promise.all` (hundreds of ledger transactions at once) exhausts it and aborts the cycle
+ * with "Unable to start a transaction in the given time", so the work is bounded.
+ */
+const DEFAULT_SCHEDULING_CONCURRENCY = 4;
+
 interface ScopeSource {
   activeScopes?(): readonly ScopeTarget[] | Promise<readonly ScopeTarget[]>;
   allIds?(): readonly ScopeTarget[] | Promise<readonly ScopeTarget[]>;
@@ -37,6 +44,8 @@ export interface DispatcherOptions {
   /** Retires the event ingestions whose event has ended, before anything is promoted. */
   retirement?: { retireEndedScopes(now: Date): Promise<number> };
   maxNewGroupsPerCycle?: number;
+  /** How many scopes may be ledgered and enqueued at once; defaults to a pool-safe value. */
+  maxConcurrentScheduling?: number;
   /**
    * Groups already promoted during this period. The ceiling is per cycle, not per
    * dispatcher call, so a restart mid-period cannot promote a second full batch.
@@ -62,6 +71,38 @@ function scopeList(source: ScopeSource): Promise<readonly ActiveScope[]> {
         ? source.allIds()
         : [];
   return Promise.resolve(list).then((values) => values.map(toScope));
+}
+
+/**
+ * Runs `task` over `items` with at most `limit` in flight and returns the failures. A
+ * scope that fails must not prevent the others from being scheduled: the cycle retries
+ * the failure next time, but a single bad row cannot stall the whole fleet.
+ */
+async function runWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  task: (item: T) => Promise<void>,
+): Promise<unknown[]> {
+  const errors: unknown[] = [];
+  const lanes = Math.max(1, Math.min(limit, items.length));
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: lanes }, async () => {
+      for (;;) {
+        const index = next;
+        next += 1;
+        if (index >= items.length) return;
+        const item = items[index];
+        if (item === undefined) continue;
+        try {
+          await task(item);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+    }),
+  );
+  return errors;
 }
 
 export function createDispatcher(options: DispatcherOptions) {
@@ -94,8 +135,16 @@ export function createDispatcher(options: DispatcherOptions) {
             ? []
             : await options.promotion.promotePendingScopes(budget);
         const scopes = await scopeList(options.catalogue);
-        await Promise.all(
-          scopes.map(async (scope) => {
+        const requestedConcurrency =
+          options.maxConcurrentScheduling ?? DEFAULT_SCHEDULING_CONCURRENCY;
+        const maxConcurrentScheduling =
+          Number.isSafeInteger(requestedConcurrency) && requestedConcurrency > 0
+            ? requestedConcurrency
+            : DEFAULT_SCHEDULING_CONCURRENCY;
+        const failures = await runWithConcurrency(
+          scopes,
+          maxConcurrentScheduling,
+          async (scope) => {
             const jobId = buildIngestionJobId(scope.scopeId, period.periodStartUtc);
             if (options.isHandled !== undefined && (await options.isHandled(jobId))) return;
             // Recorded before the job exists: a worker can pick the job up and finish
@@ -114,8 +163,16 @@ export function createDispatcher(options: DispatcherOptions) {
               },
               { jobId },
             );
-          }),
+          },
         );
+        if (failures.length > 0) {
+          const first = failures[0];
+          throw new Error(
+            `failed to schedule ${failures.length} scope(s): ${
+              first instanceof Error ? first.message : String(first)
+            }`,
+          );
+        }
         await options.onCycle?.({ periodToken, promoted, scheduled: scopes.length, retired });
       } finally {
         running = false;

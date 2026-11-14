@@ -17,6 +17,8 @@ type StoredLedger = LedgerPatch & { attempts: number; error?: string };
 // Two concurrent transitions can wait on the same scope row under load; the default
 // five-second interactive timeout is too tight for that wait.
 const LEDGER_TRANSACTION_TIMEOUT_MS = 15_000;
+// Waiting for a pooled connection is a separate budget from the transaction itself.
+const LEDGER_TRANSACTION_MAX_WAIT_MS = 10_000;
 
 export class IngestionLedgerStore {
   private readonly values = new Map<string, StoredLedger>();
@@ -138,7 +140,7 @@ export class PostgresIngestionLedgerStore {
           },
         });
       },
-      { timeout: LEDGER_TRANSACTION_TIMEOUT_MS },
+      { timeout: LEDGER_TRANSACTION_TIMEOUT_MS, maxWait: LEDGER_TRANSACTION_MAX_WAIT_MS },
     );
   }
 

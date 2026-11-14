@@ -16,6 +16,7 @@ export * from './ingestion/event-mapper.js';
 export * from './ingestion/publication.js';
 export * from './ingestion/ingestion-outcome.js';
 export * from './dispatcher/cycle-report.js';
+export * from './dispatcher/cycle-runner.js';
 export * from './operations/ingestion-ledger.js';
 export * from './persistence/snapshot-publisher.js';
 export * from './persistence/event-repository.js';

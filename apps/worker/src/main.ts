@@ -44,6 +44,7 @@ import {
 } from './geography/reference-refresh.js';
 import { reEnrichEvents } from './geography/re-enrichment.js';
 import { reportDispatcherCycle } from './dispatcher/cycle-report.js';
+import { createCycleRunner } from './dispatcher/cycle-runner.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
 import { queueJobState } from './dispatcher/job-state.js';
 import { RedisLock } from './dispatcher/lock.js';
@@ -319,37 +320,68 @@ export function createWorkerRuntime(
         outcome: 'started',
       });
       healthServer = createServer(async (request, response) => {
-        const live = request.url === '/health/live';
-        const metrics = request.url === '/metrics';
-        if (metrics) {
-          const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
-          observability.metrics.setGauge(
-            'actionpop_queue_depth',
-            {},
-            (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0),
-          );
-          observability.metrics.setGauge('actionpop_redis_ready', {}, (await readiness()) ? 1 : 0);
-          observability.metrics.setGauge(
-            'actionpop_build_info',
-            {
-              deployment: config.observability.deployment,
-              version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
-            },
-            1,
-          );
-          response.statusCode = 200;
-          response.setHeader('content-type', 'text/plain; version=0.0.4');
-          response.end(observability.metrics.prometheus());
+        try {
+          const live = request.url === '/health/live';
+          const metrics = request.url === '/metrics';
+          if (metrics) {
+            const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
+            observability.metrics.setGauge(
+              'actionpop_queue_depth',
+              {},
+              (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0),
+            );
+            observability.metrics.setGauge(
+              'actionpop_redis_ready',
+              {},
+              (await readiness()) ? 1 : 0,
+            );
+            observability.metrics.setGauge(
+              'actionpop_build_info',
+              {
+                deployment: config.observability.deployment,
+                version: (process.env.APP_VERSION ?? '0.0.0').trim() || '0.0.0',
+              },
+              1,
+            );
+            response.statusCode = 200;
+            response.setHeader('content-type', 'text/plain; version=0.0.4');
+            response.end(observability.metrics.prometheus());
+            return;
+          }
+          const ready = live || (request.url === '/health/ready' && (await readiness()));
+          response.statusCode = ready ? 200 : 503;
+          response.setHeader('content-type', 'application/json');
+          response.end(JSON.stringify({ status: ready ? 'ready' : 'not_ready' }));
+        } catch (error) {
+          // A scrape or probe must never turn a transient Redis/Postgres failure into an
+          // unhandled rejection, which would stop the worker.
+          observability.logger.error('health request failed', {
+            operation: 'health',
+            outcome: 'failure',
+            failure: error instanceof Error ? error.message : 'unknown error',
+          });
+          if (!response.headersSent) {
+            response.statusCode = 503;
+            response.setHeader('content-type', 'application/json');
+            response.end(JSON.stringify({ status: 'not_ready' }));
+          } else {
+            response.destroy();
+          }
+        }
+      });
+      await new Promise<void>((resolve, reject) => {
+        if (healthServer === undefined) {
+          reject(new Error('health server could not be created'));
           return;
         }
-        const ready = live || (request.url === '/health/ready' && (await readiness()));
-        response.statusCode = ready ? 200 : 503;
-        response.setHeader('content-type', 'application/json');
-        response.end(JSON.stringify({ status: ready ? 'ready' : 'not_ready' }));
+        // Without this, a port conflict leaves the startup promise pending forever.
+        const onListenError = (error: Error) => reject(error);
+        healthServer.once('error', onListenError);
+        healthServer.listen(Number(env.WORKER_HEALTH_PORT ?? 8081), '0.0.0.0', () => {
+          healthServer?.off('error', onListenError);
+          resolve();
+        });
       });
-      await new Promise<void>((resolve) =>
-        healthServer?.listen(Number(env.WORKER_HEALTH_PORT ?? 8081), '0.0.0.0', resolve),
-      );
       observability.logger.info('worker health server listening', {
         operation: 'startup',
         outcome: 'health_ready',
@@ -360,7 +392,7 @@ export function createWorkerRuntime(
         outcome: 'redis_ready',
       });
 
-      const runCycle = async () => {
+      const runCycle = createCycleRunner(async () => {
         // An unavailable map directory must not stop the cycle: the listings that can
         // still be retrieved are dispatched even when the directory cannot be read.
         const directory = await synchronizeDirectory(
@@ -387,10 +419,13 @@ export function createWorkerRuntime(
           });
         }
         await dispatcher.runOnce();
-      };
+      }, observability.logger);
 
+      // A failing first cycle must not abort the whole worker: the interval still retries.
       await runCycle();
-      timer = setInterval(runCycle, dispatcher.intervalMs);
+      timer = setInterval(() => {
+        void runCycle();
+      }, dispatcher.intervalMs);
       observability.logger.info('worker started', {
         operation: 'startup',
         outcome: 'ready',
@@ -412,8 +447,32 @@ export function createWorkerRuntime(
 
 export async function startWorker(): Promise<void> {
   loadEnvFile();
+  const { logger } = createWorkerObservability();
+  // Last-resort safety net: an escaped rejection must be logged, not terminate the worker
+  // mid-cycle. Cycles and probes handle their own errors; this only covers the unforeseen.
+  process.on('uncaughtException', (error: Error) => {
+    logger.error('uncaught exception', {
+      operation: 'process',
+      outcome: 'failure',
+      failure: error.message,
+    });
+  });
+  process.on('unhandledRejection', (reason: unknown) => {
+    logger.error('unhandled promise rejection', {
+      operation: 'process',
+      outcome: 'failure',
+      failure: reason instanceof Error ? reason.message : String(reason),
+    });
+  });
   const runtime = createWorkerRuntime();
-  await runtime.start();
+  try {
+    await runtime.start();
+  } catch (error) {
+    // Release the pool and connections: otherwise the process stays alive with open
+    // handles and never dispatches anything again.
+    await runtime.close().catch(() => undefined);
+    throw error;
+  }
   const shutdown = async () => {
     await runtime.close();
   };
