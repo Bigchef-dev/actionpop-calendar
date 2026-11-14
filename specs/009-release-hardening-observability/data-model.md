@@ -1,5 +1,7 @@
 # Phase 1 Data Model: Release Hardening and Observability
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 This feature adds **no PostgreSQL table and no Prisma schema change**. The "data model" here is
 the bounded measurement vocabulary: metric families, label enumerations, band thresholds, and the
 journey step vocabulary. It is the contract every dashboard, alert and test reads.

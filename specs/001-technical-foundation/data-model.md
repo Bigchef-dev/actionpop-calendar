@@ -1,5 +1,7 @@
 # Data Model: Technical Foundation
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 The data model is split by responsibility:
 
 - [Groups and scheduling](data-model-groups.md): scopes, active group catalogue

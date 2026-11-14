@@ -1,10 +1,13 @@
 # Feature Specification: Technical Foundation
 
+> **Status**: Implemented · 9 follow-up tasks open (T088–T104)
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `001-technical-foundation`
 
 **Created**: 2026-09-24
 
-**Status**: Draft
 
 **Input**: User description: "Phase 1: Technical Foundation & Infrastructure with Node.js 20+ LTS, strict TypeScript, pnpm workspaces, Fastify, isolated API and worker applications, Redis persistence, BullMQ-based worker scaling, multi-stage Docker images, and registry-ready deployment."
 

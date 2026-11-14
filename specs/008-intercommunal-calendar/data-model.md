@@ -1,5 +1,7 @@
 # Data Model: Intercommunal Calendar Discovery
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 ## Reference Version
 
 Represents one imported administrative snapshot.

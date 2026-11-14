@@ -1,5 +1,7 @@
 # Contract: Metrics Exposition
 
+> **Historical record.** The living, normative metrics exposition contract is [`specs/contracts/operations/metrics.md`](../../contracts/operations/metrics.md). This file is kept for the feature decision history.
+
 **Applies to**: `GET /internal/metrics` on the API (port 3000) and `GET /metrics` on the worker
 (port 8081, `WORKER_HEALTH_PORT`).
 

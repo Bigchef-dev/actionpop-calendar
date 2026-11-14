@@ -1,5 +1,7 @@
 # Contract: Scope Lifecycle and Scheduling
 
+> **Historical record.** The living, normative scope lifecycle contract is [`specs/contracts/ingestion/scopes.md`](../../contracts/ingestion/scopes.md). This file is kept for the feature decision history.
+
 Two kinds share one registry: `group` and `event`. Identity is `(scope_kind, scope_key)`. Every query that answers a question about organizers filters `scope_kind = 'group'`.
 
 ## Creation

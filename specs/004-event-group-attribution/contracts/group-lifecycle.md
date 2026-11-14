@@ -1,5 +1,7 @@
 # Contract: Group Lifecycle and Scheduling
 
+> **Historical record.** The living, normative scope lifecycle contract is [`specs/contracts/ingestion/scopes.md`](../../contracts/ingestion/scopes.md). This file is kept for the feature decision history.
+
 ## Directory synchronisation
 
 Input: the validated complete response of `GET /carte/liste_groupes/`.

@@ -1,5 +1,7 @@
 # Data Model: Reliable Event–Group Attribution During Ingestion
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 ## Group
 
 An organizer known to the calendar. One row per source identifier; identity is the source identifier, and a case-only difference is not a new group.

@@ -1,5 +1,7 @@
 # Contract: EPCI Calendar Feed
 
+> **Historical record.** The living, normative `epci` criterion contract is [`specs/contracts/http/calendar-ics.md`](../../contracts/http/calendar-ics.md). This file is kept for the feature decision history.
+
 ## Endpoint
 
 `GET /calendar.ics?epci={id}&event_type={type}&group={group-id}`

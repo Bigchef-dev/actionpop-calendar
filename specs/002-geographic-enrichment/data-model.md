@@ -1,5 +1,7 @@
 # Data Model: Geographic Enrichment
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 All persistence is PostgreSQL through Prisma, alongside the existing snapshot, ledger and
 catalogue models in `prisma/schema.prisma`.
 

@@ -1,5 +1,7 @@
 # Contract: Subject Search
 
+> **Historical record.** The living, normative subject search contract is [`specs/contracts/http/search-subjects.md`](../../contracts/http/search-subjects.md). This file is kept for the feature decision history.
+
 ## Purpose
 
 Resolve a human query to the calendar subjects it can mean — a commune, a department or an

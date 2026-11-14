@@ -1,10 +1,13 @@
 # Feature Specification: Release Hardening and Observability
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `009-release-hardening-observability`
 
 **Created**: 2026-11-02
 
-**Status**: Draft
 
 **Input**: User description: "Avant de publier, je souhaite mettre en place — Check sécurité / exploit — Avoir des metrics prometheus + grafana (compatible avec un compose extérieur, qui contient le grafana de mon serveur avec d'autres services). Pouvoir suivre assez facilement le parcours des utilisateurs, les abonnements calendriers et les metrics d'usage de manière fine. Explorer les pistes, me laisser décider, pose-moi des questions jusqu'à ce que ce soit satisfaisant."
 

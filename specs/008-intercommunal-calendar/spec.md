@@ -1,10 +1,13 @@
 # Feature Specification: Intercommunal Calendar Discovery
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `008-intercommunal-calendar`
 
 **Created**: 2026-11-02
 
-**Status**: Draft
 
 **Input**: User description: "Ajouter les intercommunalités : agir comme un item, « communauté de communes », dans la recherche ; permettre de faire un calendrier pour une communauté de communes, comme pour les villes et groupes d'action ; étudier toutes les étapes nécessaires à l'intégration ; demander les choix nécessaires."
 

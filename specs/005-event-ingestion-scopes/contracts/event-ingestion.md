@@ -1,5 +1,7 @@
 # Contract: Event Ingestion
 
+> **Historical record.** The living, normative event ingestion contract is [`specs/contracts/ingestion/attribution.md`](../../contracts/ingestion/attribution.md). This file is kept for the feature decision history.
+
 Internal boundary between the worker, the source's per-event detail resource and the publisher. No HTTP surface changes.
 
 ## Source resource

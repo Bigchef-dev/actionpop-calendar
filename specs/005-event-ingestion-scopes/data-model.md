@@ -1,5 +1,7 @@
 # Data Model: Dedicated Ingestion for Events Without a Stated Group
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 ## Ingestion scope
 
 One row per retrieval target. The table is the renamed `group_scope`, now shared by both kinds. `scope_id` stays the primary key, so a scope is addressed by that identifier alone; `(scope_kind, scope_key)` is the **unique identity** that prevents the same source identifier from existing twice per kind.

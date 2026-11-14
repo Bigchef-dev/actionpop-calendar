@@ -1,5 +1,7 @@
 # Contract: Operator Reporting
 
+> **Historical record.** The living, normative operator reporting contract is [`specs/contracts/operations/metrics.md`](../../contracts/operations/metrics.md). This file is kept for the feature decision history.
+
 No public calendar change. Every signal below is reachable from the worker's existing `/metrics` endpoint or its structured logs (FR-013, P-VISIBILITY = A).
 
 ## Per-cycle counters (`ingestion_cycle_metric`)

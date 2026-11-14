@@ -1,5 +1,7 @@
 # Contract: Map Discovery Job and Selection
 
+> **Historical record.** The living, normative map discovery contract is [`specs/contracts/ingestion/map-discovery.md`](../../contracts/ingestion/map-discovery.md). This file is kept for the feature decision history.
+
 ## Scheduling
 
 The map discovery runs as a singleton ingestion scope:

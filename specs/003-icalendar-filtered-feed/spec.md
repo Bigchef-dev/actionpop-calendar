@@ -1,12 +1,15 @@
 # Feature Specification: Filtered iCalendar Feed
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `003-icalendar-filtered-feed`
 
 **Created**: 2026-10-28
 
 **Revised**: 2026-10-28 (experimental metadata properties added)
 
-**Status**: Draft
 
 **Input**: User description: "Tu dois fournir une api qui : à partir d'une url GET - Peut prendre en paramètre get, nom de commune, - Le format de données en sortie : iCalendar (RFC 5545) `department=69&insee_commune=69123,69124&event_type=tractage.... (regarder les autres specs si besoin d'informations) - Documenter dans le scalar (regarder le readme) - Si il y a des choix d'implémentation, me référer"
 

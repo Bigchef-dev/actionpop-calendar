@@ -1,5 +1,7 @@
 # Contract: Journey Telemetry
 
+> **Historical record.** The living, normative journey telemetry contract is [`specs/contracts/http/observability.md`](../../contracts/http/observability.md). This file is kept for the feature decision history.
+
 `POST /telemetry/journey` — the only write surface this feature adds.
 
 ## Routing

@@ -1,5 +1,7 @@
 # Contract: Published Edge Surface
 
+> **Historical record.** The living, normative published edge contract is [`specs/contracts/http/observability.md`](../../contracts/http/observability.md). This file is kept for the feature decision history.
+
 **Principle**: closed by default. A route is public only because it is listed here, and adding a
 route is a visible change to `infra/edge/https.conf` (FR-013).
 

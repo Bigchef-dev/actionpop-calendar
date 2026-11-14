@@ -1,5 +1,7 @@
 # Contract: Geographic Event Filtering
 
+> **Historical record.** The living, normative geographic event list contract is [`specs/contracts/http/events.md`](../../contracts/http/events.md). This file is kept for the feature decision history.
+
 ## Purpose
 
 Return each event once when it satisfies every supplied geographic and event-type criterion. The API or query service reads the geographic columns already published on the event row and must not perform reference lookup during a read.

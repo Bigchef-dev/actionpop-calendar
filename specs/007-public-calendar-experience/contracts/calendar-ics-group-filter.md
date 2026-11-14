@@ -1,5 +1,7 @@
 # Contract: `group` criterion on the filtered calendar feed
 
+> **Historical record.** The living, normative `group` criterion contract is [`specs/contracts/http/calendar-ics.md`](../../contracts/http/calendar-ics.md). This file is kept for the feature decision history.
+
 **Extends**: [specs/003-icalendar-filtered-feed/contracts/calendar-ics.md](../../003-icalendar-filtered-feed/contracts/calendar-ics.md)
 
 ## Purpose

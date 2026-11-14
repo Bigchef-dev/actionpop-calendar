@@ -1,5 +1,7 @@
 # API Contract: Public Calendar Feed
 
+> **Historical record.** The living, normative dataset feed contract is [`specs/contracts/http/feed.md`](../../contracts/http/feed.md). This file is kept for the feature decision history.
+
 ## Scope
 
 The API exposes only public, read-only calendar feeds in this phase. Redis, BullMQ,

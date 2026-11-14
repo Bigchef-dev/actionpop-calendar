@@ -1,10 +1,13 @@
 # Feature Specification: Map Event Discovery and Detail Resolution
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `006-map-event-discovery`
 
 **Created**: 2026-10-30
 
-**Status**: Draft
 
 **Input**: User description: "Ajouter au action populaire client 2 capacités — Récupérer depuis https://actionpopulaire.fr/carte/liste_evenements/ — Et ensuite récupérer depuis https://actionpopulaire.fr/api/evenements/0b75e623-33b2-4e4e-8e73-add257957513/details/ — Définir et s'assurer des formats avant mise en place. ça doit être compatible avec l'existant. En cas de question sur l'implémentation me les poser."
 

@@ -1,5 +1,7 @@
 # Contract: Monitoring Package
 
+> **Historical record.** The living, normative monitoring package contract is [`specs/contracts/operations/metrics.md`](../../contracts/operations/metrics.md). This file is kept for the feature decision history.
+
 The package lives in `infra/monitoring/` and is mounted by the monitoring Compose project that
 already runs on the host. Applying it must not require hand-editing a shipped file (FR-032).
 

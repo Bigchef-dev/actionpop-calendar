@@ -1,5 +1,7 @@
 # Contract: Filtered iCalendar Feed
 
+> **Historical record.** The living, normative Filtered iCalendar feed contract is [`specs/contracts/http/calendar-ics.md`](../../contracts/http/calendar-ics.md). This file is kept for the feature decision history.
+
 ## Purpose
 
 Return, as one RFC 5545 calendar document, every published event that satisfies all supplied criteria and whose period overlaps the calendar window, each event exactly once.

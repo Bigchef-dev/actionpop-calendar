@@ -1,10 +1,13 @@
 # Feature Specification: Dedicated Ingestion for Events Without a Stated Group
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `005-event-ingestion-scopes`
 
 **Created**: 2026-10-29
 
-**Status**: Draft
 
 **Input**: User description: "Avoir une ingestion groupe ou ingestion événement — https://actionpopulaire.fr/api/evenements/777ed907-c8fa-4f3b-9209-9c73c6b7b23a/details/ — si découvert avec les ingestions de groupes, si événement n'a aucun groupe alors créer une ingestion spécifique pour mettre à jour cet événement. Faire un ensemble de schémas mermaid expliquant la démarche. Me poser des questions sur les choix de mise en place."
 

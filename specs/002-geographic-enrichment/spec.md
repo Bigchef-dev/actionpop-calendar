@@ -1,12 +1,15 @@
 # Feature Specification: Geographic Enrichment and Event Filtering
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `002-geographic-enrichment`
 
 **Created**: 2026-10-01
 
 **Revised**: 2026-10-28
 
-**Status**: Draft
 
 **Input**: User description: "Add geographic data to the event calendar, model the French administrative geography, enrich events, support combined geographic filtering, validate event types, and update the geographic dataset from data.gouv.fr."
 

@@ -1,5 +1,7 @@
 # Data Model: Filtered iCalendar Feed
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 Persistence is unchanged: this feature reads existing tables and adds no migration. The models below are the in-memory contracts of the read path and the configuration surface.
 
 ## CalendarCriteria

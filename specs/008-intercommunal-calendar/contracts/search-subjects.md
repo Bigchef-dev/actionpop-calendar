@@ -1,5 +1,7 @@
 # Contract: Search Subjects with EPCI
 
+> **Historical record.** The living, normative `epci` search kind contract is [`specs/contracts/http/search-subjects.md`](../../contracts/http/search-subjects.md). This file is kept for the feature decision history.
+
 ## Endpoint
 
 `GET /search/subjects?q={query}&kind=epci&limit={1..30}`

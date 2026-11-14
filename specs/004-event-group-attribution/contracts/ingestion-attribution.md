@@ -1,5 +1,7 @@
 # Contract: Ingestion and Attribution
 
+> **Historical record.** The living, normative attribution contract is [`specs/contracts/ingestion/attribution.md`](../../contracts/ingestion/attribution.md). This file is kept for the feature decision history.
+
 Internal boundary between the worker, the snapshot publisher and PostgreSQL. No HTTP surface changes.
 
 ## Payload mapping

@@ -1,10 +1,13 @@
 # Feature Specification: Public Calendar Discovery and Composition Experience
 
+> **Status**: Implemented in code · task list stale (11/55 checked)
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `007-public-calendar-experience`
 
 **Created**: 2026-11-01
 
-**Status**: Draft
 
 **Input**: User description: "L'objectif est de partir de apps/web pour la connecter à actionpop-calendar. Fonctionnalités: Filtres; Reprendre thème campagne tortue @design.md; Barre de recherche centrale, pouvoir rechercher sa ville, département, groupe d'action (index, destiné à être étendu); Disposer d'un placeholder sur la barre de recherche, avec quelques exemples qui se tapent puis s'effacent. Faire plusieurs propositions sur l'UI; Sélectionner et créer son lien de calendrier pour l'importer dans son app de calendrier. Une fois le calendrier cherché: pouvoir filtrer par type d'action (front uniquement); afficher les informations supplémentaires X-ACTIONPOP; utiliser un emoji selon le type d'action; disposer de l'ensemble des fonctionnalités disponibles dans le calendrier : météo, maps, contact de la personne responsable; pour le script d'autocomplétion tampermonkey, archiver; concernant la partie sondage, dans un second temps. Découpe-moi en thèmes, et propose-moi des sondages pour les choix à prendre. Je souhaite avoir une réflexion approfondie sur l'UX, quels possibilités pour mettre l'utilisateur dans le bain et utiliser l'outil. Une fois un calendrier affiché, pouvoir cumuler plusieurs communes ou critères de recherche avec un bouton + qui ouvre la recherche; le lien final doit correspondre strictement à ce qui est affiché, notamment pour les groupes, plusieurs calendriers et types d'action; le changement de sujet devient la suppression d'un calendrier; le bouton de copie doit être explicitement limité au lien de la ville; si la liste est vide, retourner à l'accueil avec la grande barre."
 

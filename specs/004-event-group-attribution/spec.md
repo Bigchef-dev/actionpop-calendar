@@ -1,10 +1,13 @@
 # Feature Specification: Reliable Event–Group Attribution During Ingestion
 
+> **Status**: Implemented
+> **Implementation verified**: 2026-11-14
+> **Canonical contracts**: [specs/contracts](../contracts/README.md)
+
 **Feature Branch**: `004-event-group-attribution`
 
 **Created**: 2026-10-29
 
-**Status**: Draft
 
 **Input**: User description: "Je souhaite refactor la mise à jour des événements action populaire. J'ai remarqué que : des groupes n'étant pas sur la carte, peuvent faire des événements (groupe non répertorié) ; des événements sont sans groupes d'action, rare mais ça arrive. Faire un ensemble de propositions, et me poser les questions pour les choix d'implémentation."
 

@@ -1,5 +1,7 @@
 # Contract: Public Map Event Listing
 
+> **Historical record.** The living, normative map listing contract is [`specs/contracts/ingestion/map-discovery.md`](../../contracts/ingestion/map-discovery.md). This file is kept for the feature decision history.
+
 ## Request
 
 ```http

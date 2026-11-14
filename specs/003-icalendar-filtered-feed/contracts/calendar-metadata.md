@@ -1,5 +1,7 @@
 # Contract: Calendar Entry Metadata
 
+> **Historical record.** The living, normative iCalendar entry metadata contract is [`specs/contracts/http/calendar-ics.md`](../../contracts/http/calendar-ics.md). This file is kept for the feature decision history.
+
 ## Purpose
 
 Carry reconciliation, classification, provenance and diagnostic information on each calendar entry without breaking third-party clients. Experimental properties use the RFC 5545 `X-` namespace; a client that does not know them ignores them.

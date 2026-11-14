@@ -1,5 +1,7 @@
 # Data Model: Public Calendar Discovery Experience
 
+> **Historical record.** The living data model is [`specs/contracts/data/model.md`](../../contracts/data/model.md), derived from `prisma/schema.prisma`. This file records the feature-specific increment.
+
 **Feature**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Research**: [research.md](./research.md)
 
 The model has two halves. The **read model** is what the API returns and the browser consumes; it
