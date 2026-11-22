@@ -5,11 +5,14 @@ import {
   CALENDAR_SETTINGS,
   DATASET_REPOSITORY,
   EVENT_QUERY,
+  GROUP_AREA_RESOLVER,
+  GROUP_LISTING,
   SUBJECT_SEARCH,
 } from './constants.js';
 import { CalendarController } from './controllers/calendar.controller.js';
 import { CalendarIcsController } from './controllers/calendar-ics.controller.js';
 import { EventsController } from './controllers/events.controller.js';
+import { GroupsController } from './controllers/groups.controller.js';
 import { InternalController, SERVER_OPTIONS } from './internal/internal.controller.js';
 import { SearchController } from './controllers/search.controller.js';
 import { TelemetryController } from './observability/telemetry.controller.js';
@@ -28,6 +31,8 @@ export function createAppModule(options: ServerOptions) {
   if (options.calendarService !== undefined) controllers.push(CalendarIcsController);
   // Same rule for the search read: a deployment without a reader never exposes the route.
   if (options.subjectSearch !== undefined) controllers.push(SearchController);
+  // And for the territory listing: without its reader there is nothing to answer with.
+  if (options.groupListing !== undefined) controllers.push(GroupsController);
 
   @Module({
     controllers,
@@ -38,6 +43,8 @@ export function createAppModule(options: ServerOptions) {
       { provide: CALENDAR_SERVICE, useValue: options.calendarService },
       { provide: CALENDAR_SETTINGS, useValue: options.calendarSettings },
       { provide: SUBJECT_SEARCH, useValue: options.subjectSearch },
+      { provide: GROUP_LISTING, useValue: options.groupListing },
+      { provide: GROUP_AREA_RESOLVER, useValue: options.groupAreaResolver },
       { provide: SERVER_OPTIONS, useValue: options },
     ],
   })

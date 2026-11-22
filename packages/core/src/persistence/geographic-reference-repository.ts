@@ -72,6 +72,27 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
     return rows.map(toCommuneRecord);
   }
 
+  public async findCommunesByCodes(
+    version: string,
+    codes: readonly string[],
+  ): Promise<CommuneReferenceRecord[]> {
+    if (codes.length === 0) return [];
+    const rows = await this.prisma.communeReference.findMany({
+      where: { versionId: version, inseeCode: { in: [...codes] } },
+      select: {
+        inseeCode: true,
+        name: true,
+        normalizedName: true,
+        pronounFreeNormalizedName: true,
+        postalCodes: true,
+        departmentCode: true,
+        population: true,
+      },
+      orderBy: { inseeCode: 'asc' },
+    });
+    return rows.map(toCommuneRecord);
+  }
+
   public async resolveEpcis(ids: readonly string[]): Promise<CommuneNameResolution> {
     const version = await this.findActiveVersion();
     if (version === null) {
@@ -89,7 +110,11 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
     }
     const rows = await this.prisma.epciReference.findMany({
       where: { versionId: version.version, epciId: { in: [...new Set(ids)] }, active: true },
-      select: { epciId: true, kind: true, memberships: { select: { communeId: true, quality: true } } },
+      select: {
+        epciId: true,
+        kind: true,
+        memberships: { select: { communeId: true, quality: true } },
+      },
     });
     const found = new Set(rows.map((row) => row.epciId));
     const missing = ids.find((id) => !found.has(id));
@@ -126,7 +151,11 @@ export class PostgresGeographicReferenceRepository implements GeographicReferenc
       };
     }
     return {
-      inseeCodes: [...new Set(rows.flatMap((row) => row.memberships.map((membership) => membership.communeId)))].sort(),
+      inseeCodes: [
+        ...new Set(
+          rows.flatMap((row) => row.memberships.map((membership) => membership.communeId)),
+        ),
+      ].sort(),
       diagnostics: [],
     };
   }

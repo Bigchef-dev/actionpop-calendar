@@ -1,4 +1,9 @@
-import { normalizeEpciName, type EpciKind, type EpciMembershipRecord, type EpciReferenceRecord } from '@actionpop/core';
+import {
+  normalizeEpciName,
+  type EpciKind,
+  type EpciMembershipRecord,
+  type EpciReferenceRecord,
+} from '@actionpop/core';
 
 export interface ParsedEpciCsv {
   readonly references: readonly EpciReferenceRecord[];
@@ -50,7 +55,10 @@ export function parseEpciCsv(text: string, versionId: string): ParsedEpciCsv {
 function parseRows(section: string, callback: (columns: string[], line: number) => void): void {
   for (const [index, raw] of section.split(/\r?\n/).entries()) {
     if (index === 0 || raw.trim() === '') continue;
-    callback(raw.split(',').map((value) => value.trim()), index + 1);
+    callback(
+      raw.split(',').map((value) => value.trim()),
+      index + 1,
+    );
   }
 }
 

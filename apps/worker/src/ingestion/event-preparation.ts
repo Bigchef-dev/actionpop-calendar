@@ -41,7 +41,7 @@ export async function prepareIncomingEvent(
   }
 
   const geography = await enrichEventGeography(
-    toRawLocationFields(event),
+    toRawLocationFields(event.location),
     deps.geographicReference,
   );
   return toIncomingEvent(event, geography, typeValidation.eventType);

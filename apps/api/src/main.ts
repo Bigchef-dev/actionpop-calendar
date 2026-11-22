@@ -12,6 +12,7 @@ import {
   PostgresCalendarEventQuery,
   PostgresGeographicReferenceRepository,
   PostgresEventQuery,
+  PostgresGroupListing,
   PostgresSubjectSearch,
   probeRedis,
   runPreflight,
@@ -74,6 +75,8 @@ export async function startApi(): Promise<void> {
     datasetRepository: new PostgresCalendarDatasetRepository(postgres),
     eventQuery: new PostgresEventQuery(postgres),
     subjectSearch: new PostgresSubjectSearch(postgres),
+    groupListing: new PostgresGroupListing(postgres),
+    groupAreaResolver: new CommuneNameResolver(new PostgresGeographicReferenceRepository(postgres)),
     corsOrigins: loadCorsOrigins(),
     calendarService: new FilteredCalendarService(
       new PostgresCalendarEventQuery(postgres),
@@ -99,9 +102,6 @@ export async function startApi(): Promise<void> {
       disabledFamilies: config.calendar.disabledFamilies,
       maxGroupsPerEvent: config.calendar.maxGroupsPerEvent,
     },
-    // Off unless explicitly enabled: an exploratory console and a raw schema have no reason to
-    // be reachable from the internet on a service that only serves a calendar.
-    apiReference: process.env.API_REFERENCE === 'true',
     volumeBandSalt: config.observability.bandSalt,
     buildInfo: {
       deployment: config.observability.deployment,

@@ -52,7 +52,12 @@ export function parseOfficialEpciCsv(
   const seenMemberships = new Set<string>();
 
   if (lines.length === 0) {
-    return { references: [], memberships: [], errors: ['the EPCI file is empty'], ignoredNatures: [] };
+    return {
+      references: [],
+      memberships: [],
+      errors: ['the EPCI file is empty'],
+      ignoredNatures: [],
+    };
   }
 
   const header = splitRow(lines[0] ?? '').map((value) => value.toLowerCase());

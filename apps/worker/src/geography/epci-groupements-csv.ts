@@ -31,10 +31,7 @@ const REQUIRED_COLUMNS = ['N° SIREN', 'Nom du groupement', 'Nature juridique'] 
  * This export is the authority for identity and nature. It carries no membership, which is
  * read from the commune dataset and joined on the SIREN.
  */
-export function parseGroupementsCsv(
-  text: string,
-  versionId: string,
-): GroupementsParseResult {
+export function parseGroupementsCsv(text: string, versionId: string): GroupementsParseResult {
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '');
   const errors: string[] = [];
   const ignoredNatures: Record<string, number> = {};

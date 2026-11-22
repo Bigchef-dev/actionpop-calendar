@@ -34,6 +34,41 @@ datasets and event history are not deleted implicitly.
 `coordinates` uses `[longitude, latitude]` order. `filter` may be empty and
 `is_certified` is informational; neither changes active eligibility.
 
+## Group detail
+
+```http
+GET /api/groupes/{groupId}/ HTTP/1.1
+Accept: application/json
+```
+
+One group's detail resource. `id` is the stable group identity. The resource states the same
+`location` object as an event, which is why a group's administrative attachment goes through the
+event geographic rules unchanged (see feature [010](../../010-geographic-group-listing/spec.md)).
+
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "location": {
+    "zip": "42000",
+    "city": "Saint-Étienne",
+    "departement": "42",
+    "country": "FR",
+    "commune": { "name": "Saint-Étienne", "nameOf": "de Saint-Étienne" },
+    "coordinates": { "type": "Point", "coordinates": [4.388326, 45.43393] },
+    "staticMapUrl": "https://media.actionpopulaire.fr/carte/staticmapimage/<id>.png"
+  }
+}
+```
+
+`location` is nullable: a group that states no place simply cannot be attached to a commune.
+`coordinates` uses `[longitude, latitude]` order, like the catalogue. Only the fields the
+enricher reads are listed here; the document carries further presentation fields (description,
+contact, routes, links, facts) that this project ignores.
+
+A `404` is a definitive answer for an unknown group; every other status keeps the retry
+behaviour of the client.
+
 ## Synchronization rules
 
 The catalogue endpoint is the source of truth for dispatcher scope discovery. The

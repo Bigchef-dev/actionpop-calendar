@@ -122,6 +122,9 @@ describe('CommuneNameResolver', () => {
     const result = await resolver.resolve(['Lyon'], undefined);
 
     expect(result.inseeCodes).toEqual([]);
-    expect(result.diagnostics[0]).toMatchObject({ code: 'commune_name_unavailable', severity: 'error' });
+    expect(result.diagnostics[0]).toMatchObject({
+      code: 'commune_name_unavailable',
+      severity: 'error',
+    });
   });
 });

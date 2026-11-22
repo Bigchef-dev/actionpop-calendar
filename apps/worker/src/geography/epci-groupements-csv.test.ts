@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { joinMemberships, parseGroupementsCsv } from './epci-groupements-csv.js';
 
 const HEADER =
-  "Département;Arrondissement siège;Commune siège;N° SIREN;Nom du groupement;Nature juridique;Nombre de membres";
+  'Département;Arrondissement siège;Commune siège;N° SIREN;Nom du groupement;Nature juridique;Nombre de membres';
 
 function parse(rows: readonly string[]) {
   return parseGroupementsCsv([HEADER, ...rows].join('\n'), 'epci-2026');
@@ -79,7 +79,9 @@ describe('joinMemberships', () => {
       '243500139:35001',
       '200000001:01001',
     ]);
-    expect(joined.references.find((row) => row.id === '243500139')?.departmentCodes).toEqual(['35']);
+    expect(joined.references.find((row) => row.id === '243500139')?.departmentCodes).toEqual([
+      '35',
+    ]);
     expect(joined.communesWithoutTerritory).toBe(1);
   });
 

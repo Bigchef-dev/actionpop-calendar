@@ -13,19 +13,27 @@ A route is public only because it is listed here. Adding a route is a visible ch
 
 ## Public allowlist
 
-| Path                                                       | Match                | Target | Notes                                                                            |
-| ---------------------------------------------------------- | -------------------- | ------ | -------------------------------------------------------------------------------- |
-| `/`                                                        | exact                | `web`  | SPA index                                                                        |
-| `/assets/`                                                 | prefix               | `web`  | Hashed build assets                                                              |
-| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$`                      | regex                | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`                 |
-| `/calendar.ics`                                            | exact                | `api`  | Filtered iCalendar feed                                                          |
-| `/search/`                                                 | prefix               | `api`  | Subject search                                                                   |
-| `/events`                                                  | prefix               | `api`  | Geographic JSON event list                                                       |
-| `/feed/`                                                   | prefix               | `api`  | Dataset-scoped calendar                                                          |
-| `/telemetry/journey`                                       | exact, `POST`        | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header     |
+| Path                                   | Match         | Target | Notes                                                                        |
+| -------------------------------------- | ------------- | ------ | ---------------------------------------------------------------------------- |
+| `/`                                    | exact         | `web`  | SPA index                                                                    |
+| `/assets/`                             | prefix        | `web`  | Hashed build assets                                                          |
+| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$` | regex         | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`             |
+| `/calendar.ics`                        | exact         | `api`  | Filtered iCalendar feed                                                      |
+| `/search/`                             | prefix        | `api`  | Subject search                                                               |
+| `/events`                              | prefix        | `api`  | Geographic JSON event list                                                   |
+| `/groups`                              | prefix        | `api`  | Territory action group list                                                  |
+| `/feed/`                               | prefix        | `api`  | Dataset-scoped calendar                                                      |
+| `/telemetry/journey`                   | exact, `POST` | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
 
 Everything else — including `/internal/*`, `/reference`, `/openapi.json` and any unknown path —
 answers `404` at the edge.
+
+### Generated API reference
+
+The API always serves a Scalar reference UI at `/reference` backed by `GET /openapi.json`
+(`apps/api/src/server.ts`); there is no switch to disable it. Both paths are deliberately outside
+the allowlist above, so the published site answers `404` and the schema stays on the private
+network. Inside the network it answers at `http://127.0.0.1:3000/reference`.
 
 ## Redirects and transport
 
@@ -43,16 +51,16 @@ Applied to every proxied and static response by one shared snippet,
 `infra/edge/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
 server so the scan validates exactly what production serves.
 
-| Header                         | Value                                                                                                                                                                                                                            |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Content-Security-Policy`      | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`                                  |
-| `X-Content-Type-Options`       | `nosniff`                                                                                                                                                                                                                        |
-| `X-Frame-Options`              | `DENY`                                                                                                                                                                                                                           |
-| `Referrer-Policy`              | `no-referrer`                                                                                                                                                                                                                    |
-| `Permissions-Policy`           | `geolocation=(), microphone=(), camera=(), payment=(), usb=()`                                                                                                                                                                   |
-| `Cross-Origin-Opener-Policy`   | `same-origin`                                                                                                                                                                                                                    |
-| `Cross-Origin-Embedder-Policy` | `require-corp`                                                                                                                                                                                                                   |
-| `Cross-Origin-Resource-Policy` | `same-origin`                                                                                                                                                                                                                    |
+| Header                         | Value                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`      | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
+| `X-Content-Type-Options`       | `nosniff`                                                                                                                                                                                         |
+| `X-Frame-Options`              | `DENY`                                                                                                                                                                                            |
+| `Referrer-Policy`              | `no-referrer`                                                                                                                                                                                     |
+| `Permissions-Policy`           | `geolocation=(), microphone=(), camera=(), payment=(), usb=()`                                                                                                                                    |
+| `Cross-Origin-Opener-Policy`   | `same-origin`                                                                                                                                                                                     |
+| `Cross-Origin-Embedder-Policy` | `require-corp`                                                                                                                                                                                    |
+| `Cross-Origin-Resource-Policy` | `same-origin`                                                                                                                                                                                     |
 
 `style-src 'unsafe-inline'` is required by Tailwind/Vue runtime style injection and
 `font-src data:` by the FullCalendar icon font; scripts are never allowed inline, so a markup
@@ -60,11 +68,11 @@ injection cannot become script execution.
 
 ## Private routes (must not be routed at the edge)
 
-| Surface                        | Why                                                      |
-| ------------------------------ | -------------------------------------------------------- |
-| `GET /internal/live`           | Liveness probe, read by Docker on the private network    |
-| `GET /internal/ready`          | Readiness probe, verifies datastore access               |
-| `GET /internal/metrics`        | Usage data, read by Prometheus over `monitoring`         |
+| Surface                           | Why                                                   |
+| --------------------------------- | ----------------------------------------------------- |
+| `GET /internal/live`              | Liveness probe, read by Docker on the private network |
+| `GET /internal/ready`             | Readiness probe, verifies datastore access            |
+| `GET /internal/metrics`           | Usage data, read by Prometheus over `monitoring`      |
 | `GET /openapi.json`, `/reference` | Exploratory; off by default in production             |
 
 The API still registers these routes; being absent from the allowlist is what makes them
@@ -75,24 +83,24 @@ private.
 The only write surface added by 009. Public through the edge, same origin as the SPA, so no CORS
 rule is involved.
 
-| Part           | Rule                                                                                                                       |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Method         | `POST` only                                                                                                                |
-| `Content-Type` | `application/json` (`; charset=utf-8` accepted)                                                                            |
-| Body limit     | 2 000 bytes                                                                                                                |
-| Body schema    | `{ "v": 1, "visit": "<1-64 chars, [A-Za-z0-9_-]>", "steps": [ { "s": "<JourneyStep>", "k"?: "<SubjectKind>" } ] }`         |
-| `steps` length | 1 to 10                                                                                                                    |
+| Part           | Rule                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Method         | `POST` only                                                                                                        |
+| `Content-Type` | `application/json` (`; charset=utf-8` accepted)                                                                    |
+| Body limit     | 2 000 bytes                                                                                                        |
+| Body schema    | `{ "v": 1, "visit": "<1-64 chars, [A-Za-z0-9_-]>", "steps": [ { "s": "<JourneyStep>", "k"?: "<SubjectKind>" } ] }` |
+| `steps` length | 1 to 10                                                                                                            |
 
 `JourneyStep` and `SubjectKind` vocabularies are enumerated once in
 [`../data/model.md`](../data/model.md).
 
-| Status | When                                                                                                                              | Body  |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `204`  | Batch accepted. Also returned when some steps are unknown: unknown steps are counted as `unknown_step` and dropped.                | empty |
-| `405`  | Any method other than `POST`.                                                                                                     | empty |
-| `413`  | Body exceeds 2 000 bytes.                                                                                                         | empty |
-| `415`  | Content type is not JSON.                                                                                                         | empty |
-| `400`  | Body is not parseable JSON, or a required field is missing or out of range.                                                       | empty |
+| Status | When                                                                                                                | Body  |
+| ------ | ------------------------------------------------------------------------------------------------------------------- | ----- |
+| `204`  | Batch accepted. Also returned when some steps are unknown: unknown steps are counted as `unknown_step` and dropped. | empty |
+| `405`  | Any method other than `POST`.                                                                                       | empty |
+| `413`  | Body exceeds 2 000 bytes.                                                                                           | empty |
+| `415`  | Content type is not JSON.                                                                                           | empty |
+| `400`  | Body is not parseable JSON, or a required field is missing or out of range.                                         | empty |
 
 No response echoes the payload and no error body explains what failed, to remove enumeration
 value from a public write route.
@@ -107,8 +115,9 @@ failures without retry; keep working when `localStorage` is unavailable.
 ## Verification
 
 - `tests/integration/edge-surface.test.ts` — parses `https.conf`, asserts the location table
-  matches this contract, that no `location` matches `/internal`, that both servers include the
-  shared header snippet, and that the write surface caps its body at 2 KB.
+  matches this contract (including `/groups`), that no `location` matches `/internal`,
+  `/reference` or `/openapi.json`, that both servers include the shared header snippet, and that
+  the write surface caps its body at 2 KB.
 - `apps/api/src/observability/telemetry.controller.test.ts` — status codes per row, and no step
   recorded for a rejected batch.
 - The ZAP baseline job asserts the header set and that unterminated paths 404.

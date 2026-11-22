@@ -1,10 +1,5 @@
 export type GeographicStatus =
-  | 'resolved'
-  | 'national'
-  | 'international'
-  | 'incomplete'
-  | 'invalid'
-  | 'unavailable';
+  'resolved' | 'national' | 'international' | 'incomplete' | 'invalid' | 'unavailable';
 
 export type DepartmentSource = 'stated' | 'reference';
 

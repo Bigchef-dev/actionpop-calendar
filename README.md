@@ -8,6 +8,12 @@ ActionPop Calendar is a pnpm TypeScript monorepo with four workspace units:
 - `apps/web`: Vue 3 + Vite campaign agenda, published on GitHub Pages
   (see [apps/web/README.md](apps/web/README.md))
 
+Documentation entry points:
+
+- [specs/root.md](specs/root.md) — inventory and reading order of every feature specification.
+- [specs/contracts/README.md](specs/contracts/README.md) — the living, normative contracts
+  (HTTP surfaces, ingestion, data model, metrics).
+
 ## Requirements
 
 - Node.js 26+ (the floor is declared once in `engines.node` and mirrored by every
@@ -320,8 +326,8 @@ docker compose -f infra/compose/docker-compose.yml up -d
 ```
 
 The public surface is the read-only `GET /feed/{scopeId}` route, the read-only
-`GET /events` route, the read-only `GET /search/subjects` route, and the read-only
-`GET /calendar.ics` route. `/events` filters events by `country`, `department`, `commune` and
+`GET /events` route, the read-only `GET /groups` route, the read-only `GET /search/subjects`
+route, and the read-only `GET /calendar.ics` route. `/events` filters events by `country`, `department`, `commune` and
 `event_type` with `AND` semantics. Geographic identifiers are strings, so `01`, `2A` and `01001`
 keep their leading zeroes.
 
@@ -339,7 +345,26 @@ prefix, then contains. Each entry carries the exact filter parameters to use, so
 derives them. A too-short, too-long, unknown-kind or invalid-limit request answers `400` with a
 diagnostic; an unavailable data source answers `503`. The route is served with CORS restricted to
 `API_CORS_ORIGINS` (comma-separated origins, empty by default, which means no cross-origin access).
-Contract: `specs/007-public-calendar-experience/contracts/search-api.md`.
+Contract: [`specs/contracts/http/search-subjects.md`](specs/contracts/http/search-subjects.md).
+
+`GET /groups` lists the action groups located in a territory, which is the catalogue question
+behind a map or "groups near me" view:
+
+```text
+GET /groups?department=42&limit=50
+GET /groups?insee_commune=42218&limit=2&offset=2
+GET /groups?commune_name=Lyon&department=69
+GET /groups?epci=200054781
+```
+
+It accepts `country`, `department`, `insee_commune` (or its alias `commune`), `commune_name` and
+`epci`, with the semantics of the calendar feed: OR inside one parameter, AND across parameters,
+one commune dimension. Each item carries the group's identity, published name, location context
+(country, department, commune, coordinates) and the calendar reference to use verbatim, so a
+group with no upcoming event is still discoverable. A group belongs to an area through its own
+attached position, never through the events it organizes. An unknown identifier answers `400`,
+an area holding no group answers `200` with an empty list, and an unavailable reference answers
+`503`. Contract: [`specs/contracts/http/groups.md`](specs/contracts/http/groups.md).
 
 `GET /calendar.ics` returns the matching events as an iCalendar (RFC 5545) document that a
 calendar client can subscribe to:
@@ -388,9 +413,9 @@ file or the environment. The calendar settings are `enabled`, `lookbackDays`,
 for the complete table.
 
 The API also serves its own OpenAPI document and an interactive Scalar reference, generated
-from the running service: `GET /openapi.json` and the `/reference` page
-(`http://127.0.0.1:3000/reference` in development). Set `API_REFERENCE=false` to stop
-serving the page. Redis, BullMQ,
+from the running service and always available on the API itself: `GET /openapi.json` and the
+`/reference` page (`http://127.0.0.1:3000/reference`). The published edge does not proxy either
+path, so the schema is reachable only from inside the private network. Redis, BullMQ,
 worker responsibilities, and internal health routes stay on the private network.
 Production traffic must terminate HTTPS before it reaches the containers: the host-wide Caddy
 reverse proxy owns ports 80/443 and forwards `calendar.example` to the nginx edge over the
@@ -410,11 +435,11 @@ configuration under `infra/monitoring/`.
 The application publishes its own metrics on two private ports and never on the internet:
 `api:3000/internal/metrics` and `worker:8081/metrics`. Both are reachable only over the `monitoring`
 Docker network, which the Prometheus and Grafana already running on the server join. The edge
-never routes `/internal/*`, and the API reference (`/reference`, `/openapi.json`) is closed unless
-`API_REFERENCE=true` is set explicitly.
+never routes `/internal/*`, `/reference` or `/openapi.json`, so the generated schema stays on the
+private network even though the API always serves it.
 
 What is measured, with the exact label sets and bucket boundaries, is specified once in
-[`specs/009-release-hardening-observability/contracts/metrics-exposition.md`](specs/009-release-hardening-observability/contracts/metrics-exposition.md).
+[`specs/contracts/operations/metrics.md`](specs/contracts/operations/metrics.md).
 Three rules hold everywhere:
 
 - a label value is always one of a closed enumeration; anything else becomes `other`, `none` or
@@ -430,3 +455,9 @@ Install the dashboards and alerts by following
 [`docs/security/pre-publication-checklist.md`](docs/security/pre-publication-checklist.md). An
 automated baseline scan runs on every pull request touching the application or `infra/`, and fails
 the build on a high-severity finding.
+
+ssh -N -L 5432:172.20.0.2:5432 -L 6379:172.20.0.3:6379 debian@aaronlem.ovh
+
+WORKER_HEALTH_PORT=8081 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8082 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8083 pnpm --filter @actionpop/worker dev &

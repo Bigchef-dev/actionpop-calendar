@@ -20,11 +20,13 @@ describe('parseEpciCsv', () => {
       id: '200000001',
       normalizedName: 'grand exemple',
     });
-    expect(result.memberships).toEqual([{
-      versionId: 'geo-2026',
-      epciId: '200000001',
-      communeId: '01001',
-      quality: 'complete',
-    }]);
+    expect(result.memberships).toEqual([
+      {
+        versionId: 'geo-2026',
+        epciId: '200000001',
+        communeId: '01001',
+        quality: 'complete',
+      },
+    ]);
   });
 });

@@ -69,9 +69,7 @@ export class CommuneNameResolver {
     if (this.reader.resolveEpcis === undefined) {
       return {
         inseeCodes: [],
-        diagnostics: [
-          error('epci_unavailable', 'epci', 'EPCI references are not available'),
-        ],
+        diagnostics: [error('epci_unavailable', 'epci', 'EPCI references are not available')],
       };
     }
     return await this.reader.resolveEpcis(ids);

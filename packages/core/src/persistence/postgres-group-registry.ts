@@ -17,6 +17,8 @@ export interface GroupRegistryCounts {
   readonly pending: number;
   readonly unlisted: number;
   readonly stopped: number;
+  /** Listed active groups whose position could not be attached to a commune. */
+  readonly unattached: number;
 }
 
 export type ScopeIdLookup = ReadonlyMap<string, string>;

@@ -8,10 +8,7 @@ import {
   type EpciReferenceRecord,
 } from './epci-reference.js';
 import { validateEpciReference } from './epci-reference-validation.js';
-import {
-  EPCI_FIXTURE_MEMBERSHIPS,
-  EPCI_FIXTURE_REFERENCES,
-} from '../test-fixtures/epci.js';
+import { EPCI_FIXTURE_MEMBERSHIPS, EPCI_FIXTURE_REFERENCES } from '../test-fixtures/epci.js';
 
 const reference = (overrides: Partial<EpciReferenceRecord> = {}): EpciReferenceRecord => ({
   versionId: 'geo-1',
@@ -70,8 +67,9 @@ describe('EPCI reference', () => {
   });
 
   it('accepts the shared reference fixture for all four public categories', () => {
-    expect(EPCI_FIXTURE_REFERENCES.filter((reference) => reference.active).map((r) => r.kind))
-      .toEqual(['CC', 'CA', 'CU', 'METRO']);
+    expect(
+      EPCI_FIXTURE_REFERENCES.filter((reference) => reference.active).map((r) => r.kind),
+    ).toEqual(['CC', 'CA', 'CU', 'METRO']);
 
     const diagnostics = validateEpciReference({
       references: EPCI_FIXTURE_REFERENCES,

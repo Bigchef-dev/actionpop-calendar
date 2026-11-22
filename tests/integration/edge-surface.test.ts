@@ -33,13 +33,21 @@ describe('published edge surface', () => {
         '= /calendar.ics',
         '^~ /search/',
         '^~ /events',
+        '^~ /groups',
         '^~ /feed/',
         '= /telemetry/journey',
         '/',
         '@journey_method_not_allowed',
       ].sort(),
     );
-    for (const entry of ['/calendar.ics', '/search/', '/events', '/feed/', '/telemetry/journey']) {
+    for (const entry of [
+      '/calendar.ics',
+      '/search/',
+      '/events',
+      '/groups',
+      '/feed/',
+      '/telemetry/journey',
+    ]) {
       expect(CONTRACT).toContain(entry);
     }
   });
@@ -91,6 +99,8 @@ describe('published edge surface', () => {
   it('limits the write surface to the journey endpoint and caps its body', () => {
     expect(HTTPS).toContain('location = /telemetry/journey');
     expect(HTTPS).toContain('client_max_body_size 2k;');
-    expect(locations(HTTPS).find((l) => l.match === '= /telemetry/journey')?.target).toBe('api:3000');
+    expect(locations(HTTPS).find((l) => l.match === '= /telemetry/journey')?.target).toBe(
+      'api:3000',
+    );
   });
 });

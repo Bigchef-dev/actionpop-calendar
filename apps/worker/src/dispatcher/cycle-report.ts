@@ -44,6 +44,7 @@ export async function reportDispatcherCycle(
   deps.metrics.setGauge('actionpop_groups_pending', {}, counts.pending);
   deps.metrics.setGauge('actionpop_groups_unlisted', {}, counts.unlisted);
   deps.metrics.setGauge('actionpop_groups_stopped', {}, counts.stopped);
+  deps.metrics.setGauge('actionpop_groups_unattached', {}, counts.unattached);
   deps.metrics.setGauge('actionpop_event_scopes_pending', {}, events.pending);
   deps.metrics.setGauge('actionpop_event_scopes_active', {}, events.active);
   deps.metrics.setGauge('actionpop_event_scopes_retired', {}, events.retired);

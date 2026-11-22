@@ -6,6 +6,12 @@ d'action, de les filtrer, puis d'emporter un lien de calendrier personnel. Elle 
 
 Ce paquet vit dans `apps/web` du monorepo `actionpop-calendar` et se déploie sur GitHub Pages.
 
+## Contrats
+
+- Recherche de sujets : [`specs/contracts/http/search-subjects.md`](../../specs/contracts/http/search-subjects.md).
+- Flux iCalendar : [`specs/contracts/http/calendar-ics.md`](../../specs/contracts/http/calendar-ics.md).
+- Index des spécifications : [`specs/root.md`](../../specs/root.md).
+
 ---
 
 ## Parcours

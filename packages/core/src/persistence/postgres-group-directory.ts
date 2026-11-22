@@ -3,13 +3,15 @@ import { Prisma } from '@prisma/client';
 import { normalizeScopeIdentity } from '../groups/observed-groups.js';
 import { nextGroupStatus } from '../groups/group-status.js';
 
-export type DirectoryClient = Prisma.TransactionClient;
-
 export interface DirectoryEntry {
   readonly id: string;
   readonly name: string;
   readonly isActive: boolean;
+  /** ISO 3166-1 alpha-2 code stated by the catalogue, never deduced from coordinates. */
+  readonly country?: string;
 }
+
+export type DirectoryClient = Prisma.TransactionClient;
 
 /**
  * Applies a complete map directory to the group registry. The caller validates the
@@ -38,7 +40,8 @@ export async function synchronizeGroupDirectory(
           ${status.mapStatus}::text,
           ${status.retrievalStatus}::text,
           ${stopped ? stoppedAt : null}::timestamptz,
-          ${stopped ? 'map_inactive' : null}::text
+          ${stopped ? 'map_inactive' : null}::text,
+          ${entry.country ?? null}::text
         )`;
       }),
     );
@@ -46,16 +49,17 @@ export async function synchronizeGroupDirectory(
     await client.$executeRaw(Prisma.sql`
       INSERT INTO "ingestion_scope" (
         "scope_id", "scope_key", "scope_kind", "display_name", "discovery_source", "map_status",
-        "retrieval_status", "stopped_at", "stopped_reason"
+        "retrieval_status", "stopped_at", "stopped_reason", "country_code"
       )
       SELECT "scope_id", "scope_key", 'group', "display_name", 'directory', "map_status",
-             "retrieval_status", "stopped_at", "stopped_reason"
+             "retrieval_status", "stopped_at", "stopped_reason", "country_code"
       FROM (VALUES ${values}) AS incoming(
         "scope_id", "scope_key", "display_name", "map_status", "retrieval_status",
-        "stopped_at", "stopped_reason"
+        "stopped_at", "stopped_reason", "country_code"
       )
       ON CONFLICT ("scope_kind", "scope_key") DO UPDATE SET
         "display_name" = EXCLUDED."display_name",
+        "country_code" = EXCLUDED."country_code",
         "map_status" = EXCLUDED."map_status",
         "retrieval_status" = EXCLUDED."retrieval_status",
         "stopped_at" = CASE

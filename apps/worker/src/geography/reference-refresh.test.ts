@@ -10,7 +10,9 @@ import { refreshGeographicReference } from './reference-refresh.js';
 const HEADER = 'code_insee,nom_standard,nom_sans_pronom,code_postal,codes_postaux,dep_code,dep_nom';
 
 function communeRows(codes: readonly string[]): string[] {
-  return codes.map((code, index) => `${code},Commune ${index + 1},Commune ${index + 1},0100${index},,01,Ain`);
+  return codes.map(
+    (code, index) => `${code},Commune ${index + 1},Commune ${index + 1},0100${index},,01,Ain`,
+  );
 }
 
 interface StagedWriter {

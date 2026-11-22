@@ -7,31 +7,40 @@ datasource db {
 }
 
 model IngestionScope {
-  scopeId         String             @id @map("scope_id")
-  scopeKey        String             @map("scope_key")
-  scopeKind       String             @default("group") @map("scope_kind")
-  displayName     String?            @map("display_name")
-  discoverySource String             @default("directory") @map("discovery_source")
-  mapStatus       String             @default("unlisted") @map("map_status")
-  retrievalStatus String             @default("pending") @map("retrieval_status")
-  firstObservedAt DateTime?          @map("first_observed_at")
-  lastObservedAt  DateTime?          @map("last_observed_at")
-  stoppedAt       DateTime?          @map("stopped_at")
-  stoppedReason   String?            @map("stopped_reason")
-  eventEndsAt     DateTime?          @map("event_ends_at")
-  scopeType       String?            @map("scope_type")
-  sourceSubtype   Int?               @map("source_subtype")
-  certified       Boolean?
-  sourceLink      String?            @map("source_link")
-  sourceFilter    String?            @map("source_filter")
-  locationId      String?            @map("location_id")
-  location        LocationRecord?    @relation(fields: [locationId], references: [locationId])
-  attributions    EventGroupLink[]   @relation("GroupAttribution")
-  observedVia     EventGroupLink[]   @relation("GroupAttributionSource")
-  observations    EventObservation[] @relation("ObservationSource")
-  subscriptions   Subscription[]
-  snapshots       CalendarSnapshot[]
-  ledgers         IngestionLedger[]
+  scopeId               String             @id @map("scope_id")
+  scopeKey              String             @map("scope_key")
+  scopeKind             String             @default("group") @map("scope_kind")
+  displayName           String?            @map("display_name")
+  discoverySource       String             @default("directory") @map("discovery_source")
+  mapStatus             String             @default("unlisted") @map("map_status")
+  retrievalStatus       String             @default("pending") @map("retrieval_status")
+  firstObservedAt       DateTime?          @map("first_observed_at")
+  lastObservedAt        DateTime?          @map("last_observed_at")
+  stoppedAt             DateTime?          @map("stopped_at")
+  stoppedReason         String?            @map("stopped_reason")
+  eventEndsAt           DateTime?          @map("event_ends_at")
+  scopeType             String?            @map("scope_type")
+  sourceSubtype         Int?               @map("source_subtype")
+  certified             Boolean?
+  sourceLink            String?            @map("source_link")
+  sourceFilter          String?            @map("source_filter")
+  countryCode           String?            @map("country_code")
+  departmentCode        String?            @map("department_code")
+  communeId             String?            @map("commune_id")
+  communeName           String?            @map("commune_name")
+  departmentName        String?            @map("department_name")
+  referenceVersion      String?            @map("reference_version")
+  geographicStatus      String?            @map("geographic_status")
+  geographicDiagnostics Json?              @map("geographic_diagnostics")
+  enrichedAt            DateTime?          @map("enriched_at")
+  locationId            String?            @map("location_id")
+  location              LocationRecord?    @relation(fields: [locationId], references: [locationId])
+  attributions          EventGroupLink[]   @relation("GroupAttribution")
+  observedVia           EventGroupLink[]   @relation("GroupAttributionSource")
+  observations          EventObservation[] @relation("ObservationSource")
+  subscriptions         Subscription[]
+  snapshots             CalendarSnapshot[]
+  ledgers               IngestionLedger[]
 
   @@unique([scopeKind, scopeKey])
   @@index([retrievalStatus])
@@ -39,20 +48,23 @@ model IngestionScope {
   @@index([firstObservedAt])
   @@index([scopeKind, retrievalStatus])
   @@index([scopeKind, eventEndsAt])
+  @@index([scopeKind, mapStatus, retrievalStatus, communeId])
+  @@index([scopeKind, mapStatus, retrievalStatus, departmentCode])
+  @@index([scopeKind, mapStatus, retrievalStatus, countryCode])
   @@map("ingestion_scope")
 }
 
 model LocationRecord {
-  locationId   String        @id @map("location_id")
-  ownerType    String?       @map("owner_type")
+  locationId   String           @id @map("location_id")
+  ownerType    String?          @map("owner_type")
   name         String?
   address1     String?
   address2     String?
   zip          String?
   city         String?
-  fullAddress  String?       @map("full_address")
-  shortAddress String?       @map("short_address")
-  staticMapUrl String?       @map("static_map_url")
+  fullAddress  String?          @map("full_address")
+  shortAddress String?          @map("short_address")
+  staticMapUrl String?          @map("static_map_url")
   geoPoint     GeoPoint?
   groups       IngestionScope[]
   events       EventRecord[]
@@ -111,12 +123,12 @@ model EventRecord {
 }
 
 model EventGroupLink {
-  eventId            String      @map("event_id")
-  scopeId            String      @map("scope_id")
-  observedViaScopeId String      @map("observed_via_scope_id")
-  event              EventRecord @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
-  group              IngestionScope  @relation("GroupAttribution", fields: [scopeId], references: [scopeId], onDelete: Cascade)
-  observedVia        IngestionScope  @relation("GroupAttributionSource", fields: [observedViaScopeId], references: [scopeId], onDelete: Cascade)
+  eventId            String         @map("event_id")
+  scopeId            String         @map("scope_id")
+  observedViaScopeId String         @map("observed_via_scope_id")
+  event              EventRecord    @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
+  group              IngestionScope @relation("GroupAttribution", fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  observedVia        IngestionScope @relation("GroupAttributionSource", fields: [observedViaScopeId], references: [scopeId], onDelete: Cascade)
 
   @@id([eventId, scopeId, observedViaScopeId])
   @@index([scopeId])
@@ -124,13 +136,13 @@ model EventGroupLink {
 }
 
 model EventObservation {
-  eventId          String      @map("event_id")
-  viaScopeId       String      @map("via_scope_id")
-  statedGroupCount Int         @map("stated_group_count")
-  firstSeenPeriod  String      @map("first_seen_period")
-  lastSeenPeriod   String      @map("last_seen_period")
-  event            EventRecord @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
-  viaScope         IngestionScope  @relation("ObservationSource", fields: [viaScopeId], references: [scopeId], onDelete: Cascade)
+  eventId          String         @map("event_id")
+  viaScopeId       String         @map("via_scope_id")
+  statedGroupCount Int            @map("stated_group_count")
+  firstSeenPeriod  String         @map("first_seen_period")
+  lastSeenPeriod   String         @map("last_seen_period")
+  event            EventRecord    @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
+  viaScope         IngestionScope @relation("ObservationSource", fields: [viaScopeId], references: [scopeId], onDelete: Cascade)
 
   @@id([eventId, viaScopeId])
   @@index([lastSeenPeriod])
@@ -138,13 +150,13 @@ model EventObservation {
 }
 
 model Subscription {
-  id        String       @id
-  scopeId   String       @map("scope_id")
-  eventId   String?      @map("event_id")
-  userId    String?      @map("user_id")
-  createdAt DateTime     @default(now()) @map("created_at")
-  group     IngestionScope   @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
-  event     EventRecord? @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
+  id        String         @id
+  scopeId   String         @map("scope_id")
+  eventId   String?        @map("event_id")
+  userId    String?        @map("user_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+  group     IngestionScope @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  event     EventRecord?   @relation(fields: [eventId], references: [sourceEventId], onDelete: Cascade)
 
   @@index([scopeId])
   @@index([eventId])
@@ -182,7 +194,7 @@ model IngestionLedger {
   workerId    String?          @map("worker_id")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
-  group       IngestionScope       @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
+  group       IngestionScope   @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
   period      ProcessingPeriod @relation(fields: [periodToken], references: [periodToken], onDelete: Cascade)
 
   @@unique([scopeId, periodToken])
@@ -190,12 +202,12 @@ model IngestionLedger {
 }
 
 model CalendarSnapshot {
-  snapshotId  String     @id @map("snapshot_id")
-  scopeId     String     @map("scope_id")
+  snapshotId  String         @id @map("snapshot_id")
+  scopeId     String         @map("scope_id")
   revision    Int
-  generatedAt DateTime   @map("generated_at")
+  generatedAt DateTime       @map("generated_at")
   status      String
-  eventIds    Json       @map("event_ids")
+  eventIds    Json           @map("event_ids")
   group       IngestionScope @relation(fields: [scopeId], references: [scopeId], onDelete: Cascade)
 
   @@index([scopeId, status, revision])
@@ -262,15 +274,15 @@ model CommuneReference {
 }
 
 model EpciReference {
-  versionId        String                     @map("version_id")
-  epciId           String                     @map("epci_id")
-  name             String
-  normalizedName   String                     @map("normalized_name")
-  kind             String
-  departmentCodes  String[]                   @map("department_codes")
-  active           Boolean                    @default(true)
-  version          GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
-  memberships      EpciMembership[]
+  versionId       String                     @map("version_id")
+  epciId          String                     @map("epci_id")
+  name            String
+  normalizedName  String                     @map("normalized_name")
+  kind            String
+  departmentCodes String[]                   @map("department_codes")
+  active          Boolean                    @default(true)
+  version         GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  memberships     EpciMembership[]
 
   @@id([versionId, epciId])
   @@index([versionId, normalizedName])
@@ -278,12 +290,12 @@ model EpciReference {
 }
 
 model EpciMembership {
-  versionId  String                     @map("version_id")
-  epciId     String                     @map("epci_id")
-  communeId  String                     @map("commune_id")
-  quality    String                     @default("complete")
-  version    GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
-  epci       EpciReference              @relation(fields: [versionId, epciId], references: [versionId, epciId], onDelete: Cascade)
+  versionId String                     @map("version_id")
+  epciId    String                     @map("epci_id")
+  communeId String                     @map("commune_id")
+  quality   String                     @default("complete")
+  version   GeographicReferenceVersion @relation(fields: [versionId], references: [version], onDelete: Cascade)
+  epci      EpciReference              @relation(fields: [versionId, epciId], references: [versionId, epciId], onDelete: Cascade)
 
   @@id([versionId, epciId, communeId])
   @@index([versionId, communeId])

@@ -50,13 +50,18 @@ export async function findGroupScope(
 
 export async function countGroupScopes(client: RegistryClient): Promise<GroupRegistryCounts> {
   const rows = await client.$queryRaw<
-    { active: bigint; pending: bigint; unlisted: bigint; stopped: bigint }[]
+    { active: bigint; pending: bigint; unlisted: bigint; stopped: bigint; unattached: bigint }[]
   >(Prisma.sql`
     SELECT
       count(*) FILTER (WHERE "retrieval_status" = 'active') AS active,
       count(*) FILTER (WHERE "retrieval_status" = 'pending') AS pending,
       count(*) FILTER (WHERE "map_status" = 'unlisted') AS unlisted,
-      count(*) FILTER (WHERE "retrieval_status" LIKE 'stopped_%') AS stopped
+      count(*) FILTER (WHERE "retrieval_status" LIKE 'stopped_%') AS stopped,
+      count(*) FILTER (
+        WHERE "map_status" = 'listed'
+          AND "retrieval_status" = 'active'
+          AND ("geographic_status" IS NULL OR "geographic_status" <> 'resolved')
+      ) AS unattached
     FROM "ingestion_scope"
     WHERE "scope_kind" = 'group'
   `);
@@ -66,5 +71,6 @@ export async function countGroupScopes(client: RegistryClient): Promise<GroupReg
     pending: Number(row?.pending ?? 0),
     unlisted: Number(row?.unlisted ?? 0),
     stopped: Number(row?.stopped ?? 0),
+    unattached: Number(row?.unattached ?? 0),
   };
 }

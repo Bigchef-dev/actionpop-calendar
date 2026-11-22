@@ -85,9 +85,7 @@ export async function validateEpciReferenceSource(
     memberships: document.memberships,
     communeIds,
   });
-  const checksum = createHash('sha256')
-    .update(JSON.stringify(document))
-    .digest('hex');
+  const checksum = createHash('sha256').update(JSON.stringify(document)).digest('hex');
   return {
     version: document.version,
     status: diagnostics.length === 0 ? 'valid' : 'rejected',

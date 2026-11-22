@@ -103,6 +103,7 @@ export class PostgresGroupCatalogueRepository {
             id: entry.id,
             name: entry.name,
             isActive: entry.is_active,
+            ...(entry.location_country === undefined ? {} : { country: entry.location_country }),
           })),
           stoppedAt,
         ),

@@ -125,7 +125,12 @@ async function readEpciSnapshot(
     const text = await readFile(input.epciGroupementsPath, 'latin1');
     const parsed = parseGroupementsCsv(text, '');
     for (const error of parsed.errors) {
-      diagnostics.push({ code: 'epci_source_invalid', field: 'groupements', message: error, severity: 'error' });
+      diagnostics.push({
+        code: 'epci_source_invalid',
+        field: 'groupements',
+        message: error,
+        severity: 'error',
+      });
     }
     // One line per refresh: an operator needs the totals, not seven similar warnings.
     const ignored = Object.entries(parsed.ignoredNatures);
@@ -219,9 +224,7 @@ function checksumOf(
   references: readonly EpciReferenceRecord[],
   memberships: readonly EpciMembershipRecord[],
 ): string {
-  return createHash('sha256')
-    .update(JSON.stringify({ references, memberships }))
-    .digest('hex');
+  return createHash('sha256').update(JSON.stringify({ references, memberships })).digest('hex');
 }
 
 function warning(field: string, message: string): Diagnostic {

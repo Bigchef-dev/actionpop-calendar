@@ -103,7 +103,6 @@ function at(record: string[], header: string[], column: string): string {
   return index === -1 ? '' : (record[index] ?? '').trim();
 }
 
-
 function expandPostalCodes(primary: string, list: string): string[] {
   const codes = new Set<string>();
   for (const candidate of [...primary.split(','), ...list.split(',')]) {

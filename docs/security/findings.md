@@ -6,12 +6,12 @@ own judgement, the evidence that reproduces it, and its disposition.
 A finding is never deleted. When it is fixed, the entry stays and records what closed it, so a
 regression is recognisable.
 
-| Field | Meaning |
-|---|---|
-| Scanner severity | Verbatim from the scan report (`0` informational to `3` high). `n/a` for findings made by review before any scan ran. |
-| Reviewer judgement | One line, and it may disagree with the scanner. A disagreement must say why. |
-| Disposition | `fixed`, `mitigated` or `accepted`. |
-| Revisit trigger | Required for `accepted`: the condition that reopens the decision. |
+| Field              | Meaning                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Scanner severity   | Verbatim from the scan report (`0` informational to `3` high). `n/a` for findings made by review before any scan ran. |
+| Reviewer judgement | One line, and it may disagree with the scanner. A disagreement must say why.                                          |
+| Disposition        | `fixed`, `mitigated` or `accepted`.                                                                                   |
+| Revisit trigger    | Required for `accepted`: the condition that reopens the decision.                                                     |
 
 A release is blocked while any finding is `open`, and while any finding is high severity according
 to the scanner (see `scripts/zap-gate.mjs`).
@@ -25,9 +25,11 @@ to the scanner (see `scripts/zap-gate.mjs`).
   `API_REFERENCE=false` was set, so the default deployment exposed an interactive console and the
   full route schema to the internet.
 - **Evidence**: `apps/api/src/main.ts` previously read `process.env.API_REFERENCE !== 'false'`.
-- **Disposition**: fixed. Both surfaces are now registered only when `API_REFERENCE === 'true'`,
-  which means an unconfigured deployment has no such route at all. Asserted by
-  `apps/api/src/server.test.ts`.
+- **Disposition**: fixed at the edge. The API always serves both surfaces — the route is part of
+  the service and documents whatever controllers a deployment wired — while the published edge
+  never proxies `/reference` or `/openapi.json`, so they answer `404` from the internet. The
+  earlier `API_REFERENCE` switch was removed because it made the reference unreachable for local
+  work; containment now lives in the allowlist, asserted by `tests/integration/edge-surface.test.ts`.
 
 ### SEC-002 — No browser security headers on the published site
 
@@ -93,7 +95,7 @@ to the scanner (see `scripts/zap-gate.mjs`).
   Pages base path.
 - **Disposition**: mitigated. The site is now served by the application edge. The Pages build is
   kept as an immediate fallback, with its base path and API URL supplied by the workflow, and it
-  is explicitly the *degraded* deployment: no HSTS, no CSP, no frame protection.
+  is explicitly the _degraded_ deployment: no HSTS, no CSP, no frame protection.
 - **Revisit trigger**: retiring the Pages fallback promotes this entry to `fixed`.
 
 ### SEC-008 — Server banner disclosed the nginx build
@@ -150,20 +152,20 @@ to the scanner (see `scripts/zap-gate.mjs`).
 
 **Run: 2026-11-03**, OWASP ZAP baseline against the plain-HTTP edge of the full stack.
 
-| Outcome | Count |
-|---|---|
-| Fail (high severity) | 0 |
-| Warn | 0 |
-| Pass | 65 |
+| Outcome                   | Count                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| Fail (high severity)      | 0                                                                            |
+| Warn                      | 0                                                                            |
+| Pass                      | 65                                                                           |
 | Tuned in `.zap/rules.tsv` | 3 rules (10049, 10055, 90004 are reported as `IGNORE` when they still apply) |
 
 Alerts after the fixes above, all dispositioned:
 
-| Rule | Name | Severity | Disposition |
-|---|---|---|---|
-| 10055 | CSP: `style-src unsafe-inline` | medium | SEC-011, accepted |
-| 10049 | Storable and Cacheable Content | informational | SEC-012, accepted |
-| 10109 | Modern Web Application | informational | informational only, no action possible |
+| Rule  | Name                           | Severity      | Disposition                            |
+| ----- | ------------------------------ | ------------- | -------------------------------------- |
+| 10055 | CSP: `style-src unsafe-inline` | medium        | SEC-011, accepted                      |
+| 10049 | Storable and Cacheable Content | informational | SEC-012, accepted                      |
+| 10109 | Modern Web Application         | informational | informational only, no action possible |
 
 `node scripts/zap-gate.mjs zap-report/zap-report.json` exits `0` on this report; the CI job
 uploads `zap-report/` as an artifact on every outcome.

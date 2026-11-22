@@ -7,9 +7,11 @@ import {
   UnknownGroupError,
   validateActionPopulaireEvent,
   validateGroupCatalogue,
+  validateGroupDetail,
   validateMapEventListing,
   type ActionPopulaireEventPayload,
   type GroupCatalogueEntry,
+  type GroupDetail,
   type MapEventListingValidation,
 } from '@actionpop/core';
 
@@ -35,6 +37,19 @@ export class ActionPopulaireClient {
 
   public async fetchMapEventListing(): Promise<MapEventListingValidation> {
     return validateMapEventListing(await this.request('/carte/liste_evenements/'));
+  }
+
+  /**
+   * One group's detail resource. The document states the same `location` shape as an event, which
+   * is what lets the attachment rule reuse the event geographic rules unchanged.
+   */
+  public async fetchGroupDetail(groupId: string): Promise<GroupDetail> {
+    const value = await this.request(`/api/groupes/${encodeURIComponent(groupId)}/`);
+    const detail = validateGroupDetail(value);
+    if (detail.id !== groupId) {
+      throw new EventIdentityMismatchError(groupId, detail.id);
+    }
+    return detail;
   }
 
   /**

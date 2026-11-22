@@ -2,14 +2,21 @@ import {
   normalizeEventType,
   toObservedGroups,
   type ActionPopulaireEventPayload,
+  type ActionPopulaireLocation,
   type GeographicAttachment,
   type IncomingEvent,
   type LocationEvent,
   type RawLocationFields,
 } from '@actionpop/core';
 
-export function toRawLocationFields(event: ActionPopulaireEventPayload): RawLocationFields {
-  const location = event.location;
+/**
+ * Selects the fields the geographic enricher reads from a stated location. Events and groups
+ * state the same object, so both go through this function rather than through two similar ones.
+ */
+export function toRawLocationFields(
+  location: ActionPopulaireLocation | null | undefined,
+): RawLocationFields {
+  if (location === null || location === undefined) return {};
   return {
     ...(location.country === undefined ? {} : { country: location.country }),
     ...(location.departement === undefined ? {} : { departement: location.departement }),

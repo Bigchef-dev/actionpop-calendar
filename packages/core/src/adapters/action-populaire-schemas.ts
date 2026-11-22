@@ -158,6 +158,19 @@ const actionPopulaireEventSchema = z
   })
   .strip();
 
+/**
+ * A group's detail document states the same `location` shape as an event, so the group attachment
+ * reuses the event location schema and, through it, the event geographic rules. Nothing about how
+ * a commune is resolved is duplicated for groups.
+ */
+const groupDetailSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    location: locationSchema.nullable().optional(),
+  })
+  .strip();
+
 const groupCatalogueEntrySchema = z
   .object({
     id: z.string().trim().min(1),
@@ -180,6 +193,7 @@ const groupCatalogueEntrySchema = z
 export type ActionPopulaireLocation = z.output<typeof locationSchema>;
 export type ActionPopulaireEventPayload = z.output<typeof actionPopulaireEventSchema>;
 export type GroupCatalogueEntry = z.output<typeof groupCatalogueEntrySchema>;
+export type GroupDetail = z.output<typeof groupDetailSchema>;
 
 function parseSchema<T>(schema: z.ZodType<T>, value: unknown, label: string): T {
   const result = schema.safeParse(value);
@@ -283,6 +297,10 @@ export function parseMapEventSummaryEntry(value: unknown): MapEventSummaryParse 
 
 export function validateActionPopulaireEvent(value: unknown): ActionPopulaireEventPayload {
   return parseSchema(actionPopulaireEventSchema, value, 'event');
+}
+
+export function validateGroupDetail(value: unknown): GroupDetail {
+  return parseSchema(groupDetailSchema, value, 'group detail');
 }
 
 export function validateGroupCatalogue(value: unknown): GroupCatalogueEntry[] {

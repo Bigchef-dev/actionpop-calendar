@@ -180,6 +180,7 @@ describe('kind isolation', () => {
       pending: 0,
       unlisted: 0,
       stopped: 0,
+      unattached: 1,
     });
     expect(await countEventScopes(harness.prisma)).toEqual({ pending: 0, active: 0, retired: 1 });
   });

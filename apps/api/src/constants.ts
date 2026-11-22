@@ -4,3 +4,5 @@ export const EVENT_QUERY = Symbol('EVENT_QUERY');
 export const CALENDAR_SERVICE = Symbol('CALENDAR_SERVICE');
 export const CALENDAR_SETTINGS = Symbol('CALENDAR_SETTINGS');
 export const SUBJECT_SEARCH = Symbol('SUBJECT_SEARCH');
+export const GROUP_LISTING = Symbol('GROUP_LISTING');
+export const GROUP_AREA_RESOLVER = Symbol('GROUP_AREA_RESOLVER');

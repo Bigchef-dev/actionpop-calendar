@@ -19,15 +19,27 @@ export function validateEpciReference(input: EpciValidationInput): EpciReference
     if (reference.id.trim() === '') {
       diagnostics.push({ code: 'id_missing', message: 'EPCI id must not be empty' });
     } else if (referenceIds.has(reference.id)) {
-      diagnostics.push({ code: 'membership_duplicate', epciId: reference.id, message: 'EPCI id must be unique' });
+      diagnostics.push({
+        code: 'membership_duplicate',
+        epciId: reference.id,
+        message: 'EPCI id must be unique',
+      });
     } else {
       referenceIds.add(reference.id);
     }
     if (reference.name.trim() === '') {
-      diagnostics.push({ code: 'name_missing', epciId: reference.id, message: 'EPCI name must not be empty' });
+      diagnostics.push({
+        code: 'name_missing',
+        epciId: reference.id,
+        message: 'EPCI name must not be empty',
+      });
     }
     if (!isEpciKind(reference.kind)) {
-      diagnostics.push({ code: 'kind_unknown', epciId: reference.id, message: 'EPCI kind is unsupported' });
+      diagnostics.push({
+        code: 'kind_unknown',
+        epciId: reference.id,
+        message: 'EPCI kind is unsupported',
+      });
     }
   }
 

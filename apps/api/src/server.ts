@@ -9,6 +9,8 @@ import {
   type CalendarDataset,
   type FilteredCalendarReader,
   type GeographicFilter,
+  type GroupAreaResolver,
+  type GroupListingReader,
   type SubjectSearchReader,
 } from '@actionpop/core';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -34,12 +36,13 @@ export interface ServerOptionsEventQuery {
 export interface ServerOptions {
   datasetRepository: DatasetReader;
   subjectSearch?: SubjectSearchReader;
+  groupListing?: GroupListingReader;
+  groupAreaResolver?: GroupAreaResolver;
   /** Origins allowed to read the public JSON reads; empty means no cross-origin access. */
   corsOrigins?: readonly string[];
   eventQuery?: ServerOptionsEventQuery;
   calendarService?: FilteredCalendarReader;
   calendarSettings?: CalendarIcsSettings;
-  apiReference?: boolean;
   health?: { redis?: () => Promise<void>; postgres?: () => Promise<void> };
   upstream?: (...args: unknown[]) => unknown;
   metrics?: MetricsRegistry;
@@ -107,32 +110,33 @@ export async function buildApp(options: ServerOptions): Promise<NestFastifyAppli
   // 3. Initialisation des modules Nest
   await app.init();
 
-  // 4. Exploratory surfaces, closed by default. They are registered only when explicitly enabled,
-  // so an absent route is genuinely absent rather than a filtered one.
-  if (options.apiReference === true) {
-    const document = SwaggerModule.createDocument(
-      app,
-      new DocumentBuilder()
-        .setTitle('ActionPop Calendar API')
-        .setDescription(
-          'Read-only calendar surfaces. `/feed/{scopeId}` returns the group-scoped calendar, ' +
-            '`/events` returns the filtered JSON event list, `/search/subjects` resolves a query to ' +
-            'calendar subjects, and `/calendar.ics` returns the filtered iCalendar calendar. Geographic and event-type identifiers are strings so leading zeroes survive.',
-        )
-        .setVersion('0.1.0')
-        .build(),
-    );
+  // 4. The generated reference documents whatever controllers the deployment wired. The
+  // published edge still does not proxy /reference or /openapi.json, so the schema is never
+  // reachable from the internet by accident.
+  const document = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder()
+      .setTitle('ActionPop Calendar API')
+      .setDescription(
+        'Read-only calendar surfaces. `/feed/{scopeId}` returns the group-scoped calendar, ' +
+          '`/events` returns the filtered JSON event list, `/groups` lists the action groups of a ' +
+          'geographic area, `/search/subjects` resolves a query to calendar subjects, and ' +
+          '`/calendar.ics` returns the filtered iCalendar calendar. Geographic and event-type ' +
+          'identifiers are strings so leading zeroes survive.',
+      )
+      .setVersion('0.1.0')
+      .build(),
+  );
 
-    fastifyInstance.get('/openapi.json', async () => document);
-    app.use(
-      '/reference',
-      apiReference({
-        url: '/openapi.json',
-        withFastify: true,
-        pageTitle: 'ActionPop Calendar API',
-      }),
-    );
-  }
+  fastifyInstance.get('/openapi.json', async () => document);
+  app.use(
+    '/reference',
+    apiReference({
+      url: '/openapi.json',
+      withFastify: true,
+      pageTitle: 'ActionPop Calendar API',
+    }),
+  );
 
   return app;
 }

@@ -43,6 +43,7 @@ import {
   type RefreshGeographicReferenceInput,
 } from './geography/reference-refresh.js';
 import { reEnrichEvents } from './geography/re-enrichment.js';
+import { PostgresGroupAttachmentRefresher } from './geography/group-attachment-refresher.js';
 import { reportDispatcherCycle } from './dispatcher/cycle-report.js';
 import { createCycleRunner } from './dispatcher/cycle-runner.js';
 import { createDispatcher } from './dispatcher/dispatcher.js';
@@ -110,6 +111,7 @@ export function createWorkerRuntime(
     ...(config.upstreamToken === undefined ? {} : { token: config.upstreamToken }),
     fetcher: createUpstreamFetcher(config.sockProxy),
   });
+  const groupAttachments = new PostgresGroupAttachmentRefresher(postgres, client);
   const publisher = new PostgresSnapshotPublisher(new PostgresCalendarDatasetRepository(postgres));
   const revisions = new SnapshotPublisher();
   const observability = createWorkerObservability(config.app.environment);
@@ -405,6 +407,53 @@ export function createWorkerRuntime(
             outcome: 'skipped',
             ...(directory.failure === undefined ? {} : { failure: directory.failure }),
           });
+        }
+
+        // A spatial failure must never cost the catalogue that was just synchronized, so this
+        // step reports its own outcome and never throws into the cycle.
+        const activeVersion = await geographicReference.findActiveVersion().catch(() => null);
+        if (activeVersion !== null) {
+          const attachment = await groupAttachments
+            .refresh(activeVersion.version)
+            .catch((error: unknown) => {
+              observability.logger.warn('group attachment failed', {
+                operation: 'group-attachment',
+                outcome: 'failed',
+                failure: error instanceof Error ? error.message : 'unknown failure',
+              });
+              return undefined;
+            });
+          if (attachment !== undefined) {
+            observability.logger.info('group attachment', {
+              operation: 'group-attachment',
+              outcome: 'completed',
+              referenceVersion: attachment.version,
+              resolved: attachment.resolved,
+              incomplete: attachment.incomplete,
+              international: attachment.international,
+              invalid: attachment.invalid,
+              skipped: attachment.skipped,
+              failed: attachment.failed,
+            });
+            for (const outcome of [
+              'resolved',
+              'incomplete',
+              'international',
+              'invalid',
+              'failed',
+            ] as const) {
+              observability.metrics.increment(
+                'actionpop_group_attachment_total',
+                { outcome },
+                attachment[outcome],
+              );
+            }
+            observability.metrics.increment(
+              'actionpop_group_attachment_total',
+              { outcome: 'skipped' },
+              attachment.skipped,
+            );
+          }
         }
         const reconciled = await reconcileIngestionLedger(
           postgres,

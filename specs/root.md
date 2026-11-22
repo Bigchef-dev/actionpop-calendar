@@ -39,16 +39,16 @@
 The specification tree describes a pnpm TypeScript monorepo. Each spec maps onto one or more
 of these units.
 
-| Unit             | Path                                | Responsibility                                                                                                     | Main specs                   |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Core package     | [`packages/core`](../packages/core) | Domain contracts, adapters, rules, persistence                                                                     | 001–009                      |
-| API              | [`apps/api`](../apps/api)           | Public read-only HTTP surface (`/calendar.ics`, `/search/subjects`, `/events`, `/feed`, `/telemetry`, `/internal`) | 001, 002, 003, 007, 008, 009 |
-| Worker           | [`apps/worker`](../apps/worker)     | Dispatcher, BullMQ ingestion, geographic refresh, map discovery                                                    | 001, 002, 004, 005, 006, 009 |
-| Web              | [`apps/web`](../apps/web)           | Vue 3 discovery + calendar composition experience (GitHub Pages)                                                   | 007, 008, 009                |
-| Database         | [`prisma/`](../prisma)              | PostgreSQL schema and migrations                                                                                   | 001, 002, 004, 005, 006, 008 |
-| Diagrams & notes | [`docs/`](../docs)                  | Architecture diagrams and design notes                                                                             | all                          |
-| Canonical contracts | [`specs/contracts/`](contracts/README.md) | Living, normative contracts (HTTP, ingestion, data, metrics)                                              | all                          |
-| Governance       | [`.specify/`](../.specify)          | Constitution, templates, workflow registry                                                                         | —                            |
+| Unit                | Path                                      | Responsibility                                                                                                     | Main specs                   |
+| ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| Core package        | [`packages/core`](../packages/core)       | Domain contracts, adapters, rules, persistence                                                                     | 001–009                      |
+| API                 | [`apps/api`](../apps/api)                 | Public read-only HTTP surface (`/calendar.ics`, `/search/subjects`, `/events`, `/feed`, `/telemetry`, `/internal`) | 001, 002, 003, 007, 008, 009 |
+| Worker              | [`apps/worker`](../apps/worker)           | Dispatcher, BullMQ ingestion, geographic refresh, map discovery                                                    | 001, 002, 004, 005, 006, 009 |
+| Web                 | [`apps/web`](../apps/web)                 | Vue 3 discovery + calendar composition experience (GitHub Pages)                                                   | 007, 008, 009                |
+| Database            | [`prisma/`](../prisma)                    | PostgreSQL schema and migrations                                                                                   | 001, 002, 004, 005, 006, 008 |
+| Diagrams & notes    | [`docs/`](../docs)                        | Architecture diagrams and design notes                                                                             | all                          |
+| Canonical contracts | [`specs/contracts/`](contracts/README.md) | Living, normative contracts (HTTP, ingestion, data, metrics)                                                       | all                          |
+| Governance          | [`.specify/`](../.specify)                | Constitution, templates, workflow registry                                                                         | —                            |
 
 Architecture diagrams worth reading before a spec:
 [object-design](../docs/object-design.mmd), [data-oriented](../docs/data-oriented.mmd),
@@ -122,6 +122,7 @@ numbered folder and mostly contains the same artifacts:
 | [003](003-icalendar-filtered-feed/spec.md)    | Filtered iCalendar Feed                              | Implemented               | `GET /calendar.ics` with `country`/`department`/`commune_name`/`insee_commune`/`event_type`, RFC 5545 writer, `X-ACTIONPOP-*` metadata, YAML configuration file | 001, 002           |
 | [007](007-public-calendar-experience/spec.md) | Public Calendar Discovery and Composition Experience | Implemented · tasks stale | `GET /search/subjects` (commune/department/group), `group` criterion on `/calendar.ics`; web discovery + composition                                            | 002, 003, 004, 005 |
 | [008](008-intercommunal-calendar/spec.md)     | Intercommunal Calendar Discovery                     | Implemented               | EPCI reference + membership, `epci` search kind, `epci` criterion on `/calendar.ics`, territory resolution                                                      | 002, 007           |
+| [010](010-geographic-group-listing/spec.md)   | Geographic Action Group Listing                      | Implemented               | Public read of a territory's action groups by the existing geographic criteria: identity, name, location context, group calendar reference                      | 001, 002, 008      |
 
 #### E. Web experience
 
@@ -151,6 +152,7 @@ numbered folder and mostly contains the same artifacts:
 | 007  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     3     |     ✓      |     ✓     | 11 / 55 (stale) |
 | 008  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     3     |     ✓      |     ✓     | 50 / 50         |
 | 009  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     4     |     ✓      |     ✓     | 71 / 71         |
+| 010  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     1     |     ✓      |     ✓     | 41 / 41         |
 
 ---
 
@@ -219,6 +221,7 @@ with a pointer to its canonical file. When the two disagree, `contracts/` wins.
 | `GET /calendar.ics`                  | [003/contracts/calendar-ics.md](003-icalendar-filtered-feed/contracts/calendar-ics.md)                   | [007 `group`](007-public-calendar-experience/contracts/calendar-ics-group-filter.md), [008 `epci`](008-intercommunal-calendar/contracts/calendar-ics.md) | [`calendar-ics.controller.ts`](../apps/api/src/controllers/calendar-ics.controller.ts) |
 | `GET /search/subjects`               | [007/contracts/search-api.md](007-public-calendar-experience/contracts/search-api.md)                    | [008 `epci` kind](008-intercommunal-calendar/contracts/search-subjects.md)                                                                               | [`search.controller.ts`](../apps/api/src/controllers/search.controller.ts)             |
 | `GET /events`                        | [002/contracts/geographic-filter.md](002-geographic-enrichment/contracts/geographic-filter.md)           | —                                                                                                                                                        | [`events.controller.ts`](../apps/api/src/controllers/events.controller.ts)             |
+| `GET /groups`                        | [010/contracts/group-listing.md](010-geographic-group-listing/contracts/group-listing.md)                | —                                                                                                                                                        | `groups.controller.ts`                                                                 |
 | `GET/POST /feed/{scopeId}`           | [001/contracts/api.md](001-technical-foundation/contracts/api.md)                                        | — (**stale**: still says Redis snapshot; see §8)                                                                                                         | [`calendar.controller.ts`](../apps/api/src/controllers/calendar.controller.ts)         |
 | `GET /internal/{live,ready,metrics}` | [001/contracts/operations.md](001-technical-foundation/contracts/operations.md)                          | [009/contracts/metrics-exposition.md](009-release-hardening-observability/contracts/metrics-exposition.md)                                               | [`internal.controller.ts`](../apps/api/src/internal/internal.controller.ts)            |
 | `POST /telemetry/journey`            | [009/contracts/journey-telemetry.md](009-release-hardening-observability/contracts/journey-telemetry.md) | —                                                                                                                                                        | [`telemetry.controller.ts`](../apps/api/src/observability/telemetry.controller.ts)     |
