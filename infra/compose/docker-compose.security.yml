@@ -8,7 +8,13 @@
 # service itself is not declared here: the workflow runs the official image with host networking.
 services:
   edge-scan:
-    image: nginx:1.29-alpine
+    # Same image, different target: only the listener and the forwarded transport differ, so the
+    # scan attacks the published routing table and header set rather than a separately mounted copy.
+    image: ${EDGE_SCAN_IMAGE:-actionpop-edge:scan}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.edge
+      target: scan
     networks:
       - private
       # Docker cannot publish a port from a network declared `internal: true`, so the scanner
@@ -16,11 +22,6 @@ services:
       - default
     ports:
       - '127.0.0.1:8080:8080'
-    volumes:
-      # Same two mounts as the production edge: the scan attacks the published routing table and
-      # header policy, not a copy that could drift from them.
-      - ../edge/http-scan.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../edge:/etc/nginx/app:ro
     depends_on:
       api:
         condition: service_healthy

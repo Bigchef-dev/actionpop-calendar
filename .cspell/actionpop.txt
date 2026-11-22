@@ -211,3 +211,4 @@ vhosts
 unrouted
 webp
 openapi
+healthz

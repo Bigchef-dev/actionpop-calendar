@@ -163,19 +163,26 @@ services:
 
   # TLS terminates at the host-wide Caddy, which owns ports 80/443 and reaches this virtual host as
   # `edge:8080` over `caddy_network`. Publishing here would compete with Caddy for the host ports.
+  #
+  # The configuration is baked into the image rather than bind-mounted: deploying is a pull, the
+  # running tag states which routing table is live, and no file has to be copied onto the host.
   edge:
-    image: nginx:1.29-alpine
+    image: ${EDGE_IMAGE:-ghcr.io/bigchef-dev/actionpop-edge:latest}
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.edge
     profiles: ['edge']
     expose:
       - '80'
       - '8080'
-    volumes:
-      # `../edge` is `infra/edge`: the vhost is mounted as the default server and the whole
-      # directory as the include root (`/etc/nginx/app`), so `snippets/*` and `errors/*` travel
-      # with it. Mounting the tree rather than each file is what keeps a missing snippet from
-      # becoming a "nginx answers 404" incident.
-      - ../edge/https.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../edge:/etc/nginx/app:ro
+    healthcheck:
+      # Loopback and upstream-free, so `up -d` and any orchestrator can wait for "the edge serves"
+      # without depending on the API or the site being reachable from here.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/healthz']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       api:
         condition: service_healthy

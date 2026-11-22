@@ -12,7 +12,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     strategy:
-      # One image failing must not hide the state of the other two.
+      # One image failing must not hide the state of the others.
       fail-fast: false
       matrix:
         include:
@@ -22,6 +22,8 @@ jobs:
             dockerfile: infra/docker/Dockerfile.worker
           - name: web
             dockerfile: infra/docker/Dockerfile.web
+          - name: edge
+            dockerfile: infra/docker/Dockerfile.edge
     steps:
       - uses: actions/checkout@v7
       - uses: docker/login-action@v4

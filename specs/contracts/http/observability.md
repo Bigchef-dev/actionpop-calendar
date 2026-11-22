@@ -24,11 +24,14 @@ A route is public only because it is listed here. Adding a route is a visible ch
 | `/groups`, `/groups/`                  | exact + prefix | `api`  | Territory action group list                                                  |
 | `/feed/`                               | prefix         | `api`  | Dataset-scoped calendar                                                      |
 | `/telemetry/journey`                   | exact, `POST`  | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
+| `/healthz`                             | exact          | edge   | Loopback-only liveness for the container healthcheck; never proxied          |
 
 A read route called with another method answers `405` with an `Allow: GET, HEAD` header and a JSON
 body, and every edge-level `404` serves the branded page in `infra/edge/errors/404.html`. The
 routing table itself is `infra/edge/snippets/routes.conf`, included by both the production vhost and
-the CI scan twin; see [`infra/edge/README.md`](../../../infra/edge/README.md).
+the CI scan twin. The edge is deployed as an image (`infra/docker/Dockerfile.edge`), built and
+validated by CI, so the running tag is the running configuration; see
+[`infra/edge/README.md`](../../../infra/edge/README.md).
 
 Everything else — including `/internal/*`, `/reference`, `/openapi.json` and any unknown path —
 answers `404` at the edge.

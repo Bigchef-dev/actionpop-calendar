@@ -1,0 +1,28 @@
+# The published edge: routing table, header policy and error pages baked into the image.
+#
+# Bind-mounting a configuration directory onto a host is fragile in three ways, and all three have
+# already caused an incident here: the transfer is manual and easy to forget, a missing file is
+# silently created as an empty directory, and nginx keeps serving the configuration it loaded at
+# start-up whatever the file says afterwards. Shipping the configuration as an image removes all
+# three — the tag that is running is the configuration that is running.
+#
+# Two targets share every layer except the vhost: `edge` for production, `scan` for the
+# exploitation scan, so the scan attacks this same routing table and this same header set.
+FROM nginx:1.29-alpine AS edge
+
+# `default.conf` is the vhost nginx loads; `/etc/nginx/app` is the include root that vhost and its
+# snippets refer to.
+COPY infra/edge/https.conf /etc/nginx/conf.d/default.conf
+COPY infra/edge/snippets/ /etc/nginx/app/snippets/
+COPY infra/edge/errors/ /etc/nginx/app/errors/
+
+# Fail the build rather than the deployment when the configuration cannot start. The checker runs
+# the real vhost with its real snippets; see infra/edge/check-config.sh for what it rewrites.
+COPY infra/edge/check-config.sh /usr/local/bin/check-edge-config
+RUN chmod +x /usr/local/bin/check-edge-config \
+    && /usr/local/bin/check-edge-config /etc/nginx/conf.d/default.conf
+
+# The plain-HTTP twin used only by the CI scan (see infra/compose/docker-compose.security.yml).
+FROM edge AS scan
+COPY infra/edge/http-scan.conf /etc/nginx/conf.d/default.conf
+RUN /usr/local/bin/check-edge-config /etc/nginx/conf.d/default.conf

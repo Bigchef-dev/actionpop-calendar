@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'infra/docker/**'
-      - 'infra/edge/web.conf'
+      - 'infra/edge/**'
       - '.dockerignore'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -40,6 +40,23 @@ jobs:
           push: false
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
+      - name: Build edge image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infra/docker/Dockerfile.edge
+          target: edge
+          push: false
+          cache-from: type=gha,scope=edge
+          cache-to: type=gha,mode=max,scope=edge
+      - name: Build scan twin of the edge
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infra/docker/Dockerfile.edge
+          target: scan
+          push: false
+          cache-from: type=gha,scope=edge
       - name: Build web image
         uses: docker/build-push-action@v7
         with:

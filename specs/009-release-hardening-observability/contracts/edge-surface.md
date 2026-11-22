@@ -29,10 +29,12 @@ body, instead of the `403` that `limit_except` produces on its own.
 The routing table is one file, `infra/edge/snippets/routes.conf`, included by both the production
 vhost (`https.conf`) and the plain-HTTP scan twin (`http-scan.conf`). Headers live in
 `snippets/security-headers.conf`, proxy defaults in `snippets/proxy.conf`. A route therefore
-cannot exist in production and be missing from the scan, and a missing include is caught by
-`tests/integration/edge-surface.test.ts` before deployment. See
-[`infra/edge/README.md`](../../../infra/edge/README.md) for how to add a route and how to apply a
-change to a running deployment.
+cannot exist in production and be missing from the scan.
+
+The configuration ships **inside an image** (`infra/docker/Dockerfile.edge`) with two targets,
+`edge` and `scan`, rather than being copied onto a host and bind-mounted: the running tag is the
+running configuration, and the build fails when the vhost cannot start. See
+[`infra/edge/README.md`](../../../infra/edge/README.md) for how to add a route and how to deploy.
 
 ## Redirects and transport
 

@@ -6,6 +6,9 @@ const EDGE = 'infra/edge';
 const HTTPS = readFileSync(`${EDGE}/https.conf`, 'utf8');
 const SCAN = readFileSync(`${EDGE}/http-scan.conf`, 'utf8');
 const ROUTES = readFileSync(`${EDGE}/snippets/routes.conf`, 'utf8');
+const DOCKERFILE = readFileSync('infra/docker/Dockerfile.edge', 'utf8');
+const COMPOSE = readFileSync('infra/compose/docker-compose.yml', 'utf8');
+const COMPOSE_SCAN = readFileSync('infra/compose/docker-compose.security.yml', 'utf8');
 const CONTRACT = readFileSync(
   'specs/009-release-hardening-observability/contracts/edge-surface.md',
   'utf8',
@@ -45,6 +48,7 @@ describe('published edge surface', () => {
         '^~ /groups/',
         '^~ /feed/',
         '= /telemetry/journey',
+        '= /healthz',
         '^~ /errors/',
         '@read_method_not_allowed',
         '@write_method_not_allowed',
@@ -140,6 +144,39 @@ describe('published edge surface', () => {
     expect(readFileSync(`${EDGE}/snippets/proxy.conf`, 'utf8')).toContain(
       'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
     );
+  });
+
+  it('ships the configuration inside an image instead of bind-mounting it', () => {
+    // A configuration directory copied onto a host is a deployment step that can be forgotten, and
+    // nginx keeps serving what it loaded at start-up whatever the file says afterwards. Baking the
+    // configuration into the image makes the running tag the running configuration.
+    expect(DOCKERFILE).toContain('COPY infra/edge/https.conf /etc/nginx/conf.d/default.conf');
+    expect(DOCKERFILE).toContain('COPY infra/edge/snippets/ /etc/nginx/app/snippets/');
+    expect(DOCKERFILE).toContain('COPY infra/edge/errors/ /etc/nginx/app/errors/');
+    expect(DOCKERFILE).toContain('FROM edge AS scan');
+    expect(DOCKERFILE).toContain('COPY infra/edge/http-scan.conf /etc/nginx/conf.d/default.conf');
+    // The image must refuse to be built from a configuration its runtime would reject.
+    expect(DOCKERFILE).toContain('check-edge-config');
+
+    for (const compose of [COMPOSE, COMPOSE_SCAN]) {
+      // No configuration reaches the container through a volume any more.
+      expect(compose).not.toMatch(/:\s*\n?\s*- \.\.\/edge:/);
+      expect(compose).not.toContain('../edge/https.conf:');
+      expect(compose).not.toContain('../edge/http-scan.conf:');
+    }
+    expect(COMPOSE).toContain('dockerfile: infra/docker/Dockerfile.edge');
+    expect(COMPOSE_SCAN).toContain('target: scan');
+  });
+
+  it('declares a loopback-only health endpoint that no upstream can break', () => {
+    const block = /location = \/healthz \{([\s\S]*?)\n\}/.exec(ROUTES)?.[1];
+
+    expect(block).toBeDefined();
+    expect(block).toContain('allow 127.0.0.1;');
+    expect(block).toContain('deny all;');
+    expect(block).toContain("return 200 'ok';");
+    expect(block).not.toContain('proxy_pass');
+    expect(COMPOSE).toContain('/healthz');
   });
 
   it('limits the write surface to the journey endpoint and caps its body', () => {

@@ -34,15 +34,50 @@ empty directory in the tree and take the whole site down.
 5. Record the path in `specs/contracts/http/observability.md` (the normative table) and in
    `specs/009-release-hardening-observability/contracts/edge-surface.md` (the decision history).
 
-## Validating a change
+## Deployment: one image, no file transfer
 
-Syntax, without running the stack (the fake hosts only satisfy name resolution at config load):
+The configuration is **baked into an image** (`infra/docker/Dockerfile.edge`), not bind-mounted:
 
 ```bash
-docker run --rm --add-host web:127.0.0.1 --add-host api:127.0.0.1 \
-  -v "$PWD/infra/edge/https.conf:/etc/nginx/conf.d/default.conf:ro" \
-  -v "$PWD/infra/edge:/etc/nginx/app:ro" \
-  nginx:1.29-alpine nginx -t
+# build and validate locally
+docker build -f infra/docker/Dockerfile.edge --target edge -t actionpop-edge:local .
+```
+
+The build runs `check-config.sh` and fails if the vhost, a snippet or an error page cannot start,
+so a broken configuration never produces an image. Two targets share every layer:
+
+| Target | Vhost                                   | Used by                  |
+| ------ | --------------------------------------- | ------------------------ |
+| `edge` | `https.conf` (`listen 80` and `8080`)   | the production stack     |
+| `scan` | `http-scan.conf` (plain HTTP on `8080`) | the CI exploitation scan |
+
+Deploying is therefore a pull, never a copy:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml pull edge
+docker compose -f infra/compose/docker-compose.yml --profile edge up -d edge
+```
+
+Pin `EDGE_IMAGE` to an immutable tag (`...:${GIT_SHA}`) to roll back by changing one value. The
+running tag _is_ the running routing table, which is what removes the "the file on disk is newer
+than the container" failure for good.
+
+## Validating a change
+
+Everything is checked by the image build:
+
+```bash
+docker build -f infra/docker/Dockerfile.edge --target edge .
+docker build -f infra/docker/Dockerfile.edge --target scan .
+```
+
+The same check on the working tree, without building an image:
+
+```bash
+docker run --rm -v "$PWD/infra/edge:/src:ro" nginx:1.29-alpine sh -c \
+  'mkdir -p /etc/nginx/app && cp -r /src/snippets /src/errors /src/check-config.sh /etc/nginx/app/ \
+   && cp /src/https.conf /etc/nginx/conf.d/default.conf \
+   && /etc/nginx/app/check-config.sh /etc/nginx/conf.d/default.conf'
 ```
 
 Behaviour, against stub upstreams: start two containers aliased `web` and `api` on a scratch
@@ -58,18 +93,23 @@ docker compose -f infra/compose/docker-compose.yml \
                -f infra/compose/docker-compose.security.yml up -d --build   # then ZAP
 ```
 
-## Applying a change to a running deployment
+## Diagnosing a route that answers 404
 
-The vhost and its snippets are bind-mounted read-only; nginx reads them **only at start**, so
-editing a file changes nothing until the container is restarted:
+Ask the two questions in order; they are different failures.
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml --profile edge up -d --force-recreate edge
-docker compose -f infra/compose/docker-compose.yml --profile edge exec edge nginx -t
+# 1. Does the API serve it? (bypasses the edge entirely)
+docker compose -f infra/compose/docker-compose.yml exec api \
+  node -e "fetch('http://127.0.0.1:3000/groups?department=35').then(async r=>console.log(r.status, (await r.text()).slice(0,120)))"
+
+# 2. Which routing table is the edge running?
+docker compose -f infra/compose/docker-compose.yml --profile edge exec edge \
+  sh -lc 'grep -c "location = /groups" /etc/nginx/conf.d/default.conf; grep -c . /etc/nginx/app/snippets/routes.conf'
 ```
 
-A route that answers nginx's bare 404 while the API serves it is almost always this: the config
-on disk is newer than the config in the running container.
+A `404` from the API (JSON) means an image without the route; a branded `404` means the edge does
+not route the path. Since the configuration ships in the image, the second case now means "the
+edge image was not rebuilt and pulled", never "a file was not copied".
 
 ## Deliberate non-goals
 

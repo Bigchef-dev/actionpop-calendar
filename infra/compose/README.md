@@ -61,9 +61,17 @@ docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 Redis, worker, and internal health endpoints remain on the private network. TLS terminates at the
 host-wide Caddy reverse proxy, which owns ports 80/443 for the whole server. The edge is a
 plain-HTTP virtual host reachable as `edge:8080` over the external `caddy_network` (it also listens
-on port 80, so a deployment whose Caddy targets `edge:80` keeps working), and is started explicitly
-with `docker compose --profile edge -f infra/compose/docker-compose.yml up -d`. Its routing table,
-headers and error pages are documented in [`infra/edge/README.md`](../edge/README.md).
+on port 80, so a deployment whose Caddy targets `edge:80` keeps working). It ships as its own image
+built from [`infra/docker/Dockerfile.edge`](../docker/Dockerfile.edge):
+
+```bash
+docker compose -f infra/compose/docker-compose.yml pull edge
+docker compose -f infra/compose/docker-compose.yml --profile edge up -d edge
+```
+
+Nothing is copied onto the host: the routing table, headers and error pages live in the image, and
+the build refuses to produce an unusable configuration. See
+[`infra/edge/README.md`](../edge/README.md) for the layout and how to add a route.
 
 A minimal Caddy site for it:
 
