@@ -37,7 +37,7 @@ to the scanner (see `scripts/zap-gate.mjs`).
 - **Reviewer judgement**: High. Without CSP and `frame-ancestors`, any injected markup could load
   third-party script, and the calendar could be framed by another origin.
 - **Evidence**: no `add_header` directive existed in `infra/edge/`.
-- **Disposition**: fixed. A single shared snippet (`infra/edge/security-headers.conf`) is included
+- **Disposition**: fixed. A single shared snippet (`infra/edge/snippets/security-headers.conf`) is included
   by both the HTTPS server and the CI scan server: CSP with `script-src 'self'` and
   `frame-ancestors 'none'`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `Cross-Origin-Opener-Policy`.

@@ -127,7 +127,7 @@ apps/web/src/
 infra/
 ├── docker/Dockerfile.web             # NEW: vite build -> nginx static
 ├── edge/
-│   ├── security-headers.conf         # shared header snippet (CSP, HSTS, frame, permissions)
+│   ├── snippets/security-headers.conf # shared header snippet (CSP, HSTS, frame, permissions)
 │   ├── https.conf                    # explicit allowlist, everything else 404
 │   └── http-scan.conf                # plain-HTTP variant for the CI scan
 ├── compose/

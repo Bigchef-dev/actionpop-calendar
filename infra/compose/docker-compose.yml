@@ -168,8 +168,14 @@ services:
     profiles: ['edge']
     expose:
       - '80'
+      - '8080'
     volumes:
-      - ./edge/https.conf:/etc/nginx/conf.d/default.conf:ro
+      # `../edge` is `infra/edge`: the vhost is mounted as the default server and the whole
+      # directory as the include root (`/etc/nginx/app`), so `snippets/*` and `errors/*` travel
+      # with it. Mounting the tree rather than each file is what keeps a missing snippet from
+      # becoming a "nginx answers 404" incident.
+      - ../edge/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../edge:/etc/nginx/app:ro
     depends_on:
       api:
         condition: service_healthy

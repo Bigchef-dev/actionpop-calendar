@@ -7,21 +7,32 @@ route is a visible change to `infra/edge/https.conf` (FR-013).
 
 ## Allowlist
 
-| Path                                   | Match         | Target | Notes                                                                        |
-| -------------------------------------- | ------------- | ------ | ---------------------------------------------------------------------------- |
-| `/`                                    | exact         | `web`  | SPA index                                                                    |
-| `/assets/`                             | prefix        | `web`  | Hashed build assets                                                          |
-| `^/[^/]+\.(png                         | ico           | svg    | webp                                                                         | txt)$` | regex | `web` | Root-level files copied from `apps/web/public/` (currently `tortue-hourra.png`) |
-| `/calendar.ics`                        | exact         | `api`  | Filtered iCalendar feed                                                      |
-| `/search/`                             | prefix        | `api`  | Subject search                                                               |
-| `/events`                              | prefix        | `api`  | Geographic JSON event list                                                   |
-| `/groups`                              | prefix        | `api`  | Territory action group list                                                  |
-| `/feed/`                               | prefix        | `api`  | Dataset-scoped calendar                                                      |
-| `/telemetry/journey`                   | exact, `POST` | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
-| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$` | regex         | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`             |
+| Path                                   | Match          | Target | Notes                                                                  |
+| -------------------------------------- | -------------- | ------ | ---------------------------------------------------------------------- |
+| `/`                                    | exact          | `web`  | SPA index                                                              |
+| `/assets/`                             | prefix         | `web`  | Hashed build assets                                                    |
+| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$` | regex          | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`       |
+| `/calendar.ics`                        | exact          | `api`  | Filtered iCalendar feed                                                |
+| `/search/`                             | prefix         | `api`  | Subject search                                                         |
+| `/events`, `/events/`                  | exact + prefix | `api`  | Geographic JSON event list                                             |
+| `/groups`, `/groups/`                  | exact + prefix | `api`  | Territory action group list                                            |
+| `/feed/`                               | prefix         | `api`  | Dataset-scoped calendar                                                |
+| `/telemetry/journey`                   | exact, `POST`  | `api`  | Journey batches; any other method answers `405` with an `Allow` header |
 
 Everything else, including `/internal/*`, `/reference`, `/openapi.json` and any unknown path,
-answers `404` at the edge.
+answers `404` at the edge — with a branded page from `infra/edge/errors/404.html`, never nginx's
+default. A read route called with another method answers `405` with an `Allow` header and a JSON
+body, instead of the `403` that `limit_except` produces on its own.
+
+## Structure
+
+The routing table is one file, `infra/edge/snippets/routes.conf`, included by both the production
+vhost (`https.conf`) and the plain-HTTP scan twin (`http-scan.conf`). Headers live in
+`snippets/security-headers.conf`, proxy defaults in `snippets/proxy.conf`. A route therefore
+cannot exist in production and be missing from the scan, and a missing include is caught by
+`tests/integration/edge-surface.test.ts` before deployment. See
+[`infra/edge/README.md`](../../../infra/edge/README.md) for how to add a route and how to apply a
+change to a running deployment.
 
 ## Redirects and transport
 
@@ -38,7 +49,7 @@ edge therefore speaks plain HTTP, is never published, and declares no certificat
 ## Response headers
 
 Applied to every proxied and static response by a single shared snippet,
-`infra/edge/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
+`infra/edge/snippets/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
 server so the scan validates exactly what production serves.
 
 | Header                         | Value                                                                                                                                                                                             |

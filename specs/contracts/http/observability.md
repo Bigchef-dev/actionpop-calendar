@@ -13,17 +13,22 @@ A route is public only because it is listed here. Adding a route is a visible ch
 
 ## Public allowlist
 
-| Path                                   | Match         | Target | Notes                                                                        |
-| -------------------------------------- | ------------- | ------ | ---------------------------------------------------------------------------- |
-| `/`                                    | exact         | `web`  | SPA index                                                                    |
-| `/assets/`                             | prefix        | `web`  | Hashed build assets                                                          |
-| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$` | regex         | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`             |
-| `/calendar.ics`                        | exact         | `api`  | Filtered iCalendar feed                                                      |
-| `/search/`                             | prefix        | `api`  | Subject search                                                               |
-| `/events`                              | prefix        | `api`  | Geographic JSON event list                                                   |
-| `/groups`                              | prefix        | `api`  | Territory action group list                                                  |
-| `/feed/`                               | prefix        | `api`  | Dataset-scoped calendar                                                      |
-| `/telemetry/journey`                   | exact, `POST` | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
+| Path                                   | Match          | Target | Notes                                                                        |
+| -------------------------------------- | -------------- | ------ | ---------------------------------------------------------------------------- |
+| `/`                                    | exact          | `web`  | SPA index                                                                    |
+| `/assets/`                             | prefix         | `web`  | Hashed build assets                                                          |
+| `^/[^/]+\.(png\|ico\|svg\|webp\|txt)$` | regex          | `web`  | Root-level files from `apps/web/public/`, including `robots.txt`             |
+| `/calendar.ics`                        | exact          | `api`  | Filtered iCalendar feed                                                      |
+| `/search/`                             | prefix         | `api`  | Subject search                                                               |
+| `/events`, `/events/`                  | exact + prefix | `api`  | Geographic JSON event list                                                   |
+| `/groups`, `/groups/`                  | exact + prefix | `api`  | Territory action group list                                                  |
+| `/feed/`                               | prefix         | `api`  | Dataset-scoped calendar                                                      |
+| `/telemetry/journey`                   | exact, `POST`  | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
+
+A read route called with another method answers `405` with an `Allow: GET, HEAD` header and a JSON
+body, and every edge-level `404` serves the branded page in `infra/edge/errors/404.html`. The
+routing table itself is `infra/edge/snippets/routes.conf`, included by both the production vhost and
+the CI scan twin; see [`infra/edge/README.md`](../../../infra/edge/README.md).
 
 Everything else — including `/internal/*`, `/reference`, `/openapi.json` and any unknown path —
 answers `404` at the edge.
@@ -48,7 +53,7 @@ published and declares no certificate.
 ## Security headers
 
 Applied to every proxied and static response by one shared snippet,
-`infra/edge/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
+`infra/edge/snippets/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
 server so the scan validates exactly what production serves.
 
 | Header                         | Value                                                                                                                                                                                             |

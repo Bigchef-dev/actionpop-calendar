@@ -206,3 +206,8 @@ unconfigured
 untriaged
 COEP
 PGDATA
+vhost
+vhosts
+unrouted
+webp
+openapi
