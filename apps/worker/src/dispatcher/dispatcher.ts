@@ -44,7 +44,7 @@ export interface DispatcherOptions {
   /** Retires the event ingestions whose event has ended, before anything is promoted. */
   retirement?: { retireEndedScopes(now: Date): Promise<number> };
   maxNewGroupsPerCycle?: number;
-  /** How many scopes may be ledgered and enqueued at once; defaults to a pool-safe value. */
+  /** How many workers may run concurrently; defaults to a pool-safe value. */
   maxConcurrentScheduling?: number;
   /**
    * Groups already promoted during this period. The ceiling is per cycle, not per

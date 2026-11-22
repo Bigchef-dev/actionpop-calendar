@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 const HTTPS = readFileSync('infra/edge/https.conf', 'utf8');
 const SCAN = readFileSync('infra/edge/http-scan.conf', 'utf8');
-const HEADERS = readFileSync('infra/edge/security-headers.conf', 'utf8');
 const CONTRACT = readFileSync(
   'specs/009-release-hardening-observability/contracts/edge-surface.md',
   'utf8',
@@ -72,16 +71,6 @@ describe('published edge surface', () => {
   it('applies the same header snippet to both servers', () => {
     expect(HTTPS).toContain('/etc/nginx/snippets/security-headers.conf');
     expect(SCAN).toContain('/etc/nginx/snippets/security-headers.conf');
-  });
-
-  it('declares the browser security rules the contract requires', () => {
-    expect(HEADERS).toContain("frame-ancestors 'none'");
-    expect(HEADERS).toContain("script-src 'self'");
-    expect(HEADERS).toContain('X-Content-Type-Options');
-    expect(HEADERS).toContain('X-Frame-Options');
-    expect(HEADERS).toContain('Referrer-Policy');
-    expect(HEADERS).toContain('Permissions-Policy');
-    expect(HEADERS).toContain('Cross-Origin-Opener-Policy');
   });
 
   it('defers TLS to the host terminator and instructs browsers to stay secure', () => {

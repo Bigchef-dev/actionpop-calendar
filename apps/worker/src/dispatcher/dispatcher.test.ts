@@ -45,7 +45,7 @@ describe('dispatcher boundary', () => {
     expect(jobs[0]).toMatch(/^ingest-v1_scope-group_1_period-/);
   });
 
-  it('bounds how many scopes are ledgered at once', async () => {
+  it('bounds how many scopes are workers at once', async () => {
     const scopes = Array.from({ length: 20 }, (_, index) => `group-${index}`);
     let inFlight = 0;
     let peak = 0;
