@@ -12,6 +12,7 @@ The whole public surface is decided here.
 | `snippets/routes.conf`               | **the routing table** — every public path, the error pages, the method rejections    | you add, remove or move a route         |
 | `snippets/security-headers.conf`     | the response-header policy (CSP, HSTS, frame, permissions, COOP/COEP/CORP)           | you change a header                     |
 | `snippets/proxy.conf`                | proxy defaults inherited by every location (HTTP version, client identity, timeouts) | you change an upstream behaviour        |
+| `snippets/upstreams.conf`            | the `web` / `api` upstream groups and the resolver that keeps them current           | you change an upstream host or port     |
 | `errors/404.html`, `errors/50x.html` | the pages a visitor sees instead of nginx's default                                  | you change the wording or the styling   |
 | `web.conf`                           | the static server of the `web` image (not this container)                            | you change caching of the built site    |
 
@@ -61,6 +62,27 @@ docker compose -f infra/compose/docker-compose.yml --profile edge up -d edge
 Pin `EDGE_IMAGE` to an immutable tag (`...:${GIT_SHA}`) to roll back by changing one value. The
 running tag _is_ the running routing table, which is what removes the "the file on disk is newer
 than the container" failure for good.
+
+## Redeploying `web` or `api`
+
+The edge does **not** need to be restarted when one of the application containers is replaced. It
+proxies through the upstream groups in `snippets/upstreams.conf`, whose members are declared with
+`resolve`; the Docker DNS answer is re-read every ten seconds, so an upstream that comes back with
+a new address is picked up on its own.
+
+This is not cosmetic. A literal `proxy_pass http://web:8080` is resolved once at start-up and the
+address is kept for the life of the worker, so a redeploy that only changes the `web` (or `api`)
+image left the edge dialling an address that no longer existed: every request answered `502`, and
+`edge` logged
+
+```text
+connect() failed (111: Connection refused) while connecting to upstream,
+client: 172.22.0.8, server: _, request: "GET / HTTP/1.1",
+upstream: "http://172.22.0.9:8080/"
+```
+
+even though the new container was healthy. `depends_on: service_healthy` cannot prevent this: it
+orders the first start only, and re-resolves nothing afterwards.
 
 ## Validating a change
 
@@ -113,9 +135,9 @@ edge image was not rebuilt and pulled", never "a file was not copied".
 
 ## Deliberate non-goals
 
-- **No `upstream` block / keepalive.** An `upstream` cannot be declared inside a `server`, and the
-  API answers in single-digit milliseconds on the private network: the extra file and mount would
-  buy nothing measurable.
+- **No `keepalive` on the upstreams.** The groups in `snippets/upstreams.conf` exist for name
+  resolution, not connection pooling: the API answers in single-digit milliseconds on the private
+  network, so reuse would buy nothing measurable.
 - **Two listeners (80 and 8080).** Caddy reaches this vhost as `edge:8080` in the documented
   topology and as `edge:80` on some deployments. Answering both keeps a port mismatch from
   becoming an outage. Neither port is published to the host.

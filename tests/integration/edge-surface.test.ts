@@ -6,6 +6,7 @@ const EDGE = 'infra/edge';
 const HTTPS = readFileSync(`${EDGE}/https.conf`, 'utf8');
 const SCAN = readFileSync(`${EDGE}/http-scan.conf`, 'utf8');
 const ROUTES = readFileSync(`${EDGE}/snippets/routes.conf`, 'utf8');
+const UPSTREAMS = readFileSync(`${EDGE}/snippets/upstreams.conf`, 'utf8');
 const DOCKERFILE = readFileSync('infra/docker/Dockerfile.edge', 'utf8');
 const COMPOSE = readFileSync('infra/compose/docker-compose.yml', 'utf8');
 const COMPOSE_SCAN = readFileSync('infra/compose/docker-compose.security.yml', 'utf8');
@@ -168,6 +169,34 @@ describe('published edge surface', () => {
     expect(COMPOSE_SCAN).toContain('target: scan');
   });
 
+  it('re-resolves the application containers instead of pinning their address', () => {
+    // A literal `proxy_pass http://web:8080` is resolved once at start-up, so redeploying `web`
+    // or `api` left the edge dialling an address that no longer existed: every request answered
+    // 502 with `connect() failed (111: Connection refused)` until the edge was restarted too.
+    // `depends_on: service_healthy` orders the first start only; it re-resolves nothing.
+    for (const vhost of [HTTPS, SCAN]) {
+      expect(includes(vhost)).toContain('/etc/nginx/app/snippets/upstreams.conf');
+    }
+
+    expect(UPSTREAMS).toMatch(/resolver\s+127\.0\.0\.11\s+valid=\d+s/);
+    for (const [group, host] of [
+      ['web_upstream', 'web:8080'],
+      ['api_upstream', 'api:3000'],
+    ]) {
+      const block = new RegExp(`upstream ${group} \\{([\\s\\S]*?)\\n\\}`).exec(UPSTREAMS)?.[1];
+      // `resolve` requires a `zone`, or nginx refuses to start.
+      expect(block).toMatch(/zone \w+ \d+k;/);
+      expect(block).toContain(`server ${host} resolve;`);
+    }
+
+    // No literal host left in the routing table: that is what pinned the address.
+    expect(ROUTES).not.toMatch(/proxy_pass\s+http:\/\/(web:8080|api:3000)/);
+    for (const location of locations(ROUTES)) {
+      if (location.target === 'no-upstream') continue;
+      expect(UPSTREAMS).toContain(`upstream ${location.target} {`);
+    }
+  });
+
   it('declares a loopback-only health endpoint that no upstream can break', () => {
     const block = /location = \/healthz \{([\s\S]*?)\n\}/.exec(ROUTES)?.[1];
 
@@ -184,7 +213,7 @@ describe('published edge surface', () => {
     expect(ROUTES).toContain('client_max_body_size 2k;');
     expect(ROUTES).toContain('limit_except POST { deny all; }');
     expect(locations(ROUTES).find((l) => l.match === '= /telemetry/journey')?.target).toBe(
-      'api:3000',
+      'api_upstream',
     );
   });
 });
