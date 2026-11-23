@@ -71,8 +71,14 @@ services:
       args:
         VITE_BASE_PATH: /
     networks:
-      - private
-      - monitoring
+      private:
+        # The edge reaches the site through this alias, never through `web`. Docker's DNS resolves
+        # a service name across every network the querying container shares, and `caddy_network` is
+        # shared with whatever else runs on the host: a generic name such as `web` can answer with
+        # a foreign container that is not listening on this port. This alias lives on the
+        # project-private network only, where nothing outside the stack can claim it.
+        aliases: [actionpop-web]
+      monitoring:
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/']
@@ -110,9 +116,11 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - private
+      private:
+        # Same rule as `web`: the edge addresses the API by a name only this stack can own.
+        aliases: [actionpop-api]
       # Reaches the monitor's Prometheus without publishing a port on the host.
-      - monitoring
+      monitoring:
     restart: unless-stopped
     healthcheck:
       # Loopback, like every other probe: a service name would make the check depend on Docker

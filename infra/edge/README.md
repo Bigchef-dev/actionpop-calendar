@@ -5,19 +5,19 @@ The whole public surface is decided here.
 
 ## Layout, and why
 
-| File                                 | Owns                                                                                 | Read it when                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------- |
-| `https.conf`                         | the production vhost: listeners, `server_name`, which snippets to include            | you change a port or a transport detail |
-| `http-scan.conf`                     | the plain-HTTP twin used by the CI exploitation scan                                 | never, unless the scan itself changes   |
-| `snippets/routes.conf`               | **the routing table** — every public path, the error pages, the method rejections    | you add, remove or move a route         |
-| `snippets/security-headers.conf`     | the response-header policy (CSP, HSTS, frame, permissions, COOP/COEP/CORP)           | you change a header                     |
-| `snippets/proxy.conf`                | proxy defaults inherited by every location (HTTP version, client identity, timeouts) | you change an upstream behaviour        |
-| `snippets/upstreams.conf`            | the `web` / `api` upstream groups and the resolver that keeps them current           | you change an upstream host or port     |
-| `errors/404.html`, `errors/50x.html` | the pages a visitor sees instead of nginx's default                                  | you change the wording or the styling   |
-| `web.conf`                           | the static server of the `web` image (not this container)                            | you change caching of the built site    |
+| File                                 | Owns                                                                                      | Read it when                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------- |
+| `https.conf`                         | the production vhost: listeners, `server_name`, which snippets to include                 | you change a port or a transport detail |
+| `http-scan.conf`                     | the plain-HTTP twin used by the CI exploitation scan                                      | never, unless the scan itself changes   |
+| `snippets/routes.conf`               | **the routing table** — every public path, the error pages, the method rejections         | you add, remove or move a route         |
+| `snippets/security-headers.conf`     | the response-header policy (CSP, HSTS, frame, permissions, COOP/COEP/CORP)                | you change a header                     |
+| `snippets/proxy.conf`                | proxy defaults inherited by every location (HTTP version, client identity, timeouts)      | you change an upstream behaviour        |
+| `snippets/upstreams.conf`            | the `web` / `api` upstream groups: unique names, and the resolver that keeps them current | you change an upstream host or port     |
+| `errors/404.html`, `errors/50x.html` | the pages a visitor sees instead of nginx's default                                       | you change the wording or the styling   |
+| `web.conf`                           | the static server of the `web` image (not this container)                                 | you change caching of the built site    |
 
-The two vhosts include the same three snippets, so a route or a header cannot exist in production
-and be missing from the scan. `tests/integration/edge-surface.test.ts` asserts that, and also that
+The two vhosts include the same snippets, so a route or a header cannot exist in production and
+be missing from the scan. `tests/integration/edge-surface.test.ts` asserts that, and also that
 every `include` names a file this repository actually ships — a missing snippet used to leave an
 empty directory in the tree and take the whole site down.
 
@@ -63,17 +63,15 @@ Pin `EDGE_IMAGE` to an immutable tag (`...:${GIT_SHA}`) to roll back by changing
 running tag _is_ the running routing table, which is what removes the "the file on disk is newer
 than the container" failure for good.
 
-## Redeploying `web` or `api`
+## Upstream addressing
 
-The edge does **not** need to be restarted when one of the application containers is replaced. It
-proxies through the upstream groups in `snippets/upstreams.conf`, whose members are declared with
-`resolve`; the Docker DNS answer is re-read every ten seconds, so an upstream that comes back with
-a new address is picked up on its own.
+The edge proxies through the groups in `snippets/upstreams.conf`, never through a literal host.
+Two things there are load-bearing.
 
-This is not cosmetic. A literal `proxy_pass http://web:8080` is resolved once at start-up and the
-address is kept for the life of the worker, so a redeploy that only changes the `web` (or `api`)
-image left the edge dialling an address that no longer existed: every request answered `502`, and
-`edge` logged
+**Unique names.** A container resolves a service name across **every** network it shares, and the
+edge shares `caddy_network` with every other project on the host. A generic name such as `web` can
+therefore answer with a foreign container that is not listening on this port — every request then
+answers `502` with
 
 ```text
 connect() failed (111: Connection refused) while connecting to upstream,
@@ -81,8 +79,17 @@ client: 172.22.0.8, server: _, request: "GET / HTTP/1.1",
 upstream: "http://172.22.0.9:8080/"
 ```
 
-even though the new container was healthy. `depends_on: service_healthy` cannot prevent this: it
-orders the first start only, and re-resolves nothing afterwards.
+and restarting the edge does not help, because the address is wrong, not stale. The upstreams
+therefore use `actionpop-web` / `actionpop-api`, aliases declared on the project-private network in
+[`infra/compose/docker-compose.yml`](../compose/docker-compose.yml), which nothing outside this
+stack joins.
+
+**Re-resolution.** A literal `proxy_pass http://web:8080` is resolved once at start-up and the
+address is kept for the life of the worker, so a redeploy that only replaces the `web` or `api`
+container left the edge dialling an address that no longer existed. The groups declare their
+members with `resolve`, so the Docker DNS answer is re-read every ten seconds and a replacement
+container is picked up without restarting the edge. `depends_on: service_healthy` cannot do this:
+it orders the first start only, and re-resolves nothing afterwards.
 
 ## Validating a change
 

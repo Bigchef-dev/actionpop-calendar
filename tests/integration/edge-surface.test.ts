@@ -180,8 +180,8 @@ describe('published edge surface', () => {
 
     expect(UPSTREAMS).toMatch(/resolver\s+127\.0\.0\.11\s+valid=\d+s/);
     for (const [group, host] of [
-      ['web_upstream', 'web:8080'],
-      ['api_upstream', 'api:3000'],
+      ['web_upstream', 'actionpop-web:8080'],
+      ['api_upstream', 'actionpop-api:3000'],
     ]) {
       const block = new RegExp(`upstream ${group} \\{([\\s\\S]*?)\\n\\}`).exec(UPSTREAMS)?.[1];
       // `resolve` requires a `zone`, or nginx refuses to start.
@@ -189,8 +189,13 @@ describe('published edge surface', () => {
       expect(block).toContain(`server ${host} resolve;`);
     }
 
+    // Generic service names are ambiguous: the edge shares `caddy_network` with every other
+    // project on the host, so `web` can resolve to a foreign container that does not listen here.
+    expect(COMPOSE).toContain('aliases: [actionpop-web]');
+    expect(COMPOSE).toContain('aliases: [actionpop-api]');
+
     // No literal host left in the routing table: that is what pinned the address.
-    expect(ROUTES).not.toMatch(/proxy_pass\s+http:\/\/(web:8080|api:3000)/);
+    expect(ROUTES).not.toMatch(/proxy_pass\s+http:\/\/(web|api):\d+/);
     for (const location of locations(ROUTES)) {
       if (location.target === 'no-upstream') continue;
       expect(UPSTREAMS).toContain(`upstream ${location.target} {`);
