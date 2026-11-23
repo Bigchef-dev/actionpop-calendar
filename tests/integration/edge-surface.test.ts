@@ -11,10 +11,7 @@ const DOCKERFILE = readFileSync('infra/docker/Dockerfile.edge', 'utf8');
 const COMPOSE = readFileSync('infra/compose/docker-compose.yml', 'utf8');
 const COMPOSE_BUILD = readFileSync('infra/compose/docker-compose.build.yml', 'utf8');
 const COMPOSE_SCAN = readFileSync('infra/compose/docker-compose.security.yml', 'utf8');
-const CONTRACT = readFileSync(
-  'specs/009-release-hardening-observability/contracts/edge-surface.md',
-  'utf8',
-);
+const CONTRACT = readFileSync('specs/contracts/http/observability.md', 'utf8');
 
 /** Location directives, in the order they appear, with the upstream they proxy to. */
 function locations(conf: string): Array<{ match: string; target: string }> {
@@ -48,6 +45,9 @@ describe('published edge surface', () => {
         '^~ /events/',
         '= /groups',
         '^~ /groups/',
+        '= /updates',
+        '= /etat',
+        '^~ /etat/',
         '^~ /feed/',
         '= /telemetry/journey',
         '= /healthz',
@@ -63,6 +63,7 @@ describe('published edge surface', () => {
       '/search/',
       '/events',
       '/groups',
+      '/updates',
       '/feed/',
       '/telemetry/journey',
     ]) {

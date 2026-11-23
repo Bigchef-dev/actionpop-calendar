@@ -41,3 +41,16 @@ export const PLACEHOLDER_TIMING = {
   betweenMs: 600,
   minExamples: 3,
 } as const;
+
+/** Deployment base path, without its trailing slash (`''` at the root, `/agenda-rennes` on Pages). */
+const BASE_PATH: string = (
+  ((import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/') as string
+).replace(/\/$/, '');
+
+/**
+ * Dedicated update-status page.
+ *
+ * The edge serves the real `/etat` path; a static host without rewrites (GitHub Pages) falls back
+ * to the hash form, which the application resolves to the same view.
+ */
+export const UPDATES_PAGE_HREF: string = BASE_PATH === '' ? '/etat' : `${BASE_PATH}/#/etat`;

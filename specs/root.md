@@ -4,7 +4,7 @@
 > feature specification, groups them by capability, states what each one owns, and records
 > a proposal for cleaning up the specification tree.
 >
-> **Last reviewed.** 2026-11-14 (against the working tree, not only the task checkboxes).
+> **Last reviewed.** 2026-11-23 (against the working tree, not only the task checkboxes).
 > **Scope.** Feature records under `specs/`; living design notes stay in [`../docs/`](../docs);
 > project rules stay in [`.specify/memory/constitution.md`](../.specify/memory/constitution.md).
 
@@ -39,16 +39,16 @@
 The specification tree describes a pnpm TypeScript monorepo. Each spec maps onto one or more
 of these units.
 
-| Unit                | Path                                      | Responsibility                                                                                                     | Main specs                   |
-| ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Core package        | [`packages/core`](../packages/core)       | Domain contracts, adapters, rules, persistence                                                                     | 001–009                      |
-| API                 | [`apps/api`](../apps/api)                 | Public read-only HTTP surface (`/calendar.ics`, `/search/subjects`, `/events`, `/feed`, `/telemetry`, `/internal`) | 001, 002, 003, 007, 008, 009 |
-| Worker              | [`apps/worker`](../apps/worker)           | Dispatcher, BullMQ ingestion, geographic refresh, map discovery                                                    | 001, 002, 004, 005, 006, 009 |
-| Web                 | [`apps/web`](../apps/web)                 | Vue 3 discovery + calendar composition experience (GitHub Pages)                                                   | 007, 008, 009                |
-| Database            | [`prisma/`](../prisma)                    | PostgreSQL schema and migrations                                                                                   | 001, 002, 004, 005, 006, 008 |
-| Diagrams & notes    | [`docs/`](../docs)                        | Architecture diagrams and design notes                                                                             | all                          |
-| Canonical contracts | [`specs/contracts/`](contracts/README.md) | Living, normative contracts (HTTP, ingestion, data, metrics)                                                       | all                          |
-| Governance          | [`.specify/`](../.specify)                | Constitution, templates, workflow registry                                                                         | —                            |
+| Unit                | Path                                      | Responsibility                                                                                                                            | Main specs                        |
+| ------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Core package        | [`packages/core`](../packages/core)       | Domain contracts, adapters, rules, persistence                                                                                            | 001–009                           |
+| API                 | [`apps/api`](../apps/api)                 | Public read-only HTTP surface (`/calendar.ics`, `/search/subjects`, `/events`, `/groups`, `/updates`, `/feed`, `/telemetry`, `/internal`) | 001, 002, 003, 007, 008, 009, 011 |
+| Worker              | [`apps/worker`](../apps/worker)           | Dispatcher, BullMQ ingestion, geographic refresh, map discovery                                                                           | 001, 002, 004, 005, 006, 009      |
+| Web                 | [`apps/web`](../apps/web)                 | Vue 3 discovery + calendar composition experience (GitHub Pages)                                                                          | 007, 008, 009, 011                |
+| Database            | [`prisma/`](../prisma)                    | PostgreSQL schema and migrations                                                                                                          | 001, 002, 004, 005, 006, 008      |
+| Diagrams & notes    | [`docs/`](../docs)                        | Architecture diagrams and design notes                                                                                                    | all                               |
+| Canonical contracts | [`specs/contracts/`](contracts/README.md) | Living, normative contracts (HTTP, ingestion, data, metrics)                                                                              | all                               |
+| Governance          | [`.specify/`](../.specify)                | Constitution, templates, workflow registry                                                                                                | —                                 |
 
 Architecture diagrams worth reading before a spec:
 [object-design](../docs/object-design.mmd), [data-oriented](../docs/data-oriented.mmd),
@@ -136,6 +136,7 @@ numbered folder and mostly contains the same artifacts:
 | ID                                                 | Title                               | Status      | Owns                                                                                                                                                                         | Depends on         |
 | -------------------------------------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | [009](009-release-hardening-observability/spec.md) | Release Hardening and Observability | Implemented | Pre-publication security verdict (ZAP + checklist), closed-by-default edge allowlist, security headers, Prometheus metrics exposition, journey telemetry, monitoring package | 001, 003, 007, 008 |
+| [011](011-update-progress-view/spec.md)            | Minimal Update Progress View        | Implemented | Public, aggregate-only freshness and live progress indicator for ingestion refresh cycles, plus a short recent-run history                                                   | 001, 007, 009      |
 
 ### 4.2 Artifact matrix
 
@@ -153,6 +154,7 @@ numbered folder and mostly contains the same artifacts:
 | 008  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     3     |     ✓      |     ✓     | 50 / 50         |
 | 009  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     4     |     ✓      |     ✓     | 71 / 71         |
 | 010  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     1     |     ✓      |     ✓     | 41 / 41         |
+| 011  |  ✓   |  ✓   |   ✓   |    ✓     |      ✓      |     1     |     ✓      |     ✓     | 56 / 56         |
 
 ---
 
@@ -216,16 +218,17 @@ with a pointer to its canonical file. When the two disagree, `contracts/` wins.
 
 ### 6.1 HTTP surfaces
 
-| Surface                              | Owner                                                                                                    | Amendments                                                                                                                                               | Live code                                                                              |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `GET /calendar.ics`                  | [003/contracts/calendar-ics.md](003-icalendar-filtered-feed/contracts/calendar-ics.md)                   | [007 `group`](007-public-calendar-experience/contracts/calendar-ics-group-filter.md), [008 `epci`](008-intercommunal-calendar/contracts/calendar-ics.md) | [`calendar-ics.controller.ts`](../apps/api/src/controllers/calendar-ics.controller.ts) |
-| `GET /search/subjects`               | [007/contracts/search-api.md](007-public-calendar-experience/contracts/search-api.md)                    | [008 `epci` kind](008-intercommunal-calendar/contracts/search-subjects.md)                                                                               | [`search.controller.ts`](../apps/api/src/controllers/search.controller.ts)             |
-| `GET /events`                        | [002/contracts/geographic-filter.md](002-geographic-enrichment/contracts/geographic-filter.md)           | —                                                                                                                                                        | [`events.controller.ts`](../apps/api/src/controllers/events.controller.ts)             |
-| `GET /groups`                        | [010/contracts/group-listing.md](010-geographic-group-listing/contracts/group-listing.md)                | —                                                                                                                                                        | `groups.controller.ts`                                                                 |
-| `GET/POST /feed/{scopeId}`           | [001/contracts/api.md](001-technical-foundation/contracts/api.md)                                        | — (**stale**: still says Redis snapshot; see §8)                                                                                                         | [`calendar.controller.ts`](../apps/api/src/controllers/calendar.controller.ts)         |
-| `GET /internal/{live,ready,metrics}` | [001/contracts/operations.md](001-technical-foundation/contracts/operations.md)                          | [009/contracts/metrics-exposition.md](009-release-hardening-observability/contracts/metrics-exposition.md)                                               | [`internal.controller.ts`](../apps/api/src/internal/internal.controller.ts)            |
-| `POST /telemetry/journey`            | [009/contracts/journey-telemetry.md](009-release-hardening-observability/contracts/journey-telemetry.md) | —                                                                                                                                                        | [`telemetry.controller.ts`](../apps/api/src/observability/telemetry.controller.ts)     |
-| Published edge (allowlist, headers)  | [009/contracts/edge-surface.md](009-release-hardening-observability/contracts/edge-surface.md)           | —                                                                                                                                                        | [`infra/edge`](../infra/edge)                                                          |
+| Surface                              | Owner                                                                                                    | Amendments                                                                                                                                               | Live code                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /calendar.ics`                  | [003/contracts/calendar-ics.md](003-icalendar-filtered-feed/contracts/calendar-ics.md)                   | [007 `group`](007-public-calendar-experience/contracts/calendar-ics-group-filter.md), [008 `epci`](008-intercommunal-calendar/contracts/calendar-ics.md) | [`calendar-ics.controller.ts`](../apps/api/src/controllers/calendar-ics.controller.ts)   |
+| `GET /search/subjects`               | [007/contracts/search-api.md](007-public-calendar-experience/contracts/search-api.md)                    | [008 `epci` kind](008-intercommunal-calendar/contracts/search-subjects.md)                                                                               | [`search.controller.ts`](../apps/api/src/controllers/search.controller.ts)               |
+| `GET /events`                        | [002/contracts/geographic-filter.md](002-geographic-enrichment/contracts/geographic-filter.md)           | —                                                                                                                                                        | [`events.controller.ts`](../apps/api/src/controllers/events.controller.ts)               |
+| `GET /groups`                        | [010/contracts/group-listing.md](010-geographic-group-listing/contracts/group-listing.md)                | —                                                                                                                                                        | `groups.controller.ts`                                                                   |
+| `GET /updates`                       | [011/contracts/update-status.md](011-update-progress-view/contracts/update-status.md)                    | —                                                                                                                                                        | [`update-status.controller.ts`](../apps/api/src/controllers/update-status.controller.ts) |
+| `GET/POST /feed/{scopeId}`           | [001/contracts/api.md](001-technical-foundation/contracts/api.md)                                        | — (**stale**: still says Redis snapshot; see §8)                                                                                                         | [`calendar.controller.ts`](../apps/api/src/controllers/calendar.controller.ts)           |
+| `GET /internal/{live,ready,metrics}` | [001/contracts/operations.md](001-technical-foundation/contracts/operations.md)                          | [009/contracts/metrics-exposition.md](009-release-hardening-observability/contracts/metrics-exposition.md)                                               | [`internal.controller.ts`](../apps/api/src/internal/internal.controller.ts)              |
+| `POST /telemetry/journey`            | [009/contracts/journey-telemetry.md](009-release-hardening-observability/contracts/journey-telemetry.md) | —                                                                                                                                                        | [`telemetry.controller.ts`](../apps/api/src/observability/telemetry.controller.ts)       |
+| Published edge (allowlist, headers)  | [009/contracts/edge-surface.md](009-release-hardening-observability/contracts/edge-surface.md)           | —                                                                                                                                                        | [`infra/edge`](../infra/edge)                                                            |
 
 ### 6.2 Internal and ingestion contracts
 
@@ -287,6 +290,7 @@ Hard dependencies (a later spec assumes the earlier behaviour exists):
 | 007  | 002 geography, 003 ICS feed, 004/005 group scopes as search subjects |
 | 008  | 002 commune reference, 007 subject-search contract                   |
 | 009  | 001 infra, 003/007/008 published surface                             |
+| 011  | 001 ingestion cycles, 007 public experience, 009 operational metrics |
 
 ---
 

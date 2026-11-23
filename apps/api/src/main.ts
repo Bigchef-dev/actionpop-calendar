@@ -14,12 +14,14 @@ import {
   PostgresEventQuery,
   PostgresGroupListing,
   PostgresSubjectSearch,
+  PostgresUpdateStatus,
   probeRedis,
   runPreflight,
 } from '@actionpop/core';
 import { buildApp } from './server.js';
 import { loadApiConfiguration, loadCorsOrigins } from './config.js';
 import { logger } from './logger.js';
+import { UpdateStatusService } from './services/update-status.service.js';
 
 process.on('uncaughtException', (error: Error) => {
   logger.error({ err: error }, 'Uncaught exception');
@@ -77,6 +79,11 @@ export async function startApi(): Promise<void> {
     subjectSearch: new PostgresSubjectSearch(postgres),
     groupListing: new PostgresGroupListing(postgres),
     groupAreaResolver: new CommuneNameResolver(new PostgresGeographicReferenceRepository(postgres)),
+    updateStatus: new UpdateStatusService({
+      reader: new PostgresUpdateStatus(postgres),
+      intervalMs: config.queue.dispatcherIntervalMs,
+      onFailure: (error) => logger.warn({ err: error }, 'update status read failed'),
+    }),
     corsOrigins: loadCorsOrigins(),
     calendarService: new FilteredCalendarService(
       new PostgresCalendarEventQuery(postgres),

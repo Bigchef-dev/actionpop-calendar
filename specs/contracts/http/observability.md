@@ -22,6 +22,7 @@ A route is public only because it is listed here. Adding a route is a visible ch
 | `/search/`                             | prefix         | `api`  | Subject search                                                               |
 | `/events`, `/events/`                  | exact + prefix | `api`  | Geographic JSON event list                                                   |
 | `/groups`, `/groups/`                  | exact + prefix | `api`  | Territory action group list                                                  |
+| `/updates`                             | exact          | `api`  | Public refresh freshness and progress, aggregate only                        |
 | `/feed/`                               | prefix         | `api`  | Dataset-scoped calendar                                                      |
 | `/telemetry/journey`                   | exact, `POST`  | `api`  | Journey batches; any other method answers `405` with an `Allow: POST` header |
 | `/healthz`                             | exact          | edge   | Loopback-only liveness for the container healthcheck; never proxied          |

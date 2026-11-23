@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import CalendarScreen from './features/calendar/components/CalendarScreen.vue';
+import UpdateStatusPage from './features/updates/components/UpdateStatusPage.vue';
 import { useJourneyEmission } from './features/calendar/composables/useJourneyEmission';
 import SearchHero from './features/discovery/components/SearchHero.vue';
 import { resolveSubject } from './shared/api/client';
@@ -16,6 +17,8 @@ import {
 import type { SearchSubject } from './types';
 
 type Resolution = 'idle' | 'loading' | 'ready' | 'unknown' | 'error';
+
+withDefaults(defineProps<{ page?: 'experience' | 'updates' }>(), { page: 'experience' });
 
 const journey = useJourneyEmission();
 const route = useRoute();
@@ -37,11 +40,11 @@ watch(
       return;
     }
     resolution.value = 'loading';
-    Promise.all(
-      state.value.subjects.map((target) => resolveSubject(target.kind, target.id)),
-    ).then((found) => {
+    Promise.all(state.value.subjects.map((target) => resolveSubject(target.kind, target.id)))
+      .then((found) => {
         subjects.value = found.filter((subject): subject is SearchSubject => subject !== null);
-        resolution.value = subjects.value.length === state.value.subjects.length ? 'ready' : 'unknown';
+        resolution.value =
+          subjects.value.length === state.value.subjects.length ? 'ready' : 'unknown';
       })
       .catch(() => {
         subjects.value = [];
@@ -148,47 +151,55 @@ function retryResolution(): void {
 </script>
 
 <template>
-  <AppShell :on-discovery="subjects.length === 0" @home="backToDiscovery">
-    <p v-for="notice in state.notices" :key="notice" class="mb-3 text-xs ap-secondary-text">
-      {{ notice }}
-    </p>
+  <AppShell
+    :on-discovery="page !== 'updates' && subjects.length === 0"
+    :home-href="page === 'updates' ? '/' : undefined"
+    :show-status="page !== 'updates'"
+    @home="backToDiscovery"
+  >
+    <template v-if="page !== 'updates'">
+      <p v-for="notice in state.notices" :key="notice" class="mb-3 text-xs ap-secondary-text">
+        {{ notice }}
+      </p>
 
-    <SearchHero
-      v-if="subjects.length === 0 || adding"
-      @select="handleSubjectSelect"
-      @searched="journey.track($event === 'empty' ? 'search_empty' : 'search')"
-    />
+      <SearchHero
+        v-if="subjects.length === 0 || adding"
+        @select="handleSubjectSelect"
+        @searched="journey.track($event === 'empty' ? 'search_empty' : 'search')"
+      />
 
-    <div
-      v-else-if="resolution === 'loading'"
-      class="ap-surface mt-6 animate-pulse rounded-2xl px-4 py-10"
-    >
-      <span class="sr-only">Chargement du sujet…</span>
-    </div>
+      <div
+        v-else-if="resolution === 'loading'"
+        class="ap-surface mt-6 animate-pulse rounded-2xl px-4 py-10"
+      >
+        <span class="sr-only">Chargement du sujet…</span>
+      </div>
 
-    <StateMessage
-      v-else-if="resolution === 'unknown'"
-      class="mt-6"
-      title="Ce sujet n'existe plus"
-      message="Un item de recherche est introuvable. Il a peut-être été renommé ou fusionné."
-      primary-label="Rechercher à nouveau"
-      @primary="backToDiscovery"
-    />
+      <StateMessage
+        v-else-if="resolution === 'unknown'"
+        class="mt-6"
+        title="Ce sujet n'existe plus"
+        message="Un item de recherche est introuvable. Il a peut-être été renommé ou fusionné."
+        primary-label="Rechercher à nouveau"
+        @primary="backToDiscovery"
+      />
 
-    <StateMessage
-      v-else-if="resolution === 'error'"
-      class="mt-6"
-      title="Service momentanément indisponible"
-      message="Le sujet n'a pas pu être retrouvé. Vous pouvez réessayer sans perdre votre adresse."
-      primary-label="Réessayer"
-      @primary="retryResolution"
-    />
+      <StateMessage
+        v-else-if="resolution === 'error'"
+        class="mt-6"
+        title="Service momentanément indisponible"
+        message="Le sujet n'a pas pu être retrouvé. Vous pouvez réessayer sans perdre votre adresse."
+        primary-label="Réessayer"
+        @primary="retryResolution"
+      />
 
-    <CalendarScreen
-      v-else-if="subjects.length > 0"
-      :subjects="subjects"
-      @add-subject="adding = true"
-      @remove-subject="removeSubject"
-    />
+      <CalendarScreen
+        v-else-if="subjects.length > 0"
+        :subjects="subjects"
+        @add-subject="adding = true"
+        @remove-subject="removeSubject"
+      />
+    </template>
+    <UpdateStatusPage v-else />
   </AppShell>
 </template>

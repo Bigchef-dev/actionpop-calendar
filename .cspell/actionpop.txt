@@ -212,3 +212,7 @@ unrouted
 webp
 openapi
 healthz
+
+testid
+valuenow
+valuetext

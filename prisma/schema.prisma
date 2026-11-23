@@ -198,6 +198,7 @@ model IngestionLedger {
   period      ProcessingPeriod @relation(fields: [periodToken], references: [periodToken], onDelete: Cascade)
 
   @@unique([scopeId, periodToken])
+  @@index([periodToken])
   @@map("ingestion_ledger")
 }
 

@@ -74,3 +74,43 @@ export interface ScopeSelection {
   layout: CalendarLayout;
   eventId: string | null;
 }
+
+/** Visitor-facing state of the periodic calendar refresh. */
+export type UpdateState = 'updating' | 'up_to_date' | 'stale' | 'partial' | 'unknown';
+
+export type UpdateOutcome = 'complete' | 'partial' | 'failed';
+
+export interface UpdateCounts {
+  processed: number;
+  failed: number;
+  remaining: number;
+  total: number;
+}
+
+export interface UpdateKindCounts {
+  groups: UpdateCounts;
+  events: UpdateCounts;
+}
+
+export interface CurrentUpdateRun extends UpdateCounts, UpdateKindCounts {
+  startedAt: string;
+  takingLongerThanUsual: boolean;
+}
+
+export interface CompletedUpdateRun extends UpdateKindCounts {
+  completedAt: string;
+  durationSeconds: number;
+  processed: number;
+  failed: number;
+  outcome: UpdateOutcome;
+}
+
+export interface UpdateStatusAnswer {
+  checkedAt: string;
+  refreshIntervalSeconds: number;
+  state: UpdateState;
+  current: CurrentUpdateRun | null;
+  lastCompleted: CompletedUpdateRun | null;
+  history: CompletedUpdateRun[];
+  available: { current: boolean; lastCompleted: boolean; history: boolean };
+}

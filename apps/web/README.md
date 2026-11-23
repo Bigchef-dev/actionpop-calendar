@@ -26,6 +26,15 @@ Ce paquet vit dans `apps/web` du monorepo `actionpop-calendar` et se déploie su
 Aucun compte, aucune géolocalisation, aucune donnée personnelle conservée : seule la dernière
 recherche est mémorisée localement, et l'adresse prime toujours sur cette mémoire.
 
+## État des mises à jour
+
+Une page dédiée `/etat` (repli `#/etat` sur un hébergement statique sans réécriture) affiche la
+fraîcheur des données : progression explicite des **groupes** (`n/total`) et des **événements
+considérés à jour** (`n/total`), dernière mise à jour réussie, cinq derniers cycles et une petite
+visualisation (une barre par catégorie et bande des cinq cycles). Elle est liée depuis le
+pied de page de l'agenda. Les données restent agrégées : aucun identifiant, motif d'échec ni
+information d'infrastructure n'est exposé.
+
 Les intercommunalités sont proposées sous le libellé « Intercommunalité » et couvrent les
 communautés de communes, communautés d'agglomération, communautés urbaines et métropoles.
 Leur lien de calendrier conserve l'identifiant EPCI (`epci=...`) ainsi que les filtres choisis.

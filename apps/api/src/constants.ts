@@ -6,3 +6,4 @@ export const CALENDAR_SETTINGS = Symbol('CALENDAR_SETTINGS');
 export const SUBJECT_SEARCH = Symbol('SUBJECT_SEARCH');
 export const GROUP_LISTING = Symbol('GROUP_LISTING');
 export const GROUP_AREA_RESOLVER = Symbol('GROUP_AREA_RESOLVER');
+export const UPDATE_STATUS = Symbol('UPDATE_STATUS');

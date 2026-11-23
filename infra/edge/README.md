@@ -146,10 +146,12 @@ Ask the two questions in order; they are different failures.
 # 1. Does the API serve it? (bypasses the edge entirely)
 docker compose -f infra/compose/docker-compose.yml exec api \
   node -e "fetch('http://127.0.0.1:3000/groups?department=35').then(async r=>console.log(r.status, (await r.text()).slice(0,120)))"
+docker compose -f infra/compose/docker-compose.yml exec api \
+  node -e "fetch('http://127.0.0.1:3000/updates').then(async r=>console.log(r.status, (await r.text()).slice(0,120)))"
 
 # 2. Which routing table is the edge running?
 docker compose -f infra/compose/docker-compose.yml exec edge \
-  sh -lc 'grep -c "location = /groups" /etc/nginx/conf.d/default.conf; grep -c . /etc/nginx/app/snippets/routes.conf'
+  sh -lc 'grep -c "location = /groups" /etc/nginx/conf.d/default.conf; grep -c "location = /updates" /etc/nginx/app/snippets/routes.conf'
 ```
 
 A `404` from the API (JSON) means an image without the route; a branded `404` means the edge does

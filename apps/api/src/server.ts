@@ -19,6 +19,7 @@ import { createAppModule } from './app.module.js';
 import type { CalendarIcsSettings } from './controllers/calendar-ics.controller.js';
 import type { GeographicQueryResult } from './controllers/events.controller.js';
 import type { BuildInfo } from './observability/build-info.js';
+import type { UpdateStatusService } from './services/update-status.service.js';
 import { ClientVolumeBand } from './observability/client-volume-band.js';
 import {
   registerRequestHook,
@@ -38,6 +39,8 @@ export interface ServerOptions {
   subjectSearch?: SubjectSearchReader;
   groupListing?: GroupListingReader;
   groupAreaResolver?: GroupAreaResolver;
+  /** Public update status service; absent when the read is not wired. */
+  updateStatus?: UpdateStatusService;
   /** Origins allowed to read the public JSON reads; empty means no cross-origin access. */
   corsOrigins?: readonly string[];
   eventQuery?: ServerOptionsEventQuery;

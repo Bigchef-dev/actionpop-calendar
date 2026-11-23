@@ -333,7 +333,7 @@ there: `docker compose -f infra/compose/docker-compose.yml pull` then `up -d`. S
 
 The public surface is the read-only `GET /feed/{scopeId}` route, the read-only
 `GET /events` route, the read-only `GET /groups` route, the read-only `GET /search/subjects`
-route, and the read-only `GET /calendar.ics` route. `/events` filters events by `country`, `department`, `commune` and
+route, the read-only `GET /updates` route, and the read-only `GET /calendar.ics` route. `/events` filters events by `country`, `department`, `commune` and
 `event_type` with `AND` semantics. Geographic identifiers are strings, so `01`, `2A` and `01001`
 keep their leading zeroes.
 
@@ -371,6 +371,23 @@ group with no upcoming event is still discoverable. A group belongs to an area t
 attached position, never through the events it organizes. An unknown identifier answers `400`,
 an area holding no group answers `200` with an empty list, and an unavailable reference answers
 `503`. Contract: [`specs/contracts/http/groups.md`](specs/contracts/http/groups.md).
+
+`GET /updates` reports the freshness of the calendar data without exposing operational detail:
+
+```text
+GET /updates
+```
+
+It returns the current refresh state (`updating`, `up_to_date`, `stale`, `partial` or `unknown`),
+the aggregate progress of a running cycle, the last completed cycle and a bounded history of the
+five most recent ones. Counts are aggregate only: no scope, job, organizer or failure reason is
+ever returned. An unreadable source becomes an explicit `unknown` section rather than a zero.
+Contract: [`specs/contracts/http/updates.md`](specs/contracts/http/updates.md).
+
+The web application presents the same status on a dedicated page at `/etat`, linked from the
+footer of every calendar screen. The page shows explicit `n/total` figures for **groups refreshed**
+and **events considered up to date**, one progress bar per kind, and a five-cycle strip; it remains
+usable when a source is unavailable (the affected section says so instead of showing zero).
 
 `GET /calendar.ics` returns the matching events as an iCalendar (RFC 5545) document that a
 calendar client can subscribe to:
@@ -462,8 +479,15 @@ Install the dashboards and alerts by following
 automated baseline scan runs on every pull request touching the application or `infra/`, and fails
 the build on a high-severity finding.
 
-ssh -N -L 5432:172.20.0.3:5432 -L 6379:172.20.0.4:6379 debian@aaronlem.ovh -v
+docker inspect actionpop-postgres-1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}: {{.IPAddress}} {{end}}'
+docker inspect actionpop-redis-1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}: {{.IPAddress}} {{end}}'
+
+ssh -N -L 5432:172.20.0.2:5432 -L 6379:172.20.0.3:6379 debian@aaronlem.ovh -v
 
 WORKER_HEALTH_PORT=8081 pnpm --filter @actionpop/worker dev &
 WORKER_HEALTH_PORT=8082 pnpm --filter @actionpop/worker dev &
 WORKER_HEALTH_PORT=8083 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8084 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8085 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8086 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8087 pnpm --filter @actionpop/worker dev &

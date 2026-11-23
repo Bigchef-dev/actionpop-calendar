@@ -1,30 +1,28 @@
 <script setup lang="ts">
 import { useDarkMode } from '../composables/useDarkMode';
 
-defineProps<{ onDiscovery?: boolean }>();
+defineProps<{ onDiscovery?: boolean; homeHref?: string }>();
 const emit = defineEmits<{ (event: 'home'): void }>();
 const { isDark, toggle } = useDarkMode();
 </script>
 
 <template>
   <header class="flex items-center justify-between gap-3 py-4">
-    <button
-      type="button"
+    <component
+      :is="homeHref ? 'a' : 'button'"
+      :href="homeHref"
+      :type="homeHref ? undefined : 'button'"
       class="ap-focusable flex items-center gap-3 rounded-lg text-left"
-      @click="emit('home')"
+      @click="homeHref ? undefined : emit('home')"
     >
-      <span
-        class="grid h-10 w-10 place-items-center rounded-full text-lg"
-        aria-hidden="true"
-      >
-              <img src="/tortue-hourra.png" alt="Tortue de la campagne">
-
+      <span class="grid h-10 w-10 place-items-center rounded-full text-lg" aria-hidden="true">
+        <img src="/tortue-hourra.png" alt="Tortue de la campagne" />
       </span>
       <span class="leading-tight">
         <span class="block text-sm font-bold uppercase tracking-widest">Agenda des actions</span>
         <span class="block text-xs opacity-70">Action Populaire</span>
       </span>
-    </button>
+    </component>
     <button
       type="button"
       class="ap-focusable rounded-lg border px-3 py-2 text-sm font-semibold"

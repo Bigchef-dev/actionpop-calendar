@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../../config';
-import type { SearchAnswer, SearchSubject } from '../../types';
+import type { SearchAnswer, SearchSubject, UpdateStatusAnswer } from '../../types';
 
 export class ApiError extends Error {
   readonly status: number | null;
@@ -70,4 +70,15 @@ export async function fetchCalendarText(
   });
   if (!response.ok) throw new ApiError(`calendar failed with ${response.status}`, response.status);
   return await response.text();
+}
+
+/** Reads the public update status; the server already reduces it to aggregate-only fields. */
+export async function fetchUpdateStatus(signal?: AbortSignal): Promise<UpdateStatusAnswer> {
+  const response = await fetch(`${API_BASE_URL}/updates`, {
+    ...(signal === undefined ? {} : { signal }),
+    headers: { accept: 'application/json' },
+    cache: 'no-cache',
+  });
+  if (!response.ok) throw new ApiError(`updates failed with ${response.status}`, response.status);
+  return (await response.json()) as UpdateStatusAnswer;
 }

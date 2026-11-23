@@ -27,6 +27,7 @@ export default defineConfig({
       '/events': { target: devApiTarget, changeOrigin: true },
       '/feed': { target: devApiTarget, changeOrigin: true },
       '/telemetry': { target: devApiTarget, changeOrigin: true },
+      '/updates': { target: devApiTarget, changeOrigin: true },
     },
   },
 });
