@@ -117,7 +117,7 @@ jobs:
           pnpm exec playwright test apps/web/tests/edge-smoke.spec.ts
       - name: Upload the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zap-report
           path: zap-report/

@@ -43,7 +43,7 @@ jobs:
       - run: pnpm --filter @actionpop/web test
       - run: pnpm --filter @actionpop/web typecheck
       - run: pnpm --filter @actionpop/web build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: apps/web/dist
