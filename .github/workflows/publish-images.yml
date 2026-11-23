@@ -24,6 +24,9 @@ jobs:
             dockerfile: infra/docker/Dockerfile.web
           - name: edge
             dockerfile: infra/docker/Dockerfile.edge
+            # `Dockerfile.edge` ends with the `scan` stage, so an untargeted build would publish the
+            # plain-HTTP twin as the production edge.
+            target: edge
     steps:
       - uses: actions/checkout@v7
       - uses: docker/login-action@v4
@@ -42,6 +45,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           push: true
           tags: |
             ghcr.io/${{ steps.image.outputs.owner }}/actionpop-${{ matrix.name }}:${{ github.sha }}

@@ -316,14 +316,20 @@ in `packages/core`; service-specific code stays in its application package. Runt
 configuration and deployment details are documented in the technical foundation
 quickstart under `specs/001-technical-foundation/quickstart.md`.
 
-Build and start the independent runtime targets:
+Build and start the stack, edge included:
 
 ```bash
-docker build -t actionpop-api:test -f infra/docker/Dockerfile.api .
-docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 cp infra/compose/.env.example infra/compose/.env
-docker compose -f infra/compose/docker-compose.yml up -d
+# External networks the stack joins; Compose never creates them.
+docker network create monitoring 2>/dev/null || true
+docker network create caddy_network 2>/dev/null || true
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml up -d --build
 ```
+
+On a deployment host the images are pulled instead of built, so the build override is not used
+there: `docker compose -f infra/compose/docker-compose.yml pull` then `up -d`. See
+[`infra/compose/README.md`](infra/compose/README.md).
 
 The public surface is the read-only `GET /feed/{scopeId}` route, the read-only
 `GET /events` route, the read-only `GET /groups` route, the read-only `GET /search/subjects`

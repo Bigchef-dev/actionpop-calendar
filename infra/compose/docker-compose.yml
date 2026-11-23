@@ -1,3 +1,11 @@
+# The production stack: images only, no `build:` block, so deploying is
+#
+#   docker compose -f infra/compose/docker-compose.yml pull
+#   docker compose -f infra/compose/docker-compose.yml up -d --remove-orphans
+#
+# `pull` must not have to skip anything: a `build:` key makes Compose try to build a service too
+# (and fails the pull when the image tag was never published). The build definitions live in
+# `docker-compose.build.yml`, which the CI scan and a local build combine with this file.
 name: actionpop
 
 services:
@@ -45,9 +53,6 @@ services:
   # services wait for it, so a deployment can never start against an older schema.
   migrate:
     image: ${WORKER_IMAGE:-ghcr.io/bigchef-dev/actionpop-worker:latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.worker
     entrypoint: ['node_modules/.bin/prisma', 'migrate', 'deploy', '--schema=prisma/schema.prisma']
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
@@ -65,11 +70,6 @@ services:
   # gets one origin and no cross-origin requests are needed.
   web:
     image: ${WEB_IMAGE:-ghcr.io/bigchef-dev/actionpop-web:latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.web
-      args:
-        VITE_BASE_PATH: /
     networks:
       private:
         # The edge reaches the site through this alias, never through `web`. Docker's DNS resolves
@@ -89,9 +89,6 @@ services:
 
   api:
     image: ${API_IMAGE:-ghcr.io/bigchef-dev/actionpop-api:latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.api
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
@@ -134,9 +131,6 @@ services:
 
   worker:
     image: ${WORKER_IMAGE:-ghcr.io/bigchef-dev/actionpop-worker:latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.worker
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       DATABASE_URL: ${DATABASE_URL:-postgresql://actionpop:actionpop@postgres:5432/actionpop}
@@ -174,19 +168,18 @@ services:
   #
   # The configuration is baked into the image rather than bind-mounted: deploying is a pull, the
   # running tag states which routing table is live, and no file has to be copied onto the host.
+  #
+  # No `profiles:`: the edge is part of the published stack, so `up -d` must start it. A profile
+  # was why a bare `up -d` could leave the site unreachable while every service looked healthy.
   edge:
     image: ${EDGE_IMAGE:-ghcr.io/bigchef-dev/actionpop-edge:latest}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.edge
-    profiles: ['edge']
     expose:
-      - '80'
       - '8080'
     healthcheck:
       # Loopback and upstream-free, so `up -d` and any orchestrator can wait for "the edge serves"
-      # without depending on the API or the site being reachable from here.
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/healthz']
+      # without depending on the API or the site being reachable from here. The vhost listens on
+      # 8080 only: Caddy, not the edge, owns the host ports.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/healthz']
       interval: 10s
       timeout: 3s
       retries: 5

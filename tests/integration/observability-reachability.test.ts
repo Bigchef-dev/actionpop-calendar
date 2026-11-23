@@ -54,12 +54,15 @@ describe('observability reachability', () => {
     expect(COMPOSE).toContain('external: true');
     // Both metrics producers join the monitor's network; neither publishes a port.
     const apiBlock = /api:([\s\S]*?)worker:/.exec(COMPOSE)?.[1] ?? '';
-    expect(apiBlock).toContain('- monitoring');
+    // The network is a mapping (it carries the `actionpop-api` alias), not a bare list item.
+    expect(apiBlock).toMatch(/^\s+monitoring:$/m);
     expect(apiBlock).not.toMatch(/ports:\s*\n\s*-/);
   });
 
   it('exposes only the calendar paths the visitor experience calls', () => {
-    const publicTemplates = new Set(ROUTE_TEMPLATES.filter((template) => !template.startsWith('/internal')));
+    const publicTemplates = new Set(
+      ROUTE_TEMPLATES.filter((template) => !template.startsWith('/internal')),
+    );
 
     expect([...publicTemplates].sort()).toEqual(
       [

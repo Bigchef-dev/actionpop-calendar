@@ -47,21 +47,35 @@ docker build -f infra/docker/Dockerfile.edge --target edge -t actionpop-edge:loc
 The build runs `check-config.sh` and fails if the vhost, a snippet or an error page cannot start,
 so a broken configuration never produces an image. Two targets share every layer:
 
-| Target | Vhost                                   | Used by                  |
-| ------ | --------------------------------------- | ------------------------ |
-| `edge` | `https.conf` (`listen 80` and `8080`)   | the production stack     |
-| `scan` | `http-scan.conf` (plain HTTP on `8080`) | the CI exploitation scan |
+| Target | Vhost                           | Used by                  |
+| ------ | ------------------------------- | ------------------------ |
+| `edge` | `https.conf` (`listen 8080`)    | the production stack     |
+| `scan` | `http-scan.conf` (plain `8080`) | the CI exploitation scan |
+
+`Dockerfile.edge` ends with the `scan` stage, so every build must name its target: an untargeted
+build is the plain-HTTP twin. `docker-compose.build.yml` and the publish workflow both pass
+`target: edge`.
 
 Deploying is therefore a pull, never a copy:
 
 ```bash
 docker compose -f infra/compose/docker-compose.yml pull edge
-docker compose -f infra/compose/docker-compose.yml --profile edge up -d edge
+docker compose -f infra/compose/docker-compose.yml up -d edge
 ```
 
-Pin `EDGE_IMAGE` to an immutable tag (`...:${GIT_SHA}`) to roll back by changing one value. The
-running tag _is_ the running routing table, which is what removes the "the file on disk is newer
-than the container" failure for good.
+The edge is a regular service of the stack — there is no profile to pass, because a bare `up -d`
+must start the very component the site depends on. Build it on the host instead with the build
+override:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml up -d --build edge
+```
+
+The vhost listens on `8080` only: the Caddy site must target `edge:8080`, and a deployment left on
+`edge:80` answers nothing. Pin `EDGE_IMAGE` to an immutable tag (`...:${GIT_SHA}`) to roll back by
+changing one value. The running tag _is_ the running routing table, which is what removes the "the
+file on disk is newer than the container" failure for good.
 
 ## Upstream addressing
 
@@ -70,8 +84,9 @@ Two things there are load-bearing.
 
 **Unique names.** A container resolves a service name across **every** network it shares, and the
 edge shares `caddy_network` with every other project on the host. A generic name such as `web` can
-therefore answer with a foreign container that is not listening on this port — every request then
-answers `502` with
+therefore answer with a foreign container that is not listening on this port — this is what took
+the site down once: `web` resolved to `phoning_web`, another project's container whose Compose
+service is also called `web`. Every request then answers `502` with
 
 ```text
 connect() failed (111: Connection refused) while connecting to upstream,
@@ -119,6 +134,7 @@ Automated checks:
 ```bash
 pnpm test:integration            # tests/integration/edge-surface.test.ts
 docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml \
                -f infra/compose/docker-compose.security.yml up -d --build   # then ZAP
 ```
 
@@ -132,7 +148,7 @@ docker compose -f infra/compose/docker-compose.yml exec api \
   node -e "fetch('http://127.0.0.1:3000/groups?department=35').then(async r=>console.log(r.status, (await r.text()).slice(0,120)))"
 
 # 2. Which routing table is the edge running?
-docker compose -f infra/compose/docker-compose.yml --profile edge exec edge \
+docker compose -f infra/compose/docker-compose.yml exec edge \
   sh -lc 'grep -c "location = /groups" /etc/nginx/conf.d/default.conf; grep -c . /etc/nginx/app/snippets/routes.conf'
 ```
 
@@ -145,8 +161,8 @@ edge image was not rebuilt and pulled", never "a file was not copied".
 - **No `keepalive` on the upstreams.** The groups in `snippets/upstreams.conf` exist for name
   resolution, not connection pooling: the API answers in single-digit milliseconds on the private
   network, so reuse would buy nothing measurable.
-- **Two listeners (80 and 8080).** Caddy reaches this vhost as `edge:8080` in the documented
-  topology and as `edge:80` on some deployments. Answering both keeps a port mismatch from
-  becoming an outage. Neither port is published to the host.
+- **One listener.** Caddy owns the host ports and reaches this vhost as `edge:8080`. A second
+  listener on 80 was removed: it silently answered a deployment whose Caddy had not been
+  re-pointed, which hides the misconfiguration instead of failing loudly.
 - **No SPA history fallback.** The web app owns its state in the query string and has no client
   routes, so an unknown path is genuinely absent and gets the branded 404.

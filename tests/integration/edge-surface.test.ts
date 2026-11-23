@@ -9,6 +9,7 @@ const ROUTES = readFileSync(`${EDGE}/snippets/routes.conf`, 'utf8');
 const UPSTREAMS = readFileSync(`${EDGE}/snippets/upstreams.conf`, 'utf8');
 const DOCKERFILE = readFileSync('infra/docker/Dockerfile.edge', 'utf8');
 const COMPOSE = readFileSync('infra/compose/docker-compose.yml', 'utf8');
+const COMPOSE_BUILD = readFileSync('infra/compose/docker-compose.build.yml', 'utf8');
 const COMPOSE_SCAN = readFileSync('infra/compose/docker-compose.security.yml', 'utf8');
 const CONTRACT = readFileSync(
   'specs/009-release-hardening-observability/contracts/edge-surface.md',
@@ -132,7 +133,10 @@ describe('published edge surface', () => {
   it('defers TLS to the host terminator and instructs browsers to stay secure', () => {
     // Caddy owns ports 80/443, the certificates and the HTTP -> HTTPS redirect; this config stays
     // a plain-HTTP virtual host reachable only over the caddy_network.
-    expect(HTTPS).toMatch(/listen\s+80;/);
+    // One listener: Caddy reaches this vhost as `edge:8080`, and nothing may silently answer on a
+    // second port a deployment forgot to re-point.
+    expect(HTTPS).toMatch(/listen\s+8080;/);
+    expect(HTTPS).not.toMatch(/listen\s+80;/);
     expect(HTTPS).not.toMatch(/listen\s+443/);
     expect(HTTPS).not.toContain('ssl_certificate');
     expect(HTTPS).not.toContain('return 301');
@@ -165,8 +169,25 @@ describe('published edge surface', () => {
       expect(compose).not.toContain('../edge/https.conf:');
       expect(compose).not.toContain('../edge/http-scan.conf:');
     }
-    expect(COMPOSE).toContain('dockerfile: infra/docker/Dockerfile.edge');
+    expect(COMPOSE_BUILD).toContain('dockerfile: infra/docker/Dockerfile.edge');
     expect(COMPOSE_SCAN).toContain('target: scan');
+  });
+
+  it('deploys by pull: images only, no profile, one loopback health check', () => {
+    // `docker compose pull` must not have to skip anything, and a bare `up -d` must start the edge:
+    // both were real friction, and the missing profile is how a healthy stack served nothing.
+    expect(COMPOSE).not.toMatch(/^\s*build:/m);
+    expect(COMPOSE).not.toMatch(/^\s*profiles:/m);
+    // redis, postgres, migrate, web, api, worker, edge.
+    expect(COMPOSE.match(/^\s{4}image:/gm) ?? []).toHaveLength(7);
+    // The health check must hit the port the vhost actually listens on.
+    expect(COMPOSE).toContain('http://127.0.0.1:8080/healthz');
+    expect(COMPOSE).toContain("expose:\n      - '8080'");
+
+    // Every build definition lives in the override, including the production stage of the edge:
+    // `Dockerfile.edge` ends with the `scan` stage, so an untargeted build is the wrong vhost.
+    expect(COMPOSE_BUILD.match(/^\s{4}build:/gm) ?? []).toHaveLength(5);
+    expect(COMPOSE_BUILD).toContain('target: edge');
   });
 
   it('re-resolves the application containers instead of pinning their address', () => {

@@ -8,17 +8,30 @@ does not require authentication. `SOCK_PROXY` is optional: when set
 through that proxy instead of connecting directly.
 
 ```bash
-# `api`, `worker` and `web` join the external `monitoring` network, which Compose never
-# creates: provide it once on the host (see "Monitoring" below).
+# The services join external networks Compose never creates: `monitoring` (see "Monitoring"
+# below) and `caddy_network` (see "Create the shared network"). Provide both once on the host.
 docker network create monitoring
-docker compose -f infra/compose/docker-compose.yml up -d
+docker network create caddy_network
+docker compose -f infra/compose/docker-compose.yml pull
+docker compose -f infra/compose/docker-compose.yml up -d --remove-orphans
 docker compose -f infra/compose/docker-compose.yml ps
 ```
 
-From the repository root, Compose can build both application images directly:
+Deploying an update is the same two commands without the network setup:
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml up --build
+git pull
+docker compose -f infra/compose/docker-compose.yml pull
+docker compose -f infra/compose/docker-compose.yml up -d --remove-orphans
+```
+
+The production file declares images only — no `build:`, no profile — so `pull` fetches every
+service and `up -d` starts the whole stack, edge included. To build the images on the host instead
+of pulling them, combine the build override:
+
+```bash
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml up -d --build
 ```
 
 `up` also runs the one-shot `migrate` service, which applies the Prisma migrations with
@@ -47,9 +60,10 @@ WORKER_IMAGE=ghcr.io/bigchef-dev/actionpop-worker:<sha> \
 docker compose -f infra/compose/docker-compose.yml pull
 ```
 
-From a checkout that also holds the sources, those services declare a `build:` section, so a
-plain `pull` tries to fetch them too and a tag that was never published fails the command. Add
-`--ignore-buildable` to fetch only the third-party images and build the rest.
+The `build:` sections live in `docker-compose.build.yml`, not in the production file: a `build:`
+key would make `pull` try to build the service too, and fail when the tag was never published. This
+is why a deployment never needs `--ignore-buildable`, and why the CI scan and a local build pass
+`-f docker-compose.build.yml` explicitly.
 
 Build the independent runtime targets from the repository root:
 
@@ -60,14 +74,17 @@ docker build -t actionpop-worker:test -f infra/docker/Dockerfile.worker .
 
 Redis, worker, and internal health endpoints remain on the private network. TLS terminates at the
 host-wide Caddy reverse proxy, which owns ports 80/443 for the whole server. The edge is a
-plain-HTTP virtual host reachable as `edge:8080` over the external `caddy_network` (it also listens
-on port 80, so a deployment whose Caddy targets `edge:80` keeps working). It ships as its own image
-built from [`infra/docker/Dockerfile.edge`](../docker/Dockerfile.edge):
+plain-HTTP virtual host that listens on `8080` only and is reachable as `edge:8080` over the
+external `caddy_network`. It is a regular service of this stack — no profile to remember — shipped
+as its own image built from [`infra/docker/Dockerfile.edge`](../docker/Dockerfile.edge):
 
 ```bash
 docker compose -f infra/compose/docker-compose.yml pull edge
-docker compose -f infra/compose/docker-compose.yml --profile edge up -d edge
+docker compose -f infra/compose/docker-compose.yml up -d edge
 ```
+
+The Caddy site **must** target `edge:8080`; the vhost no longer listens on port 80, so a deployment
+left on `edge:80` would answer nothing.
 
 Nothing is copied onto the host: the routing table, headers and error pages live in the image, and
 the build refuses to produce an unusable configuration. See
@@ -89,9 +106,10 @@ docker network create caddy_network
 
 ## Published site
 
-The `web` service builds `apps/web` and serves it as static files; the edge proxies `/` and
-`/assets/` to it, so a visitor gets one origin and the calendar paths are same-origin. Set
-`WEB_IMAGE` to use a registry image instead of the local default tag.
+The `web` service serves the built `apps/web` as static files (its `build:` lives in
+`docker-compose.build.yml`); the edge proxies `/` and `/assets/` to it, so a visitor gets one origin
+and the calendar paths are same-origin. Set `WEB_IMAGE` to use a registry image instead of the
+local default tag.
 
 ## Monitoring
 

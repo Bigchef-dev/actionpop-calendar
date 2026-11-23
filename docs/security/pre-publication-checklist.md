@@ -24,7 +24,9 @@ Every command runs against a stack started with the scan overlay:
 
 ```bash
 docker network create monitoring 2>/dev/null || true
+docker network create caddy_network 2>/dev/null || true
 docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml \
                -f infra/compose/docker-compose.security.yml up -d --build
 ```
 

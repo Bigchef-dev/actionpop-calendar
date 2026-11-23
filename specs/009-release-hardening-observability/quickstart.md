@@ -70,7 +70,9 @@ territory identifier. `sum by (client_kind)` equals the total number of calendar
 ## Scenario 4 — Published surface is closed by default (FR-007 to FR-011, SC-004)
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.security.yml up -d --build
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml \
+               -f infra/compose/docker-compose.security.yml up -d --build
 for p in / /robots.txt /calendar.ics /search/subjects /events /feed/xyz /telemetry/journey /internal/metrics /reference /openapi.json /nope; do
   printf '%-24s %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080$p)"
 done
@@ -90,6 +92,7 @@ Create a shared network once, outside this repository:
 
 ```bash
 docker network create monitoring
+docker network create caddy_network
 ```
 
 Start the application stack (api, worker, web, edge) and your monitoring project on the same
@@ -141,7 +144,9 @@ worse than the blocked baseline.
 Run the ZAP job locally through the same override:
 
 ```bash
-docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.security.yml up -d --build
+docker compose -f infra/compose/docker-compose.yml \
+               -f infra/compose/docker-compose.build.yml \
+               -f infra/compose/docker-compose.security.yml up -d --build
 mkdir -p zap-report
 docker run --rm --network host -v "$PWD:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
   zap-baseline.py -t http://127.0.0.1:8080 -c .zap/rules.tsv \

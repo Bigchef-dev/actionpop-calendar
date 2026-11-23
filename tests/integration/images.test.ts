@@ -5,6 +5,7 @@ const apiDockerfile = readFileSync('infra/docker/Dockerfile.api', 'utf8');
 const integrationWorkflow = readFileSync('.github/workflows/integration.yml', 'utf8');
 const workerDockerfile = readFileSync('infra/docker/Dockerfile.worker', 'utf8');
 const compose = readFileSync('infra/compose/docker-compose.yml', 'utf8');
+const composeBuild = readFileSync('infra/compose/docker-compose.build.yml', 'utf8');
 const rootPackage = JSON.parse(readFileSync('package.json', 'utf8')) as {
   engines?: { node?: string };
 };
@@ -57,9 +58,10 @@ describe('runtime image contracts', () => {
     expect(compose).toContain('WORKER_IMAGE');
     expect(compose).toContain('internal: true');
     expect(compose).toContain('condition: service_healthy');
-    expect(compose).toContain('dockerfile: infra/docker/Dockerfile.api');
-    expect(compose).toContain('dockerfile: infra/docker/Dockerfile.worker');
-    expect(compose).toContain('context: ../..');
+    // The build definitions live in the override so that the production file stays pullable.
+    expect(composeBuild).toContain('dockerfile: infra/docker/Dockerfile.api');
+    expect(composeBuild).toContain('dockerfile: infra/docker/Dockerfile.worker');
+    expect(composeBuild).toContain('context: ../..');
   });
 
   it('runs the same datastore versions in CI as in Compose', () => {

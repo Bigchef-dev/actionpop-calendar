@@ -31,7 +31,9 @@ docker compose up -d
 
 See [compose/README.md](compose/README.md) for ports, retention, and how to tear it down.
 
-Then start the application stack; it joins the network the common stack just created:
+Then start the application stack; it joins the network the common stack just created. The stack
+also includes the edge, which joins `caddy_network`, so that external network must exist too
+(`docker network create caddy_network`):
 
 ```bash
 docker compose -f infra/compose/docker-compose.yml up -d
@@ -54,9 +56,11 @@ below.
    Name it with `MONITORING_NETWORK` in the application `.env` if you need another name; declare
    the same name as `external: true` in the monitoring Compose project.
 
-2. **Start the application stack** (it joins the network automatically):
+2. **Start the application stack** (it joins the network automatically). Create `caddy_network`
+   as well if the edge is part of the stack: Compose never creates an external network.
 
    ```bash
+   docker network create caddy_network 2>/dev/null || true
    docker compose -f infra/compose/docker-compose.yml up -d
    ```
 

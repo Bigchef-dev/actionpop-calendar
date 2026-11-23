@@ -69,10 +69,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
-      # The stack joins the network a Prometheus project owns in production. Compose never
-      # creates an external network, so the runner provides it like a deployment host does.
-      - name: Create the monitoring network
-        run: docker network create "${MONITORING_NETWORK:-monitoring}"
+      # The stack joins networks a deployment host provides. Compose never creates an external
+      # network, so the runner provides them like a host does — `caddy_network` included, because
+      # the edge is a regular service now and a bare `up` starts it.
+      - name: Create the external networks
+        run: |
+          docker network create "${MONITORING_NETWORK:-monitoring}"
+          docker network create caddy_network
       - name: Start the published stack
         env:
           # The worker refuses to start without an upstream base URL and the scan never exercises
@@ -80,6 +83,7 @@ jobs:
           UPSTREAM_BASE_URL: http://upstream.invalid
         run: |
           docker compose -f infra/compose/docker-compose.yml \
+                         -f infra/compose/docker-compose.build.yml \
                          -f infra/compose/docker-compose.security.yml up -d --build
       - name: Wait for the edge
         run: |
@@ -88,6 +92,7 @@ jobs:
             sleep 2
           done
           docker compose -f infra/compose/docker-compose.yml \
+                         -f infra/compose/docker-compose.build.yml \
                          -f infra/compose/docker-compose.security.yml logs
           echo '::error::the edge never became reachable'
           exit 1
@@ -121,4 +126,5 @@ jobs:
         if: always()
         run: |
           docker compose -f infra/compose/docker-compose.yml \
+                         -f infra/compose/docker-compose.build.yml \
                          -f infra/compose/docker-compose.security.yml down -v
