@@ -9,6 +9,7 @@ import {
   createPostgresClient,
   createRedisConnection,
   describeDependencyFailures,
+  LEDGER_GRACE_MS,
   loadEnvFile,
   PostgresCalendarDatasetRepository,
   PostgresCycleMetrics,
@@ -60,9 +61,6 @@ export { toIncomingEvent } from './ingestion/event-mapper.js';
 export { EventTypeValidationError } from './ingestion/calendar-ingestion-processor.js';
 
 const QUEUE_NAME = 'calendar-ingestion';
-
-// Four cycles: nothing legitimate stays in a live status this long.
-const LEDGER_GRACE_MS = 60 * 60 * 1000;
 
 interface IngestionJobData {
   scopeId: string;

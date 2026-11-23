@@ -1,7 +1,10 @@
 import {
+  DEFAULT_RATE_LIMIT_DELAY_MS,
   EventIdentityMismatchError,
   HttpError,
+  MAX_RATE_LIMIT_DELAY_MS,
   NetworkError,
+  RATE_LIMIT_JITTER_MS,
   TimeoutError,
   UnknownEventError,
   UnknownGroupError,
@@ -143,9 +146,6 @@ export class ActionPopulaireClient {
 }
 
 const DEFAULT_MAX_RATE_LIMIT_RETRIES = 2;
-const DEFAULT_RATE_LIMIT_DELAY_MS = 2_000;
-const MAX_RATE_LIMIT_DELAY_MS = 30_000;
-const RATE_LIMIT_JITTER_MS = 250;
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

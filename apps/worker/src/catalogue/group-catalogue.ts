@@ -1,5 +1,7 @@
 import {
   activeGroupScopeIds,
+  CATALOGUE_SYNC_MAX_WAIT_MS,
+  CATALOGUE_SYNC_TIMEOUT_MS,
   normalizeScopeIdentity,
   PostgresGroupRegistry,
   synchronizeGroupDirectory,
@@ -7,11 +9,6 @@ import {
   type GroupCatalogueEntry,
 } from '@actionpop/core';
 import type { PrismaClient } from '@prisma/client';
-
-const CATALOGUE_SYNC_TIMEOUT_MS = 60_000;
-// Starting a transaction waits for a pooled connection; the 2 s default is too tight while
-// ingestion jobs hold connections.
-const CATALOGUE_SYNC_MAX_WAIT_MS = 10_000;
 
 interface RedisValueStore {
   get(key: string): Promise<string | null>;

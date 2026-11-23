@@ -13,12 +13,13 @@ import {
   parseGroupArea,
   resolveGroupArea,
   type GroupAreaResolver,
+  type GroupListingAnswer,
   type GroupListingReader,
-  type GroupListingResult,
 } from '@actionpop/core';
 
 import { GROUP_AREA_RESOLVER, GROUP_LISTING } from '../constants.js';
 import { logger } from '../logger.js';
+import { areaEcho } from './groups-area-echo.js';
 import { GROUPS_ANSWER_SCHEMA } from './groups-answer-schema.js';
 
 @ApiTags('groups')
@@ -53,7 +54,7 @@ export class GroupsController {
   @ApiOkResponse({ schema: GROUPS_ANSWER_SCHEMA })
   public async list(
     @Query() query: Record<string, string | undefined>,
-  ): Promise<GroupListingResult> {
+  ): Promise<GroupListingAnswer> {
     const parsed = parseGroupArea(query);
     if (!parsed.ok) throw new BadRequestException(invalidArea(parsed.diagnostics));
     if (!namesAnArea(parsed.criteria)) {
@@ -93,10 +94,11 @@ export class GroupsController {
     if (!resolved.ok) throw mappingFailure(resolved.diagnostics);
 
     try {
-      return await this.reader.list(resolved.criteria, {
+      const result = await this.reader.list(resolved.criteria, {
         limit: parsed.criteria.limit,
         offset: parsed.criteria.offset,
       });
+      return { ...result, area: areaEcho(parsed.criteria) };
     } catch (error) {
       logger.error({ err: error }, 'Group listing failed');
       throw new ServiceUnavailableException({ error: 'group storage unavailable' });

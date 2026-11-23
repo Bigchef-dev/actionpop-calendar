@@ -1,3 +1,5 @@
+import { DEFAULT_TIMEOUT_MS } from '../config/defaults.config.js';
+
 export interface DependencyProbe {
   readonly name: string;
   probe(): Promise<void>;
@@ -7,8 +9,6 @@ export interface DependencyFailure {
   readonly name: string;
   readonly message: string;
 }
-
-const DEFAULT_TIMEOUT_MS = 5_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {

@@ -1,6 +1,5 @@
 import type { CalendarWindow } from './calendar-event.js';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS } from '../config/defaults.config.js';
 
 export interface CalendarWindowSettings {
   readonly lookbackDays: number;

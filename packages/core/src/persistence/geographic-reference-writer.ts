@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
+import { STAGE_TRANSACTION_TIMEOUT_MS } from '../config/defaults.config.js';
 import type { IndexedReference } from '../geography/commune-name-index.js';
 import type { Diagnostic } from '../geography/reference-types.js';
 import type { EpciMembershipRecord, EpciReferenceRecord } from '../geography/epci-reference.js';
@@ -18,11 +19,6 @@ export type ActivationResult =
   { status: 'active' } | { status: 'retryable'; diagnostics: Diagnostic[] };
 
 const BATCH_SIZE = 1000;
-
-// Staging inserts every commune of the dataset (tens of thousands of rows) inside one
-// transaction. The Prisma default of five seconds is too tight for that volume through a
-// driver adapter, and a rollback must still cover the whole staging step.
-const STAGE_TRANSACTION_TIMEOUT_MS = 60_000;
 
 export class PostgresGeographicReferenceWriter {
   public constructor(private readonly prisma: PrismaClient) {}

@@ -1,4 +1,5 @@
 import { ConfigurationError } from '../operations/errors.js';
+import { DEFAULT_DISPATCHER_INTERVAL_MS } from '../config/defaults.config.js';
 import { normalizePeriodToken } from './job-identity.js';
 import type { ProcessingPeriod } from './types.js';
 
@@ -30,7 +31,7 @@ function parisIso(date: Date): string {
 
 export function calculateProcessingPeriod(
   instant: Date,
-  intervalMs = 15 * 60 * 1000,
+  intervalMs = DEFAULT_DISPATCHER_INTERVAL_MS,
 ): ProcessingPeriod {
   if (Number.isNaN(instant.getTime()) || !Number.isInteger(intervalMs) || intervalMs <= 0) {
     throw new ConfigurationError('processing period input is invalid');

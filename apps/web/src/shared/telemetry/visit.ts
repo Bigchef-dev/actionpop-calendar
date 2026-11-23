@@ -1,5 +1,4 @@
-/** How long a visit survives without visitor activity. */
-export const VISIT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+import { VISIT_IDLE_TIMEOUT_MS } from '../config/durations';
 
 const STORAGE_KEY = 'actionpop.visit';
 

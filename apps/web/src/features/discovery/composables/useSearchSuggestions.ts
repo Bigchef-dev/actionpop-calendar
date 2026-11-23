@@ -1,12 +1,12 @@
 import { ref, watch, type Ref } from 'vue';
 
 import { searchSubjects } from '../../../shared/api/client';
+import { DEBOUNCE_MS } from '../../../shared/config/durations';
 import type { SearchAnswer } from '../../../types';
 
 export type SuggestionStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 
 const MIN_QUERY_LENGTH = 2;
-const DEBOUNCE_MS = 150;
 
 export interface SearchSuggestionsHandle {
   readonly answer: Ref<SearchAnswer | null>;

@@ -1,3 +1,4 @@
+import { FLUSH_INTERVAL_MS } from '../config/durations';
 import { sendJourneyPayload } from './send';
 import { createVisitTracker, type VisitTracker } from './visit';
 
@@ -26,7 +27,6 @@ export type JourneySubjectKind = (typeof JOURNEY_SUBJECT_KINDS)[number];
 const UNLOAD_SAFE_STEPS: ReadonlySet<JourneyStep> = new Set(['export', 'subscribe']);
 
 const MAX_BATCH_STEPS = 10;
-const FLUSH_INTERVAL_MS = 2000;
 
 export interface JourneyReporter {
   readonly track: (step: JourneyStep, subjectKind?: JourneySubjectKind) => void;

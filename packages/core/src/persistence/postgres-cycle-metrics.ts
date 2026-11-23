@@ -1,10 +1,9 @@
 import { Prisma } from '@prisma/client';
 
 import { parsePeriodToken } from '../domain/job-identity.js';
+import { DEFAULT_DISPATCHER_INTERVAL_MS } from '../config/defaults.config.js';
 import type { CycleMetricSample } from '../groups/cycle-metrics.js';
 import type { RegistryClient } from './postgres-group-registry.js';
-
-const PERIOD_INTERVAL_MS = 15 * 60 * 1000;
 
 export interface CycleMetricReading {
   readonly periodToken: string;
@@ -26,7 +25,7 @@ export class PostgresCycleMetrics {
 
     await this.client.$executeRaw(Prisma.sql`
       INSERT INTO "processing_period" ("period_token", "period_start_utc", "period_end_utc")
-      VALUES (${canonical}::text, ${start}::timestamptz, ${new Date(start.getTime() + PERIOD_INTERVAL_MS)}::timestamptz)
+      VALUES (${canonical}::text, ${start}::timestamptz, ${new Date(start.getTime() + DEFAULT_DISPATCHER_INTERVAL_MS)}::timestamptz)
       ON CONFLICT ("period_token") DO NOTHING
     `);
 

@@ -39,6 +39,20 @@ export interface GroupAreaCriteria {
   readonly referenceVersion: string;
 }
 
+/**
+ * The area a successful answer was computed for, echoed so a page can be attributed to the
+ * territory it describes without replaying the request. Values inside one dimension are the
+ * deduplicated union the read applied.
+ */
+export interface GroupAreaEcho {
+  readonly country?: string;
+  readonly department?: string;
+  readonly communeIds?: readonly string[];
+  readonly epci?: readonly string[];
+}
+
+export type GroupListingAnswer = GroupListingResult & { readonly area: GroupAreaEcho };
+
 export const GROUP_LISTING_LIMIT = {
   default: 50,
   min: 1,

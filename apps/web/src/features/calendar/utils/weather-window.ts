@@ -1,8 +1,5 @@
 import type { CalendarEvent } from '../../../types';
-
-/** Open-Meteo publishes a 16-day forecast horizon. */
-export const FORECAST_HORIZON_DAYS = 16;
-const HOUR_MS = 3_600_000;
+import { FORECAST_HORIZON_DAYS, HOUR_MS } from '../../../shared/config/durations';
 
 export interface WeatherRequest {
   latitude: number;

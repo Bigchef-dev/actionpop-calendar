@@ -1,7 +1,7 @@
 # Contract: Geographic Action Group Listing
 
 **Owner:** [010 — Geographic Action Group Listing](../../010-geographic-group-listing/spec.md)
-**Amendments:** none
+**Amendments:** 2026-11-23 — the answer echoes the requested area
 **Status:** Implemented · 2026-11-18
 **Implementation:** [`groups.controller.ts`](../../../apps/api/src/controllers/groups.controller.ts), [`postgres-group-listing.ts`](../../../packages/core/src/persistence/postgres-group-listing.ts)
 **Upstream reference:** [`GET /api/groupes/{groupId}/`](../../001-technical-foundation/contracts/action-populaire-groups.md#group-detail) — the `location` object the attachment is resolved from
@@ -74,6 +74,8 @@ Successful identification of an area that holds no group is **not** a validation
 - `total` is the number of matching groups **before** `limit`/`offset`.
 - The whole answer is computed against one active reference version; an unchanged area returns
   the same `referenceVersion` on every read.
+- The answer echoes the area criteria it was computed for, so a page can be attributed to its
+  territory without replaying the request.
 
 ## Response
 
@@ -107,7 +109,8 @@ Access-Control-Allow-Origin: <allowed origin>
   "total": 1,
   "limit": 50,
   "offset": 0,
-  "referenceVersion": "communes-20261028-b81cad794b9c"
+  "referenceVersion": "communes-20261028-b81cad794b9c",
+  "area": { "department": "69", "communeIds": ["69123"] }
 }
 ```
 
@@ -128,6 +131,7 @@ Access-Control-Allow-Origin: <allowed origin>
 | `total`            | Matching groups before paging                                                         |
 | `limit`/`offset`   | Effective paging values, so a consumer can page deterministically                     |
 | `referenceVersion` | Active geographic reference version the whole answer was computed against             |
+| `area`             | Territory as supplied — `country`, `department`, `communeIds`, `epci`; absent keys are omitted |
 
 No internal field is exposed: no retrieval status, no geometry, no diagnostics, no source token.
 
@@ -164,3 +168,4 @@ version note.
 | Date       | Feature | Change                         |
 | ---------- | ------- | ------------------------------ |
 | 2026-11-18 | 010     | Initial proposed group listing |
+| 2026-11-23 | 010     | Answer echoes the requested area criteria |

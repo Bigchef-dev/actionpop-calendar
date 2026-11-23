@@ -129,6 +129,7 @@ describe('GET /groups', () => {
       limit: 50,
       offset: 0,
       referenceVersion: VERSION,
+      area: { department: '69' },
     });
   });
 
@@ -139,6 +140,21 @@ describe('GET /groups', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ items: [], total: 0, referenceVersion: VERSION });
+  });
+
+  it('echoes the territory the answer was computed for', async () => {
+    const app = await buildAppWith(new StubReader());
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/groups?insee_commune=69123,69124&commune=69124&epci=200054781',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().area).toEqual({
+      communeIds: ['69123', '69124'],
+      epci: ['200054781'],
+    });
   });
 
   it('exposes identity, name and a usable calendar reference only', async () => {

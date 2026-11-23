@@ -5,7 +5,7 @@
  */
 export const GROUPS_ANSWER_SCHEMA = {
   type: 'object',
-  required: ['items', 'total', 'limit', 'offset', 'referenceVersion'],
+  required: ['items', 'total', 'limit', 'offset', 'referenceVersion', 'area'],
   properties: {
     items: {
       type: 'array',
@@ -36,5 +36,15 @@ export const GROUPS_ANSWER_SCHEMA = {
     limit: { type: 'integer', example: 50 },
     offset: { type: 'integer', example: 0 },
     referenceVersion: { type: 'string', example: 'communes-20261028-b81cad794b9c' },
+    area: {
+      type: 'object',
+      description: 'The territory the answer was computed for, as supplied in the request',
+      properties: {
+        country: { type: 'string', example: 'FR' },
+        department: { type: 'string', example: '69' },
+        communeIds: { type: 'array', items: { type: 'string' }, example: ['69123'] },
+        epci: { type: 'array', items: { type: 'string' }, example: ['200054781'] },
+      },
+    },
   },
 };

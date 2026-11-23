@@ -5,6 +5,7 @@ export type {
 } from './group-attachment-outcome.js';
 
 import {
+  DEFAULT_STALE_AFTER_MS,
   PostgresGeographicReferenceRepository,
   enrichEventGeography,
   groupAttachmentFromGeography,
@@ -37,7 +38,6 @@ import type {
  * A read failure is never fatal: the group keeps its previous attachment and is retried on the
  * next cycle, because an unreachable source must not cost the catalogue.
  */
-const DEFAULT_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const ZERO_COUNTS = {
   resolved: 0,
   incomplete: 0,

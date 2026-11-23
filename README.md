@@ -462,7 +462,7 @@ Install the dashboards and alerts by following
 automated baseline scan runs on every pull request touching the application or `infra/`, and fails
 the build on a high-severity finding.
 
-ssh -N -L 5432:172.20.0.2:5432 -L 6379:172.20.0.3:6379 debian@aaronlem.ovh
+ssh -N -L 5432:172.20.0.3:5432 -L 6379:172.20.0.4:6379 debian@aaronlem.ovh -v
 
 WORKER_HEALTH_PORT=8081 pnpm --filter @actionpop/worker dev &
 WORKER_HEALTH_PORT=8082 pnpm --filter @actionpop/worker dev &

@@ -19,7 +19,7 @@ import {
   type EventScopeRequest,
 } from './postgres-event-scopes.js';
 
-const PUBLICATION_TIMEOUT_MS = 60_000;
+import { PUBLICATION_TIMEOUT_MS } from '../config/defaults.config.js';
 
 /** The pure rule answers "does this observation retire the event's own ingestion?". */
 function retiresForStatedGroup(statesGroup: boolean, endTime: string, observedAt: Date): boolean {

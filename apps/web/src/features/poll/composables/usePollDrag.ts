@@ -1,7 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { PollItem } from '../utils/poll.utils'
+import { LONG_PRESS_MS } from '../../../shared/config/durations'
 
-const LONG_PRESS_MS = 300
 const MOVE_CANCEL_PX = 8
 
 export function usePollDrag(items: Ref<PollItem[]>) {
