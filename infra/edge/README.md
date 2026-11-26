@@ -155,7 +155,14 @@ docker compose -f infra/compose/docker-compose.yml exec edge \
 ```
 
 A `404` from the API (JSON) means an image without the route; a branded `404` means the edge does
-not route the path. Since the configuration ships in the image, the second case now means "the
+not route the path. A branded `404` on a route that exists in the repository almost always means
+the **edge container runs an old image**: the routing table is baked into the edge image, so
+recreating `web` or `api` alone leaves the old table live. Recreate the edge too:
+
+````bash
+docker compose -f infra/compose/docker-compose.yml pull edge
+docker compose -f infra/compose/docker-compose.yml up -d edge
+``` Since the configuration ships in the image, the second case now means "the
 edge image was not rebuilt and pulled", never "a file was not copied".
 
 ## Deliberate non-goals
@@ -168,3 +175,4 @@ edge image was not rebuilt and pulled", never "a file was not copied".
   re-pointed, which hides the misconfiguration instead of failing loudly.
 - **No SPA history fallback.** The web app owns its state in the query string and has no client
   routes, so an unknown path is genuinely absent and gets the branded 404.
+````

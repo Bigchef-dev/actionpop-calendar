@@ -174,6 +174,15 @@ describe('published edge surface', () => {
     expect(COMPOSE_SCAN).toContain('target: scan');
   });
 
+  it('allows the embedded calendar icon font under the header policy', () => {
+    // The calendar renders a base64 `data:` icon font; a policy without `font-src data:` blocks it
+    // in the browser console while every server-side check still passes.
+    const headers = readFileSync(`${EDGE}/snippets/security-headers.conf`, 'utf8');
+    expect(headers).toMatch(/font-src 'self' data:;/);
+    expect(headers).toMatch(/script-src 'self';/);
+    expect(headers).not.toContain("script-src 'unsafe-inline'");
+  });
+
   it('deploys by pull: images only, no profile, one loopback health check', () => {
     // `docker compose pull` must not have to skip anything, and a bare `up -d` must start the edge:
     // both were real friction, and the missing profile is how a healthy stack served nothing.

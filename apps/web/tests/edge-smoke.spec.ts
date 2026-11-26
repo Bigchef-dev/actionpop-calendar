@@ -28,6 +28,21 @@ test.describe('published edge', () => {
     expect(violations).toEqual([]);
   });
 
+  test('publishes the update status and its dedicated page', async ({ request, page }) => {
+    // A stale edge image is the failure this catches: the site can be current while the routing
+    // table baked into the edge predates the routes the site links to.
+    const status = await request.get(`${EDGE_BASE_URL}/updates`);
+    expect(status.status()).toBe(200);
+    expect(status.headers()['content-type']).toContain('application/json');
+    const body = (await status.json()) as { state?: string; history?: unknown[] };
+    expect(['updating', 'up_to_date', 'stale', 'partial', 'unknown']).toContain(body.state);
+    expect(Array.isArray(body.history)).toBe(true);
+
+    const dedicated = await page.goto(`${EDGE_BASE_URL}/etat`);
+    expect(dedicated?.status()).toBe(200);
+    await expect(page.getByRole('heading', { name: 'État des données' })).toBeVisible();
+  });
+
   test('refuses an internal surface through the edge', async ({ request }) => {
     for (const path of ['/internal/metrics', '/reference', '/openapi.json', '/nope']) {
       const response = await request.get(`${EDGE_BASE_URL}${path}`);

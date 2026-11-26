@@ -60,16 +60,16 @@ Applied to every proxied and static response by one shared snippet,
 `infra/edge/snippets/security-headers.conf`, included by both the HTTPS server and the plain-HTTP scan
 server so the scan validates exactly what production serves.
 
-| Header                         | Value                                                                                                                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Content-Security-Policy`      | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
-| `X-Content-Type-Options`       | `nosniff`                                                                                                                                                                                         |
-| `X-Frame-Options`              | `DENY`                                                                                                                                                                                            |
-| `Referrer-Policy`              | `no-referrer`                                                                                                                                                                                     |
-| `Permissions-Policy`           | `geolocation=(), microphone=(), camera=(), payment=(), usb=()`                                                                                                                                    |
-| `Cross-Origin-Opener-Policy`   | `same-origin`                                                                                                                                                                                     |
-| `Cross-Origin-Embedder-Policy` | `require-corp`                                                                                                                                                                                    |
-| `Cross-Origin-Resource-Policy` | `same-origin`                                                                                                                                                                                     |
+| Header                         | Value                                                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`      | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
+| `X-Content-Type-Options`       | `nosniff`                                                                                                                                                                                               |
+| `X-Frame-Options`              | `DENY`                                                                                                                                                                                                  |
+| `Referrer-Policy`              | `no-referrer`                                                                                                                                                                                           |
+| `Permissions-Policy`           | `geolocation=(), microphone=(), camera=(), payment=(), usb=()`                                                                                                                                          |
+| `Cross-Origin-Opener-Policy`   | `same-origin`                                                                                                                                                                                           |
+| `Cross-Origin-Embedder-Policy` | `require-corp`                                                                                                                                                                                          |
+| `Cross-Origin-Resource-Policy` | `same-origin`                                                                                                                                                                                           |
 
 `style-src 'unsafe-inline'` is required by Tailwind/Vue runtime style injection and
 `font-src data:` by the FullCalendar icon font; scripts are never allowed inline, so a markup

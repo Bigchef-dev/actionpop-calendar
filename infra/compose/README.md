@@ -26,7 +26,19 @@ docker compose -f infra/compose/docker-compose.yml up -d --remove-orphans
 ```
 
 The production file declares images only — no `build:`, no profile — so `pull` fetches every
-service and `up -d` starts the whole stack, edge included. To build the images on the host instead
+service and `up -d` starts the whole stack, edge included.
+
+**Pull every service, not only the one you changed.** The routing table is baked into the edge
+image, so a deployment that recreates `web` alone serves a current site behind an old routing
+table: every new page answers the edge's branded `404` while the bundle already links to it.
+After any deployment, prove the published surface before walking away:
+
+```bash
+EDGE_BASE_URL=https://your.host pnpm exec playwright test apps/web/tests/edge-smoke.spec.ts
+```
+
+The smoke test asserts `/updates` and `/etat`, the header policy and the closed-by-default
+surfaces; a stale edge fails it on the first route. To build the images on the host instead
 of pulling them, combine the build override:
 
 ```bash
