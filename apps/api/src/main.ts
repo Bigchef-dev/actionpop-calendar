@@ -74,7 +74,10 @@ export async function startApi(): Promise<void> {
 
   logger.info('Building API application');
   const app = await buildApp({
-    datasetRepository: new PostgresCalendarDatasetRepository(postgres),
+    datasetRepository: new PostgresCalendarDatasetRepository(
+      postgres,
+      config.queue.dispatcherIntervalMs,
+    ),
     eventQuery: new PostgresEventQuery(postgres),
     subjectSearch: new PostgresSubjectSearch(postgres),
     groupListing: new PostgresGroupListing(postgres),

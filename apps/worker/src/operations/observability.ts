@@ -5,12 +5,28 @@ export interface WorkerObservability {
   metrics: MetricsRegistry;
 }
 
-export function createWorkerObservability(environment = process.env.NODE_ENV ?? 'development'): WorkerObservability {
+export function createWorkerObservability(
+  environment = process.env.NODE_ENV ?? 'development',
+  sink?: (line: string) => void,
+): WorkerObservability {
   return {
-    logger: createLogger({ service: 'worker', environment }),
+    logger: createLogger({
+      service: 'worker',
+      environment,
+      ...(sink === undefined ? {} : { sink }),
+    }),
     metrics: new MetricsRegistry({
       outcome: ['success', 'failure'],
-      reason: ['network', 'timeout', 'rate_limit', 'upstream_server', 'redis_temporary', 'validation', 'permanent', 'other'],
+      reason: [
+        'network',
+        'timeout',
+        'rate_limit',
+        'upstream_server',
+        'redis_temporary',
+        'validation',
+        'permanent',
+        'other',
+      ],
     }),
   };
 }

@@ -70,3 +70,4 @@ export * from './search/index.js';
 export * from './discovery/map-listing.js';
 export * from './discovery/map-selection.js';
 export * from './persistence/postgres-map-discovery.js';
+export * from './persistence/ingestion-maintenance.js';

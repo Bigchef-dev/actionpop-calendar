@@ -45,7 +45,9 @@
     "geo:refresh": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node scripts/geographic-refresh.mjs",
     "geo:event-types": "pnpm --filter @actionpop/core build && node scripts/event-types-sync.mjs",
     "dev:worker": "pnpm dev:infra || echo 'WARN: could not start Docker dependencies; start Redis and Postgres manually.'; pnpm db:setup && pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker dev",
-    "start:worker": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node apps/worker/dist/main.js"
+    "start:worker": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node apps/worker/dist/main.js",
+    "worker:cli": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker build && node apps/worker/dist/cli.js",
+    "worker:cli:dev": "pnpm --filter @actionpop/core build && pnpm --filter @actionpop/worker exec tsx src/cli.ts"
   },
   "devDependencies": {
     "@cspell/dict-fr-fr": "^2.3.2",

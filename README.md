@@ -314,7 +314,9 @@ pnpm exec vitest run tests/integration/typecheck-gate.test.ts --config vitest.co
 The workspace keeps the API and worker independently deployable. Shared code belongs
 in `packages/core`; service-specific code stays in its application package. Runtime
 configuration and deployment details are documented in the technical foundation
-quickstart under `specs/001-technical-foundation/quickstart.md`.
+quickstart under `specs/001-technical-foundation/quickstart.md`. Worker orchestration is
+described in [`docs/worker.md`](docs/worker.md) and its operator commands in
+[`docs/worker-cli.md`](docs/worker-cli.md).
 
 Build and start the stack, edge included:
 
@@ -484,10 +486,10 @@ docker inspect actionpop-redis-1 --format '{{range $k,$v := .NetworkSettings.Net
 
 ssh -N -L 5432:172.20.0.2:5432 -L 6379:172.20.0.3:6379 debian@aaronlem.ovh -v
 
-WORKER_HEALTH_PORT=8081 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8082 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8083 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8084 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8085 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8086 pnpm --filter @actionpop/worker dev &
-WORKER_HEALTH_PORT=8087 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8881 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8882 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8883 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8884 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8885 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8886 pnpm --filter @actionpop/worker dev &
+WORKER_HEALTH_PORT=8887 pnpm --filter @actionpop/worker dev &

@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 import type { CalendarDataset } from './calendar-dataset-repository.js';
+import { DEFAULT_DISPATCHER_INTERVAL_MS } from '../config/defaults.config.js';
 import type { GeographicAttachment, GeographicStatus } from '../geography/reference-types.js';
 import type { LocationEvent, PublishedEvent } from '../models/event.interface.js';
 import { readDiagnostics } from './diagnostic-json.js';
@@ -49,7 +50,14 @@ export interface PublicationSummary {
 }
 
 export class PostgresCalendarDatasetRepository {
-  public constructor(private readonly prisma: PrismaClient) {}
+  /**
+   * `intervalMs` is forwarded to the cycle-metric writer so a period row created from a
+   * publication covers the same window as the cycle that produced it.
+   */
+  public constructor(
+    private readonly prisma: PrismaClient,
+    private readonly intervalMs: number = DEFAULT_DISPATCHER_INTERVAL_MS,
+  ) {}
 
   public async markEventCancelled(sourceEventId: string): Promise<boolean> {
     const result = await this.prisma.eventRecord.updateMany({
@@ -184,7 +192,7 @@ export class PostgresCalendarDatasetRepository {
               ).then((counts) => counts.reduce((total, count) => total + count, 0))
             : 0;
 
-        await new PostgresCycleMetrics(transaction).increment(
+        await new PostgresCycleMetrics(transaction, this.intervalMs).increment(
           periodToken,
           cycleMetricSamples({
             [CYCLE_METRICS.discoveredUnlisted]: registration.discovered.length,

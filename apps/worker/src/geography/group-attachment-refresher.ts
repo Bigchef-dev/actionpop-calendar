@@ -21,11 +21,13 @@ import {
 import type { PrismaClient } from '@prisma/client';
 
 import { toRawLocationFields } from '../ingestion/event-mapper.js';
-import type {
-  AttachmentOutcome,
-  GroupAttachmentRefresher,
-  GroupDetailSource,
-  RefresherOptions,
+import {
+  ATTACHMENT_PROGRESS_STEP,
+  reportAttachmentProgress,
+  type AttachmentOutcome,
+  type GroupAttachmentRefresher,
+  type GroupDetailSource,
+  type RefresherOptions,
 } from './group-attachment-outcome.js';
 
 /**
@@ -67,10 +69,13 @@ export class PostgresGroupAttachmentRefresher implements GroupAttachmentRefreshe
     const writes: AttachmentWrite[] = [];
     const locations: GroupLocationInput[] = [];
 
-    for (const candidate of candidates) {
+    for (const [index, candidate] of candidates.entries()) {
       const read = await this.attachOne(candidate.scopeId, version, reference).catch(
         () => undefined,
       );
+      if (index % ATTACHMENT_PROGRESS_STEP === 0) {
+        reportAttachmentProgress(this.options, index, candidates.length, counts.failed);
+      }
       if (read === undefined) {
         counts.failed += 1;
         continue;
@@ -93,6 +98,8 @@ export class PostgresGroupAttachmentRefresher implements GroupAttachmentRefreshe
 
     // The address and its point are written in one transaction with the attachment, so a read
     // never sees a group attached to a place it does not yet state.
+    reportAttachmentProgress(this.options, candidates.length, candidates.length, counts.failed);
+
     await this.prisma.$transaction(async (transaction) => {
       await writeGroupLocations(transaction, locations);
       await persistAttachments(transaction, writes);

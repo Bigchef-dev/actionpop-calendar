@@ -5,6 +5,13 @@ import {
   type EpciReferenceRecord,
 } from '@actionpop/core';
 
+import {
+  findColumn,
+  readActive,
+  splitRow,
+  type MutableReference,
+} from './epci-official-csv-helpers.js';
+
 export interface OfficialEpciParseResult {
   readonly references: readonly EpciReferenceRecord[];
   readonly memberships: readonly EpciMembershipRecord[];
@@ -144,26 +151,6 @@ export function parseOfficialEpciCsv(
   return { references: ordered, memberships, errors, ignoredNatures: [...ignoredNatures].sort() };
 }
 
-interface MutableReference {
-  name: string;
-  kind: EpciKind;
-  departmentCodes: Set<string>;
-  active: boolean;
-}
-
-function readActive(
-  value: string | undefined,
-  activeIds: ReadonlySet<string> | undefined,
-  epciId: string,
-): boolean {
-  const stated = (value ?? '').trim().toLowerCase();
-  if (stated !== '' && ['false', '0', 'inactive', 'supprime', 'supprimé'].includes(stated)) {
-    return false;
-  }
-  if (activeIds !== undefined && !activeIds.has(epciId)) return false;
-  return true;
-}
-
 /** Department of a commune code, keeping the Corsican "2A"/"2B" form intact. */
 export function departmentOf(communeId: string): string | undefined {
   if (communeId.length < 2) return undefined;
@@ -171,45 +158,4 @@ export function departmentOf(communeId: string): string | undefined {
   if (prefix === '2A' || prefix === '2B') return prefix;
   const digits = communeId.slice(0, 2);
   return /^\d{2}$/.test(digits) ? digits : undefined;
-}
-
-function findColumn(header: readonly string[], candidates: readonly string[]): number {
-  for (const candidate of candidates) {
-    const index = header.indexOf(candidate);
-    if (index !== -1) return index;
-  }
-  return -1;
-}
-
-/** Minimal CSV splitter: official exports quote with `"` and escape by doubling it. */
-function splitRow(row: string): string[] {
-  const values: string[] = [];
-  let current = '';
-  let quoted = false;
-  for (let index = 0; index < row.length; index += 1) {
-    const character = row[index] ?? '';
-    if (quoted) {
-      if (character === '"') {
-        if (row[index + 1] === '"') {
-          current += '"';
-          index += 1;
-        } else {
-          quoted = false;
-        }
-      } else {
-        current += character;
-      }
-      continue;
-    }
-    if (character === '"') {
-      quoted = true;
-    } else if (character === ',') {
-      values.push(current);
-      current = '';
-    } else {
-      current += character;
-    }
-  }
-  values.push(current);
-  return values;
 }

@@ -12,7 +12,15 @@ export interface CycleMetricReading {
 
 /** Per-cycle counters, stored so "the last completed cycle" is answerable without log aggregation. */
 export class PostgresCycleMetrics {
-  public constructor(private readonly client: RegistryClient) {}
+  /**
+   * `intervalMs` must be the configured cycle length: it is what makes the stored `period_end_utc`
+   * agree with the period token the dispatcher computed, so two rows never describe different
+   * windows for the same cycle.
+   */
+  public constructor(
+    private readonly client: RegistryClient,
+    private readonly intervalMs: number = DEFAULT_DISPATCHER_INTERVAL_MS,
+  ) {}
 
   public async increment(
     periodToken: string,
@@ -25,14 +33,13 @@ export class PostgresCycleMetrics {
 
     await this.client.$executeRaw(Prisma.sql`
       INSERT INTO "processing_period" ("period_token", "period_start_utc", "period_end_utc")
-      VALUES (${canonical}::text, ${start}::timestamptz, ${new Date(start.getTime() + DEFAULT_DISPATCHER_INTERVAL_MS)}::timestamptz)
+      VALUES (${canonical}::text, ${start}::timestamptz, ${new Date(start.getTime() + this.intervalMs)}::timestamptz)
       ON CONFLICT ("period_token") DO NOTHING
     `);
 
     const rows = Prisma.join(
       samples.map(
-        (sample) =>
-          Prisma.sql`(${canonical}::text, ${sample.metric}::text, ${sample.value}::int)`,
+        (sample) => Prisma.sql`(${canonical}::text, ${sample.metric}::text, ${sample.value}::int)`,
       ),
     );
 

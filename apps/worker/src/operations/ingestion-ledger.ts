@@ -1,6 +1,7 @@
 import type { IngestionLedgerStatus, ScopeKind } from '@actionpop/core';
 import {
   buildRedisKey,
+  DEFAULT_DISPATCHER_INTERVAL_MS,
   LEDGER_TRANSACTION_MAX_WAIT_MS,
   LEDGER_TRANSACTION_TIMEOUT_MS,
   parsePeriodToken,
@@ -80,7 +81,14 @@ export class RedisIngestionLedgerStore {
 }
 
 export class PostgresIngestionLedgerStore {
-  public constructor(private readonly prisma: PrismaClient) {}
+  /**
+   * `intervalMs` is the configured cycle length: the ledger inserts the period row when it is the
+   * first writer, so it must compute the same `period_end_utc` as the dispatcher's own period.
+   */
+  public constructor(
+    private readonly prisma: PrismaClient,
+    private readonly intervalMs: number = DEFAULT_DISPATCHER_INTERVAL_MS,
+  ) {}
 
   public async transition(jobId: string, patch: LedgerPatch): Promise<void> {
     const previous = await this.get(jobId);
@@ -110,7 +118,7 @@ export class PostgresIngestionLedgerStore {
             {
               periodToken: canonicalToken,
               periodStartUtc: start,
-              periodEndUtc: new Date(start.getTime() + 15 * 60 * 1000),
+              periodEndUtc: new Date(start.getTime() + this.intervalMs),
             },
           ],
           skipDuplicates: true,

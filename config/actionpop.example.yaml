@@ -60,12 +60,12 @@ ingestion:
   #   The budget is shared: discovered groups and event ingestions (events that state
   #   no group) both consume it, in discovery order. Whatever exceeds the ceiling waits
   #   for a later cycle instead of being dropped.
-  maxNewGroupsPerCycle: 200
+  maxNewGroupsPerCycle: 400000
   # INGESTION_WORKER_CONCURRENCY — concurrent scope retrievals per worker (>= 1)
   #   Group listings and event detail readings both consume it. The upstream throttles
   #   bursts with HTTP 429; a 429 is retried in place after the delay it asks for, and
   #   the worker retries the job only if that fails.
-  workerConcurrency: 2
+  workerConcurrency: 4
   # INGESTION_MAP_DISCOVERY_ENABLED — read the public map listing once per cycle (boolean)
   #   The listing fills gaps left by group and event ingestions. It never publishes:
   #   selected identities become pending event scopes and consume the ceiling above.

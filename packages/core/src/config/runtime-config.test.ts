@@ -13,7 +13,11 @@ function emptyConfigRoot(): string {
 
 describe('parseRuntimeConfig', () => {
   it('uses Europe/Paris and safe defaults', () => {
-    const config = parseRuntimeConfig({ REDIS_URL: 'redis://localhost:6379' }, 'api');
+    const config = parseRuntimeConfig(
+      { REDIS_URL: 'redis://localhost:6379' },
+      'api',
+      emptyConfigRoot(),
+    );
 
     expect(config.app.timezone).toBe('Europe/Paris');
     expect(config.app.service).toBe('api');

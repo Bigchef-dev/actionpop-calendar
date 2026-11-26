@@ -33,6 +33,20 @@ describe('PostgresIngestionLedgerStore period tokens', () => {
     expect(periods[0]?.periodEndUtc.toISOString()).toBe('2026-10-28T20:30:00.000Z');
   });
 
+  it('stores the period end from the configured cycle length, not the 15-minute default', async () => {
+    const halfDay = new PostgresIngestionLedgerStore(harness.prisma, 12 * 60 * 60 * 1000);
+
+    await halfDay.transition('job-half-day', {
+      scopeId: 'group-1',
+      periodToken: '20261126T120000Z',
+      status: 'scheduled',
+    });
+
+    const periods = await harness.prisma.processingPeriod.findMany();
+    expect(periods[0]?.periodStartUtc.toISOString()).toBe('2026-11-26T12:00:00.000Z');
+    expect(periods[0]?.periodEndUtc.toISOString()).toBe('2026-11-27T00:00:00.000Z');
+  });
+
   it('stores the same canonical token for the compact and ISO forms', async () => {
     await ledger.transition('job-compact_group-1', {
       scopeId: 'group-1',
@@ -118,7 +132,6 @@ describe('PostgresIngestionLedgerStore concurrency', () => {
   });
 });
 
-
 describe('ingestion ledger reconciliation', () => {
   const cutoff = new Date('2026-10-29T10:00:00.000Z');
 
@@ -174,11 +187,15 @@ describe('ingestion ledger reconciliation', () => {
 
     await reconcileIngestionLedger(
       harness.prisma,
-      { getJob: async () => ({ getState: async () => 'failed', failedReason: 'Upstream HTTP 429' }) },
+      {
+        getJob: async () => ({ getState: async () => 'failed', failedReason: 'Upstream HTTP 429' }),
+      },
       cutoff,
     );
 
-    const row = await harness.prisma.ingestionLedger.findUnique({ where: { jobId: 'job-throttled' } });
+    const row = await harness.prisma.ingestionLedger.findUnique({
+      where: { jobId: 'job-throttled' },
+    });
     expect(row?.status).toBe('failed');
     expect(row?.lastError).toBe('Upstream HTTP 429');
   });

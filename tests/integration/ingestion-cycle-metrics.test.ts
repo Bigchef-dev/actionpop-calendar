@@ -54,10 +54,7 @@ function publish(events: ReturnType<typeof event>[], revision: number, periodTok
 describe('per-cycle operator metrics', () => {
   it('counts discoveries, blank identifiers, no-group events and added attributions', async () => {
     await publish(
-      [
-        event('event-1', ['group-a'], { blankGroupIdentifiers: 2 }),
-        event('event-2', []),
-      ],
+      [event('event-1', ['group-a'], { blankGroupIdentifiers: 2 }), event('event-2', [])],
       1,
     );
 
@@ -68,6 +65,17 @@ describe('per-cycle operator metrics', () => {
       'groups.blank_identifier': 2,
       'groups.discovered_unlisted': 1,
     });
+  });
+
+  it('stores the period end from the configured cycle length', async () => {
+    const halfDay = new PostgresCycleMetrics(harness.prisma, 12 * 60 * 60 * 1000);
+
+    await halfDay.increment(PERIOD, [{ metric: 'groups.scheduled', value: 1 }]);
+
+    const period = await harness.prisma.processingPeriod.findUnique({
+      where: { periodToken: PERIOD },
+    });
+    expect(period?.periodEndUtc.toISOString()).toBe('2026-10-29T22:00:00.000Z');
   });
 
   it('reports zero changes when the same source data is replayed', async () => {
@@ -98,7 +106,11 @@ describe('per-cycle operator metrics', () => {
     circular.self = circular;
     await expect(
       publish(
-        [event('event-2', ['group-b'], { geography: { geographicStatus: 'national', diagnostics: [circular] } })],
+        [
+          event('event-2', ['group-b'], {
+            geography: { geographicStatus: 'national', diagnostics: [circular] },
+          }),
+        ],
         2,
         NEXT,
       ),

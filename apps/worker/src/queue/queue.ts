@@ -1,12 +1,17 @@
 import type { QueueOptions } from 'bullmq';
 import { classifyRetry } from '@actionpop/core';
 
+/** The single BullMQ queue both the dispatcher and the worker operate on. */
+export const INGESTION_QUEUE_NAME = 'calendar-ingestion';
+
 export interface QueueSettings {
   attempts: number;
   backoffMs: number;
 }
 
-export function buildQueueOptions(settings: QueueSettings): Pick<QueueOptions, 'defaultJobOptions'> {
+export function buildQueueOptions(
+  settings: QueueSettings,
+): Pick<QueueOptions, 'defaultJobOptions'> {
   return {
     defaultJobOptions: {
       attempts: settings.attempts,
@@ -18,7 +23,7 @@ export function buildQueueOptions(settings: QueueSettings): Pick<QueueOptions, '
 }
 
 export function retryDelayMs(attempt: number, baseMs: number, jitterMs = 250): number {
-  const exponential = baseMs * (2 ** Math.max(0, attempt - 1));
+  const exponential = baseMs * 2 ** Math.max(0, attempt - 1);
   return exponential + (jitterMs > 0 ? Math.floor(Math.random() * jitterMs) : 0);
 }
 

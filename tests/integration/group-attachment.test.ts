@@ -207,6 +207,25 @@ describe('group geographic attachment from a stated address', () => {
     expect(stored).toMatchObject({ geographicStatus: null, mapStatus: 'listed' });
   });
 
+  it('reports how far a long sequential run has advanced', async () => {
+    const source = new StubSource();
+    for (const scopeId of ['group-run-1', 'group-run-2', 'group-run-3']) {
+      source.details.set(
+        scopeId,
+        detail({ departement: '69', country: 'FR', commune: { name: 'Lyon' } }),
+      );
+    }
+    await catalogue.synchronize([group('group-run-1'), group('group-run-2'), group('group-run-3')]);
+    const reports: { processed: number; total: number; failed: number }[] = [];
+
+    await new PostgresGroupAttachmentRefresher(harness.prisma, source, {
+      onProgress: (progress) => reports.push({ ...progress }),
+    }).refresh(VERSION);
+
+    expect(reports[0]).toEqual({ processed: 0, total: 3, failed: 0 });
+    expect(reports.at(-1)).toEqual({ processed: 3, total: 3, failed: 0 });
+  });
+
   it('does not re-read a fresh attachment', async () => {
     const source = new StubSource();
     source.details.set(
